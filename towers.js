@@ -267,10 +267,10 @@ class TowerBase {
     this.target = null;
     this.cooldown = 0;
     this.angle = 0;
-    this.totalSpent = this.cost;
     this.fireFlash = 0;
     this.buffRangeMul = 1;   // 뮤 패시브용
     this.buffDmgMul = 1;     // 영웅 버프용
+    // this.totalSpent은 def가 설정된 후 서브클래스 생성자에서 초기화됨
   }
 
   get stats() { return this.def.levels[this.level - 1]; }
@@ -398,6 +398,7 @@ function makeTower(def) {
     constructor(x, y) {
       super(x, y);
       this.def = def;
+      this.totalSpent = this.cost;
     }
     fire(engine) {
       def.fire(this, engine);
