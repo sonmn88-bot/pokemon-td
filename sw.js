@@ -1,4 +1,4 @@
-const CACHE = 'pokemon-td-v10';
+const CACHE = 'pokemon-td-v11';
 const ASSETS = [
   '/pokemon-td/',
   '/pokemon-td/index.html',
