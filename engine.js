@@ -9,7 +9,7 @@ class GameEngine {
 
     // 상태
     this.state = 'idle';
-    this.gold = 150;
+    this.gold = 250;
     this.lives = 20;
     this.currentWave = 0;
     this.totalWaves = 20;
@@ -305,7 +305,7 @@ class GameEngine {
 
   // ===== FX =====
   spawnFloatingText(text, x, y, color, opts={}) { this.particles.push(new FloatingText(text,x,y,color,opts)); }
-  spawnHitParticle(x, y, color) { for (let i=0;i<6;i++) this.particles.push(new Spark(x,y,color)); }
+  spawnHitParticle(x, y, color) { for (let i=0;i<6;i++) this.particles.push(new Spark(x,y,color)); this.onHitSound && this.onHitSound(); }
   triggerScreenShake(amt=5, dur=0.2) { this.shakeAmt=amt; this.shakeTimer=dur; }
 
   // ===== DRAW =====
@@ -465,9 +465,9 @@ class GameEngine {
         ctx.fillStyle=g; ctx.strokeStyle='#4cc9f0'; ctx.lineWidth=2.5;
         ctx.shadowColor='#4cc9f0'; ctx.shadowBlur=16;
       } else if (isHL) {
-        ctx.fillStyle='rgba(255,255,255,0.14)'; ctx.strokeStyle='rgba(255,255,255,0.65)'; ctx.lineWidth=1.5;
+        ctx.fillStyle='rgba(255,255,255,0.10)'; ctx.strokeStyle='rgba(255,255,255,0.40)'; ctx.lineWidth=1;
       } else {
-        ctx.fillStyle='rgba(70,50,30,0.40)'; ctx.strokeStyle='rgba(180,130,60,0.50)'; ctx.lineWidth=1.5;
+        ctx.fillStyle='rgba(70,50,30,0.18)'; ctx.strokeStyle='rgba(180,130,60,0.22)'; ctx.lineWidth=1;
       }
       ctx.fill(); ctx.stroke();
 
