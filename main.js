@@ -686,6 +686,7 @@ class App {
     this.bindCanvasInput();
     this.buildTowerBar();
     this.buildSpellBar();
+    this.buildTypeUpgradeBar();
     this.startHeroLoop();
   }
 
@@ -926,6 +927,50 @@ class App {
           cdEl.textContent = '';
         }
       });
+    }
+  }
+
+  buildTypeUpgradeBar() {
+    let bar = document.getElementById('type-upgrade-bar');
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.id = 'type-upgrade-bar';
+      document.getElementById('game-screen').appendChild(bar);
+    }
+    bar.innerHTML = '';
+    if (!window.TypeUpgrades || !window.TYPES) return;
+
+    for (const typeKey in window.TypeUpgrades) {
+      const typeInfo = window.TYPES[typeKey];
+      const upgrades = window.TypeUpgrades[typeKey];
+      const level = window.TypeUpgradeLevels?.[typeKey] || 0;
+      if (level >= upgrades.length) continue; // 다 올렸으면 숨김
+
+      const nextUpg = upgrades[level];
+      const btn = document.createElement('button');
+      btn.className = 'type-upg-btn';
+      btn.dataset.typeKey = typeKey;
+      btn.style.borderColor = typeInfo.color + '60';
+      btn.innerHTML = `
+        <span>${typeInfo.emoji}</span>
+        <span style="font-size:9px;color:${typeInfo.color}">${typeInfo.name}</span>
+        <span style="font-size:8px;color:#ffd60a">💰${nextUpg.cost}</span>
+        <span style="font-size:7px;color:#888">${'●'.repeat(level)}${'○'.repeat(upgrades.length-level)}</span>
+      `;
+      btn.title = `${nextUpg.label}: ${nextUpg.cost}g`;
+      btn.addEventListener('click', () => {
+        if (!this.engine) return;
+        if (window.applyTypeUpgrade(typeKey, this.engine)) {
+          if (!this.missionTracker.stats.typeUpgrades) this.missionTracker.stats.typeUpgrades = {};
+          this.missionTracker.stats.typeUpgrades[typeKey] = (this.missionTracker.stats.typeUpgrades[typeKey]||0) + 1;
+          this.missionTracker.check();
+          this.SFX.play('buy');
+          this.buildTypeUpgradeBar(); // 갱신
+        } else {
+          this.showWaveAnnounce('골드 부족!', '#ff6b6b');
+        }
+      });
+      bar.appendChild(btn);
     }
   }
 
