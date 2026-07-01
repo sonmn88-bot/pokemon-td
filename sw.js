@@ -1,4 +1,4 @@
-const CACHE = 'pokemon-td-v7';
+const CACHE = 'pokemon-td-v8';
 const ASSETS = [
   '/', '/index.html', '/style.css',
   '/engine.js', '/maps.js', '/enemies.js', '/towers.js', '/sprites.js', '/heroes.js', '/shop.js', '/main.js',
