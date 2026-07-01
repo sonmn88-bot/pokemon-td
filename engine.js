@@ -9,7 +9,7 @@ class GameEngine {
 
     // 상태
     this.state = 'idle';
-    this.gold = 200;
+    this.gold = 150;
     this.lives = 20;
     this.currentWave = 0;
     this.totalWaves = 20;
@@ -252,7 +252,7 @@ class GameEngine {
 
   waveCleared() {
     this.state = 'idle';
-    const bonus = 30 + this.currentWave * 10;
+    const bonus = 20 + this.currentWave * 7;
     this.addGold(bonus);
     this.onWaveComplete && this.onWaveComplete(this.currentWave, bonus);
     if (this.currentWave >= this.totalWaves) this.triggerVictory();
