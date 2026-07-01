@@ -5,7 +5,7 @@ const MapDefs = {
   // ===== 1. 태초마을 숲 =====
   forest: {
     name:'태초마을 숲',
-    bgColor:'#2a5418',
+    bgColor:'#2a5418', bgImage:'assets/bg_forest.jpg',
     pathColor:'#c8a44a',
     pathColorDark:'#7a5510',
     pathHighlight:'rgba(255,235,160,0.22)',
@@ -120,7 +120,7 @@ const MapDefs = {
   // ===== 2. 홍련체육관 도시 (용암 도시) =====
   city: {
     name:'홍련체육관 도시',
-    bgColor:'#180600',
+    bgColor:'#180600', bgImage:'assets/bg_city.jpg',
     pathColor:'#6b4428',
     pathColorDark:'#3a1a08',
     pathHighlight:'rgba(255,120,40,0.18)',
@@ -236,7 +236,7 @@ const MapDefs = {
   // ===== 3. 라벤더 동굴 (유령 마을) =====
   cave: {
     name:'라벤더 동굴',
-    bgColor:'#050210',
+    bgColor:'#050210', bgImage:'assets/bg_cave.jpg',
     pathColor:'#3e2860',
     pathColorDark:'#1e1030',
     pathHighlight:'rgba(180,120,255,0.18)',
