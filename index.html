@@ -6,87 +6,125 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-fullscreen">
   <meta name="apple-mobile-web-app-title" content="포켓몬TD">
-  <meta name="theme-color" content="#1a1a2e">
+  <meta name="theme-color" content="#080c14">
   <link rel="apple-touch-icon" href="icon-192.png">
   <link rel="manifest" href="manifest.json">
   <title>포켓몬 타워디펜스</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div id="app">
-    <!-- 맵 선택 화면 -->
-    <div id="map-select-screen" class="screen active">
-      <div class="title-area">
-        <div class="title-pokemon">ポケモン</div>
-        <div class="title-main">TOWER DEFENSE</div>
-        <div class="title-sub">맵을 선택하세요</div>
+<div id="app">
+
+  <!-- ===== 타이틀 화면 ===== -->
+  <div id="title-screen" class="screen active">
+    <canvas id="title-canvas"></canvas>
+    <div class="title-content">
+      <div class="title-poke-label">P O K É M O N</div>
+      <div class="title-logo">
+        <span class="title-logo-td">TOWER</span>
+        <span class="title-logo-def">DEFENSE</span>
       </div>
-      <div class="map-cards">
-        <div class="map-card" data-map="forest">
-          <div class="map-preview forest-preview">
-            <div class="map-emoji">🌿</div>
-          </div>
-          <div class="map-info">
-            <div class="map-name">태초마을 숲</div>
-            <div class="map-desc">구불구불한 경로 · 기본 난이도</div>
-            <div class="map-tag">입문</div>
-          </div>
-        </div>
-        <div class="map-card" data-map="city">
-          <div class="map-preview city-preview">
-            <div class="map-emoji">🏙️</div>
-          </div>
-          <div class="map-info">
-            <div class="map-name">홍련체육관 도시</div>
-            <div class="map-desc">짧고 빠른 경로 · 높은 난이도</div>
-            <div class="map-tag danger">고급</div>
-          </div>
-        </div>
-        <div class="map-card" data-map="cave">
-          <div class="map-preview cave-preview">
-            <div class="map-emoji">👻</div>
-          </div>
-          <div class="map-info">
-            <div class="map-name">라벤더 동굴</div>
-            <div class="map-desc">2갈래 경로 · 유령타입 HP+30%</div>
-            <div class="map-tag ghost">유령</div>
-          </div>
-        </div>
-      </div>
+      <div class="title-tagline">전설의 전투가 시작된다</div>
+      <button id="btn-start" class="title-start-btn">
+        <span class="btn-star">⭐</span> 게임 시작 <span class="btn-star">⭐</span>
+      </button>
+      <div class="title-version">v2.0 · Pokemon TD</div>
     </div>
-
-    <!-- 게임 화면 -->
-    <div id="game-screen" class="screen">
-      <canvas id="game-canvas"></canvas>
-
-      <!-- 상단 HUD -->
-      <div id="hud-top">
-        <div class="hud-cell" id="hud-lives">❤️ <span id="lives-val">20</span></div>
-        <div class="hud-cell" id="hud-gold">💰 <span id="gold-val">200</span></div>
-        <div class="hud-cell" id="hud-wave">Wave <span id="wave-val">0</span>/<span id="wave-total">20</span></div>
-        <button id="btn-menu" class="hud-btn">☰</button>
-      </div>
-
-      <!-- 웨이브 시작 버튼 -->
-      <button id="btn-wave" class="wave-btn">▶ 웨이브 시작</button>
-
-      <!-- 하단 타워 바 (2단계에서 채워짐) -->
-      <div id="tower-bar">
-        <div class="tower-bar-placeholder">🔧 타워는 2단계에서 추가됩니다</div>
-      </div>
-
-      <!-- 맵 뒤로가기 -->
-      <button id="btn-back" class="back-btn">← 맵 선택</button>
+    <div class="title-pokemon-row">
+      <span class="title-pkm" data-delay="0">⚡</span>
+      <span class="title-pkm" data-delay="200">💗</span>
+      <span class="title-pkm" data-delay="400">🥚</span>
+      <span class="title-pkm" data-delay="600">🌱</span>
+      <span class="title-pkm" data-delay="800">🦎</span>
+      <span class="title-pkm" data-delay="1000">🐢</span>
     </div>
   </div>
 
-  <script src="engine.js"></script>
-  <script src="maps.js"></script>
-  <script src="sprites.js"></script>
-  <script src="enemies.js"></script>
-  <script src="towers.js"></script>
-  <script src="heroes.js"></script>
-  <script src="shop.js"></script>
-  <script src="main.js"></script>
+  <!-- ===== 맵 선택 ===== -->
+  <div id="map-select-screen" class="screen">
+    <button id="btn-title-back" class="title-back-btn">← 타이틀</button>
+    <div class="title-area">
+      <div class="title-pokemon">맵 선택</div>
+      <div class="title-main">어디서 싸울까?</div>
+    </div>
+    <div class="map-cards">
+      <div class="map-card" data-map="forest">
+        <div class="map-preview forest-preview">
+          <div class="map-emoji">🌿</div>
+          <div class="map-difficulty">⭐ 입문</div>
+        </div>
+        <div class="map-info">
+          <div class="map-name">태초마을 숲</div>
+          <div class="map-desc">구불구불한 경로 · 18개 배치슬롯</div>
+          <div class="map-tags"><span class="map-tag">입문</span><span class="map-tag info">18슬롯</span></div>
+        </div>
+      </div>
+      <div class="map-card" data-map="city">
+        <div class="map-preview city-preview">
+          <div class="map-emoji">🔥</div>
+          <div class="map-difficulty">⭐⭐⭐ 고급</div>
+        </div>
+        <div class="map-info">
+          <div class="map-name">홍련체육관 도시</div>
+          <div class="map-desc">짧고 빠른 경로 · 8개 배치슬롯</div>
+          <div class="map-tags"><span class="map-tag danger">고급</span><span class="map-tag info">8슬롯</span></div>
+        </div>
+      </div>
+      <div class="map-card" data-map="cave">
+        <div class="map-preview cave-preview">
+          <div class="map-emoji">👻</div>
+          <div class="map-difficulty">⭐⭐ 중급</div>
+        </div>
+        <div class="map-info">
+          <div class="map-name">라벤더 동굴</div>
+          <div class="map-desc">2갈래 경로 · 유령 HP+30%</div>
+          <div class="map-tags"><span class="map-tag ghost">유령</span><span class="map-tag info">9슬롯</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 게임 화면 ===== -->
+  <div id="game-screen" class="screen">
+    <canvas id="game-canvas"></canvas>
+
+    <!-- HUD -->
+    <div id="hud-top">
+      <div class="hud-cell" id="hud-lives">❤️ <span id="lives-val">20</span></div>
+      <div class="hud-cell" id="hud-gold">💰 <span id="gold-val">200</span></div>
+      <div class="hud-cell" id="hud-wave">🌊 <span id="wave-val">0</span>/<span id="wave-total">20</span></div>
+      <div class="hud-cell hud-combo" id="hud-combo" style="display:none">
+        🔥 <span id="combo-val">0</span>콤보 <span id="combo-mul" class="combo-mul">×1.0</span>
+      </div>
+      <div id="hud-speed">
+        <button class="speed-btn active" data-speed="1">1×</button>
+        <button class="speed-btn" data-speed="2">2×</button>
+        <button class="speed-btn" data-speed="3">3×</button>
+      </div>
+      <button id="btn-mission" class="hud-btn" title="미션 보드">🎯</button>
+      <button id="btn-menu" class="hud-btn">⏸</button>
+    </div>
+
+    <!-- 웨이브 버튼 -->
+    <button id="btn-wave" class="wave-btn">▶ 웨이브 1</button>
+
+    <!-- 타워 바 -->
+    <div id="tower-bar"></div>
+
+    <!-- 뒤로 -->
+    <button id="btn-back" class="back-btn">← 맵</button>
+  </div>
+
+</div>
+
+<script src="engine.js"></script>
+<script src="maps.js"></script>
+<script src="sprites.js"></script>
+<script src="enemies.js"></script>
+<script src="towers.js"></script>
+<script src="heroes.js"></script>
+<script src="shop.js"></script>
+<script src="gacha.js"></script>
+<script src="main.js"></script>
 </body>
 </html>
