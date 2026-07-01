@@ -1,3 +1,4 @@
+// v2
 // ===== SHOP.JS - 상점 아이템 + 글로벌 스펠 =====
 
 const ShopItems = [
