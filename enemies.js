@@ -57,33 +57,33 @@ const EnemyTypes = {
   // ─── 1~5웨이브 메인 ───
   abo: {
     name: '아보',     emoji: '🐍',
-    hp: 80,  speed: 75, reward: 8,  size: 18,
+    hp: 112,  speed: 88, reward: 8,  size: 18,
     color: '#8bc34a',
     special: null,
   },
   golbat: {
     name: '골뱃',     emoji: '🦇',
-    hp: 60,  speed: 100, reward: 12, size: 20,
+    hp: 84,  speed: 118, reward: 12, size: 20,
     color: '#9c27b0',
     special: 'flying',   // 배리어 무시
     flyHeight: 8,        // 위아래 흔들림
   },
   jigglypuff: {
     name: '질퍽이',   emoji: '🔴',
-    hp: 120, speed: 55, reward: 10, size: 22,
+    hp: 168, speed: 64, reward: 10, size: 22,
     color: '#f48fb1',
     special: 'poisonImmune',
   },
   gastly: {
     name: '고오스',   emoji: '👻',
-    hp: 70,  speed: 80, reward: 15, size: 20,
+    hp: 98,  speed: 94, reward: 15, size: 20,
     color: '#673ab7',
     special: 'ghost',    // 물리 데미지 50% 감소
     ghostAlpha: 0.65,
   },
   paras: {
     name: '파라스',   emoji: '🍄',
-    hp: 90,  speed: 60, reward: 12, size: 20,
+    hp: 125,  speed: 70, reward: 12, size: 20,
     color: '#ff7043',
     special: 'spore',    // 근처 타워 디버프
     sporeRange: 80,
@@ -93,20 +93,20 @@ const EnemyTypes = {
   // ─── 6~10웨이브 ───
   phantump: {
     name: '팬텀',     emoji: '🌲',
-    hp: 200, speed: 45, reward: 25, size: 24,
+    hp: 280, speed: 53, reward: 25, size: 24,
     color: '#5d4037',
     special: 'regen',    // 초당 HP 5 재생
     regenRate: 5,
   },
   lapras: {
     name: '라프라스', emoji: '🦭',
-    hp: 130, speed: 70, reward: 20, size: 22,
+    hp: 182, speed: 82, reward: 20, size: 22,
     color: '#ce93d8',
     special: 'iceImmune',
   },
   gyarados: {
     name: '갸라도스',  emoji: '🐲',
-    hp: 350, speed: 50, reward: 40, size: 30,
+    hp: 489, speed: 59, reward: 40, size: 30,
     color: '#1565c0',
     special: 'rage',     // 피격 시 분노 = 속도 +20% (최대 3스택)
     rageStacks: 0, maxRageStacks: 3,
@@ -115,14 +115,14 @@ const EnemyTypes = {
   // ─── 11~15웨이브 ───
   weezing: {
     name: '또가스',   emoji: '💨',
-    hp: 150, speed: 55, reward: 30, size: 26,
+    hp: 210, speed: 64, reward: 30, size: 26,
     color: '#78909c',
     special: 'explode',  // 사망 시 범위 데미지
     explodeRadius: 60, explodeDamage: 30,
   },
   scyther: {
     name: '스라크',   emoji: '🦗',
-    hp: 280, speed: 75, reward: 35, size: 26,
+    hp: 392, speed: 88, reward: 35, size: 26,
     color: '#66bb6a',
     special: 'armor',    // 물리 데미지 90% 감소
   },
@@ -130,14 +130,14 @@ const EnemyTypes = {
   // ─── 보스 ───
   lugia: {
     name: '루기아',   emoji: '🕊️',
-    hp: 1800, speed: 40, reward: 120, size: 40,
+    hp: 2520, speed: 47, reward: 120, size: 40,
     color: '#b0bec5',
     special: 'boss',
     isBoss: true,
   },
   mewtwo: {
     name: '뮤츠',    emoji: '🔮',
-    hp: 5000, speed: 55, reward: 300, size: 44,
+    hp: 7000, speed: 64, reward: 300, size: 44,
     color: '#7c4dff',
     special: 'finalBoss',
     isBoss: true,
@@ -149,54 +149,54 @@ const EnemyTypes = {
   // ─── 콘텐츠 확장: 추가 포켓몬 8종 ───
   rattata: {
     name: '꼬렛',     emoji: '🐭',
-    hp: 40,  speed: 130, reward: 6, size: 16,
+    hp: 56,  speed: 140, reward: 6, size: 16,
     color: '#a1887f',
     special: 'swift',     // 매우 빠름, 타겟팅 우선순위 낮춤 트릭용
   },
   zubat: {
     name: '주뱃',     emoji: '🦋',
-    hp: 50,  speed: 95, reward: 9, size: 18,
+    hp: 70,  speed: 112, reward: 9, size: 18,
     color: '#7e57c2',
     special: 'flying',
     flyHeight: 6,
   },
   koffing: {
     name: '또도가스', emoji: '☁️',
-    hp: 100, speed: 50, reward: 14, size: 20,
+    hp: 140, speed: 59, reward: 14, size: 20,
     color: '#90a4ae',
     special: 'poisonAura',  // 주변 적 면역 부여(단순화: 자기 자신만 면역 적용은 poisonImmune로 처리)
     poisonImmune: true,
   },
   magnemite: {
     name: '코일(야생)', emoji: '🧲',
-    hp: 85,  speed: 65, reward: 13, size: 18,
+    hp: 118,  speed: 76, reward: 13, size: 18,
     color: '#fdd835',
     special: 'shockImmune',  // 스턴 저항 50%
     stunResist: 0.5,
   },
   onix: {
     name: '롱스톤',   emoji: '🪨',
-    hp: 260, speed: 40, reward: 28, size: 28,
+    hp: 364, speed: 47, reward: 28, size: 28,
     color: '#8d6e63',
     special: 'armor',
   },
   haunter: {
     name: '고우스트', emoji: '👤',
-    hp: 140, speed: 85, reward: 22, size: 22,
+    hp: 196, speed: 100, reward: 22, size: 22,
     color: '#5e35b1',
     special: 'ghost',
     ghostAlpha: 0.6,
   },
   electrode: {
     name: '마그넷',   emoji: '🔴',
-    hp: 110, speed: 90, reward: 18, size: 20,
+    hp: 154, speed: 106, reward: 18, size: 20,
     color: '#e53935',
     special: 'explode',
     explodeRadius: 70, explodeDamage: 40,
   },
   dragonite: {
     name: '망나뇽',   emoji: '🐉',
-    hp: 900, speed: 60, reward: 80, size: 34,
+    hp: 1260, speed: 70, reward: 80, size: 34,
     color: '#fb8c00',
     special: 'flying',
     flyHeight: 10,
@@ -591,4 +591,3 @@ function roundRect(ctx, x, y, w, h, r) {
   ctx.arcTo(x, y, x + r, y, r);
   ctx.closePath();
 }
-
