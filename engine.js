@@ -93,7 +93,7 @@ class GameEngine {
   }
 
   buildPaths() {
-    const HUD = 52, BAR = 82, PAD = 14;
+    const HUD = 52, BAR = 82, PAD = 20;
     const safeTop = HUD + PAD;
     const safeBot = this.height - BAR - PAD;
     const safeH = safeBot - safeTop;
@@ -107,7 +107,7 @@ class GameEngine {
     );
   }
   buildTowerSlots() {
-    const HUD = 52, BAR = 82, PAD = 14;
+    const HUD = 52, BAR = 82, PAD = 20;
     const safeTop = HUD + PAD;
     const safeBot = this.height - BAR - PAD;
     const safeH = safeBot - safeTop;
