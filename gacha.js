@@ -623,9 +623,10 @@ function _createGachaTower(def, x, y) {
                       `assets/towers/${def.pokemonId}.png` ||
                       `assets/enemies/${def.pokemonId}.png`;
       const img = window.loadSpriteImage?.(imgPath);
-      const sz = 28 + (def.grade==='unique'?6:def.grade==='legend'?4:def.grade==='epic'?2:0);
+      const gradeBonus = {normal:0,rare:2,epic:4,legend:6,unique:8};
+      const sz = 36 + (gradeBonus[def.grade]||0);
       if (img && img.complete && img.naturalWidth>0) {
-        ctx.drawImage(img, this.x-sz/2, this.y-sz/2, sz, sz);
+        const aspect = img.naturalWidth/img.naturalHeight; const dw=aspect>=1?sz:sz*aspect; const dh=aspect>=1?sz/aspect:sz; ctx.drawImage(img,this.x-dw/2,this.y-dh/2,dw,dh);
       } else {
         ctx.font=`${sz*0.85}px serif`;
         ctx.textAlign='center'; ctx.textBaseline='middle';
@@ -708,4 +709,15 @@ window.TowerSpriteImages = {
   jynxline:'assets/towers/jynxline.png',   geodude:'assets/towers/geodude.png',
   abra:'assets/towers/abra.png',           snorlax:'assets/towers/snorlax.png',
   pikachu:'assets/heroes/pikachu.png',     mewtwo:'assets/enemies/mewtwo.png',
+  // gacha 전용 매핑 (없는 건 towers/enemies에서 가장 비슷한 걸로)
+  magnemite:'assets/towers/voltorb.png',   // 코일 계열
+  rattata:'assets/enemies/rattata.png',
+  zubat:'assets/enemies/zubat.png',
+  paras:'assets/enemies/paras.png',
+  golbat:'assets/enemies/golbat.png',
+  jigglypuff:'assets/enemies/jigglypuff.png',
+  haunter:'assets/enemies/haunter.png',
+  dragonite:'assets/enemies/dragonite.png',
+  lugia:'assets/enemies/lugia.png',
+  gyarados:'assets/enemies/gyarados.png',
 };
