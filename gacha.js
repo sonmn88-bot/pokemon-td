@@ -721,4 +721,3 @@ window.TowerSpriteImages = {
   lugia:'assets/enemies/lugia.png',
   gyarados:'assets/enemies/gyarados.png',
 };
-
