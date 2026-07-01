@@ -24,46 +24,69 @@ const SkinDefs = {
 // 3x3 트리, 레벨업시 포인트 1개 획득
 // 노드 구조: { id, name, emoji, desc, cost(포인트), requires(id), type, value }
 const SkillTrees = {
+  // ===== 피카츄 (전기 딜러) - 포켓몬덱스: 전기쥐, 볼트태클, 철벽, 전기충격 =====
   pikachu: {
     nodes: [
+      // Row 0 - 기본기
+      {id:'jolt1',   name:'전기충격',  emoji:'⚡', desc:'기본공격 데미지 +18%', cost:1, requires:null, col:0, row:0, type:'atkDmg', value:0.18},
+      {id:'volt1',   name:'볼트',      emoji:'🔵', desc:'기본공격 사거리 +15%', cost:1, requires:null, col:1, row:0, type:'atkRange', value:0.15},
+      {id:'swift1',  name:'전광석화',  emoji:'💨', desc:'공격속도 +20%',         cost:1, requires:null, col:2, row:0, type:'fireRate', value:0.20},
       // Row 1
-      { id:'spd1',  name:'번개발',   emoji:'👟', desc:'이동 속도 보너스 (고정 배치라 공격 속도 +15%)', cost:1, requires:null,   col:0, row:0, type:'fireRate', value:0.15 },
-      { id:'dmg1',  name:'전압',     emoji:'⚡', desc:'기본공격 데미지 +20%', cost:1, requires:null, col:1, row:0, type:'atkDmg', value:0.2 },
-      { id:'rng1',  name:'사거리',   emoji:'📡', desc:'공격 사거리 +15%', cost:1, requires:null, col:2, row:0, type:'atkRange', value:0.15 },
+      {id:'para2',   name:'마비분말',  emoji:'🌀', desc:'기본공격 스턴 확률 +25%',cost:1, requires:'jolt1', col:0, row:1, type:'stunChance', value:0.25},
+      {id:'crit2',   name:'크리티컬',  emoji:'💥', desc:'30% 확률 2.5배 크리',   cost:1, requires:'volt1', col:1, row:1, type:'crit', value:{chance:0.30, mul:2.5}},
+      {id:'aoe2',    name:'방전',      emoji:'🌩️', desc:'100만볼트 범위 +50%',   cost:1, requires:'swift1', col:2, row:1, type:'skillRange', value:0.50},
       // Row 2
-      { id:'shock2',name:'감전파',   emoji:'⚡', desc:'기본 공격 스턴 확률 +30%', cost:1, requires:'spd1', col:0, row:1, type:'stunChance', value:0.3 },
-      { id:'crit2', name:'크리티컬', emoji:'💥', desc:'25% 확률 2.5배 데미지', cost:1, requires:'dmg1', col:1, row:1, type:'crit', value:{chance:0.25, mul:2.5} },
-      { id:'aoe2',  name:'광역전기', emoji:'🌩️', desc:'100만볼트 범위 +40%', cost:1, requires:'rng1', col:2, row:1, type:'skillRange', value:0.4 },
+      {id:'thunder3',name:'천둥',      emoji:'⛈️', desc:'20% 확률 번개 소환(광역)',cost:2, requires:'para2', col:0, row:2, type:'lightning', value:0.20},
+      {id:'raichu3', name:'라이츄화',  emoji:'⭐', desc:'기본공격 체인 번개 3연쇄',cost:2, requires:'crit2', col:1, row:2, type:'chainAtk', value:3},
+      {id:'overload3',name:'오버로드', emoji:'🔮', desc:'모든 스킬 쿨다운 -35%',  cost:2, requires:'aoe2',  col:2, row:2, type:'cdReduce', value:0.35},
       // Row 3
-      { id:'overload',name:'오버로드',emoji:'🔮', desc:'스킬 쿨다운 -30%', cost:2, requires:'shock2', col:0, row:2, type:'cdReduce', value:0.3 },
-      { id:'thunder',name:'천둥번개', emoji:'⛈️', desc:'기본공격이 가끔 번개를 소환 (범위피해)', cost:2, requires:'crit2', col:1, row:2, type:'lightning', value:0.2 },
-      { id:'raichu', name:'라이츄화', emoji:'⭐', desc:'공격이 체인 번개 효과 획득', cost:2, requires:'aoe2', col:2, row:2, type:'chainAtk', value:2 },
+      {id:'iron4',   name:'철벽',      emoji:'🛡️', desc:'스턴 지속시간 +0.5초 추가', cost:2, requires:'thunder3', col:0, row:3, type:'stunDur', value:0.5},
+      {id:'volt4',   name:'볼트태클',  emoji:'💫', desc:'기본공격 후 폭발(소형 광역)',cost:2, requires:'raichu3',  col:1, row:3, type:'atkSplash', value:60},
+      {id:'cd4',     name:'전기구슬',  emoji:'🟡', desc:'전광석화 쿨다운 -5초',   cost:2, requires:'overload3', col:2, row:3, type:'skillCd', skillIdx:1, value:-5},
     ]
   },
+
+  // ===== 뮤 (광역 서포터) - 포켓몬덱스: 사이킥, 오리진포스, 변신, 메가진화 =====
   mew: {
     nodes: [
-      { id:'spt1',  name:'영역',     emoji:'🔵', desc:'타워 사거리 버프 +15%p',    cost:1, requires:null,   col:0, row:0, type:'passiveRange', value:0.05 },
-      { id:'dmg1',  name:'사이킥',   emoji:'🔮', desc:'기본공격 데미지 +20%',       cost:1, requires:null, col:1, row:0, type:'atkDmg', value:0.2 },
-      { id:'slow1', name:'슬로우',   emoji:'🐌', desc:'기본공격 슬로우 강화 -10%p', cost:1, requires:null, col:2, row:0, type:'slowBoost', value:0.1 },
-      { id:'heal2', name:'힐링웨이브',emoji:'💚', desc:'웨이브 클리어시 라이프 +1',  cost:1, requires:'spt1', col:0, row:1, type:'waveHeal', value:1 },
-      { id:'tele2', name:'텔레포트', emoji:'✨', desc:'변신 스킬 쿨다운 -30%',      cost:1, requires:'dmg1', col:1, row:1, type:'cdReduce', value:0.3 },
-      { id:'mind2', name:'마인드블라스트',emoji:'💫', desc:'사이킥 스킬 범위 +50%',  cost:1, requires:'slow1', col:2, row:1, type:'skillRange', value:0.5 },
-      { id:'barrier',name:'배리어',  emoji:'🛡️', desc:'라이프 손실 25% 확률 무효',  cost:2, requires:'heal2', col:0, row:2, type:'barrier', value:0.25 },
-      { id:'clone', name:'분신',     emoji:'👥', desc:'기본 공격 30% 확률 2배 발사', cost:2, requires:'tele2', col:1, row:2, type:'doubleShot', value:0.3 },
-      { id:'omni',  name:'전지전능', emoji:'🌟', desc:'모든 타워 데미지 버프 추가 +10%', cost:2, requires:'mind2', col:2, row:2, type:'globalDmg', value:0.1 },
+      // Row 0
+      {id:'psycho1', name:'사이킥',    emoji:'🔮', desc:'기본공격 데미지 +15%',    cost:1, requires:null, col:0, row:0, type:'atkDmg', value:0.15},
+      {id:'range1',  name:'에어리어',  emoji:'🔵', desc:'타워 전체 사거리 +8%p',   cost:1, requires:null, col:1, row:0, type:'passiveRange', value:0.08},
+      {id:'slow1',   name:'슬로우빔', emoji:'🐌', desc:'슬로우 효과 -10%p 강화',   cost:1, requires:null, col:2, row:0, type:'slowBoost', value:0.10},
+      // Row 1
+      {id:'barrier2',name:'배리어',   emoji:'🛡️', desc:'라이프 손실 20% 확률 무효',cost:1, requires:'psycho1', col:0, row:1, type:'barrier', value:0.20},
+      {id:'clone2',  name:'분신',     emoji:'👥', desc:'기본공격 35% 확률 2발 발사',cost:1, requires:'range1',  col:1, row:1, type:'doubleShot', value:0.35},
+      {id:'mind2',   name:'마인드블라스트',emoji:'💫',desc:'사이킥 범위 +60%',     cost:1, requires:'slow1',   col:2, row:1, type:'skillRange', value:0.60},
+      // Row 2
+      {id:'heal3',   name:'힐링웨이브',emoji:'💚',desc:'웨이브 클리어시 라이프 +2', cost:2, requires:'barrier2', col:0, row:2, type:'waveHeal', value:2},
+      {id:'transform3',name:'변신+',  emoji:'✨', desc:'변신 스킬 무력화 +3초',    cost:2, requires:'clone2',   col:1, row:2, type:'skillBoost', skillIdx:1, value:3},
+      {id:'omni3',   name:'전지전능', emoji:'🌟', desc:'타워 전체 데미지 +12%',     cost:2, requires:'mind2',    col:2, row:2, type:'globalDmg', value:0.12},
+      // Row 3
+      {id:'mega4',   name:'메가진화', emoji:'💠', desc:'5초마다 자동 사이킥 발동',  cost:2, requires:'heal3',    col:0, row:3, type:'autoCast', value:5},
+      {id:'origin4', name:'오리진포스',emoji:'🌈',desc:'기본공격이 5타겟 동시 공격',cost:2, requires:'transform3',col:1, row:3, type:'multiTarget', value:5},
+      {id:'space4',  name:'시공간제어',emoji:'🌀',desc:'모든 스킬 쿨다운 -40%',    cost:2, requires:'omni3',    col:2, row:3, type:'cdReduce', value:0.40},
     ]
   },
+
+  // ===== 토게피 (행운/지원) - 포켓몬덱스: 메트로놈, 행복의알, 소원별, 요정바람 =====
   togepi: {
     nodes: [
-      { id:'luck1', name:'행운',     emoji:'🍀', desc:'골드 획득량 +15%',           cost:1, requires:null,   col:0, row:0, type:'goldBonus', value:0.15 },
-      { id:'egg1',  name:'알 방패',  emoji:'🥚', desc:'기본공격 데미지 +15%',        cost:1, requires:null, col:1, row:0, type:'atkDmg', value:0.15 },
-      { id:'cheer1',name:'응원',     emoji:'📣', desc:'스킬 쿨다운 -20%',           cost:1, requires:null, col:2, row:0, type:'cdReduce', value:0.2 },
-      { id:'lucky2',name:'럭키별',   emoji:'⭐', desc:'킬시 5% 확률 추가골드 +10g', cost:1, requires:'luck1', col:0, row:1, type:'killGold', value:{chance:0.05, amount:10} },
-      { id:'metronome2',name:'메트로놈+',emoji:'🎲', desc:'메트로놈 쿨다운 -4초',    cost:1, requires:'egg1', col:1, row:1, type:'skillCd', skillIdx:0, value:-4 },
-      { id:'burst2',name:'기쁨의터짐',emoji:'💥', desc:'행복의알 추가 데미지 이펙트', cost:1, requires:'cheer1', col:2, row:1, type:'eggBurst', value:1 },
-      { id:'jackpot',name:'잭팟',    emoji:'🎰', desc:'웨이브 클리어 보너스 골드 +50%', cost:2, requires:'lucky2', col:0, row:2, type:'waveGold', value:0.5 },
-      { id:'wish',  name:'소원',     emoji:'🌠', desc:'라이프 최대 +5 증가',         cost:2, requires:'metronome2', col:1, row:2, type:'maxLives', value:5 },
-      { id:'harmony',name:'조화',    emoji:'✨', desc:'인접 영웅들 모든 스킬 쿨다운 공유 감소', cost:2, requires:'burst2', col:2, row:2, type:'harmonyAura', value:0.15 },
+      // Row 0
+      {id:'luck1',   name:'행운',     emoji:'🍀', desc:'골드 획득 +20%',          cost:1, requires:null, col:0, row:0, type:'goldBonus', value:0.20},
+      {id:'fairy1',  name:'요정바람', emoji:'🌸', desc:'기본공격 데미지 +15%',     cost:1, requires:null, col:1, row:0, type:'atkDmg', value:0.15},
+      {id:'cd1',     name:'응원',     emoji:'📣', desc:'스킬 쿨다운 -25%',         cost:1, requires:null, col:2, row:0, type:'cdReduce', value:0.25},
+      // Row 1
+      {id:'jackpot2',name:'잭팟',     emoji:'🎰', desc:'킬시 8% 확률 추가 +15g',  cost:1, requires:'luck1',  col:0, row:1, type:'killGold', value:{chance:0.08, amount:15}},
+      {id:'egg2',    name:'행복의알', emoji:'🥚', desc:'메트로놈 쿨다운 -5초',     cost:1, requires:'fairy1', col:1, row:1, type:'skillCd', skillIdx:0, value:-5},
+      {id:'wish2',   name:'소원별',   emoji:'🌠', desc:'라이프 최대 +5',           cost:1, requires:'cd1',    col:2, row:1, type:'maxLives', value:5},
+      // Row 2
+      {id:'charm3',  name:'매혹',     emoji:'💕', desc:'주변 적 이동속도 영구-10%',cost:2, requires:'jackpot2',col:0, row:2, type:'passiveSlow', value:0.10},
+      {id:'dazzle3', name:'눈부심',   emoji:'✨', desc:'행복의알 데미지 이펙트 추가',cost:2, requires:'egg2',   col:1, row:2, type:'eggBurst', value:1},
+      {id:'togetic3',name:'토게틱화', emoji:'🦋', desc:'사거리 +20%, 공격속도 +20%',cost:2, requires:'wish2',  col:2, row:2, type:'allBoost', value:0.20},
+      // Row 3
+      {id:'gold4',   name:'황금알',   emoji:'💰', desc:'웨이브 보상 골드 +60%',    cost:2, requires:'charm3',  col:0, row:3, type:'waveGold', value:0.60},
+      {id:'metro4',  name:'메트로놈+',emoji:'🎲', desc:'메트로놈 효과 2배 강화',   cost:2, requires:'dazzle3', col:1, row:3, type:'metroBoost', value:2},
+      {id:'harmony4',name:'조화',     emoji:'🌟', desc:'모든 영웅 스킬 쿨다운 공유 -20%',cost:2, requires:'togetic3',col:2, row:3, type:'harmonyAura', value:0.20},
     ]
   }
 };
@@ -311,11 +334,11 @@ class Hero {
 
   gainExp(amount, engine) {
     this.exp += amount;
-    while (this.exp >= this.expToNext && this.level < 5) {
+    while (this.exp >= this.expToNext && this.level < 10) {
       this.exp -= this.expToNext;
       this.level++;
       this.skillPoints++;
-      this.expToNext = Math.floor(this.expToNext * 1.4);
+      this.expToNext = Math.floor(this.expToNext * 1.35);
       engine && engine.spawnFloatingText(`${this.def.name} Lv${this.level}! +SP`, this.x, this.y-42, '#ffd60a');
       engine && engine.particles && engine.particles.push(new AoeBurst(this.x, this.y, 50, '#ffd60a'));
     }
