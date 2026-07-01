@@ -538,7 +538,6 @@ html, body {
 
 /* ===== TITLE SCREEN ===== */
 #title-screen {
-  position:relative;
   overflow:hidden;
   background:#030612;
 }
