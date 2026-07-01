@@ -1,8 +1,9 @@
-const CACHE = 'pokemon-td-v8';
+const CACHE = 'pokemon-td-v9';
 const ASSETS = [
   '/', '/index.html', '/style.css',
   '/engine.js', '/maps.js', '/enemies.js', '/towers.js', '/sprites.js', '/heroes.js', '/shop.js', '/main.js',
   '/manifest.json',
+  '/assets/bg_forest.jpg','/assets/bg_city.jpg','/assets/bg_cave.jpg',
   '/assets/heroes/pikachu.png', '/assets/heroes/mew.png', '/assets/heroes/togepi.png',
   '/assets/towers/bulbasaur.png', '/assets/towers/charmander.png', '/assets/towers/squirtle.png',
   '/assets/towers/voltorb.png', '/assets/towers/jynxline.png', '/assets/towers/geodude.png',
