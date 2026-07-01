@@ -178,6 +178,7 @@ class App {
     };
 
     this.els = {
+      mapSelect: document.getElementById('map-select-screen'),
       gameScreen: document.getElementById('game-screen'),
       canvas: document.getElementById('game-canvas'),
       livesVal: document.getElementById('lives-val'),
