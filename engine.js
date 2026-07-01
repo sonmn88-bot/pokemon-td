@@ -85,19 +85,39 @@ class GameEngine {
   }
 
   resize() {
-    const dpr = this._dpr;
     const w = this.canvas.clientWidth, h = this.canvas.clientHeight;
-    this.canvas.width = w * dpr; this.canvas.height = h * dpr;
-    this.ctx.scale(dpr, dpr);
+    this.canvas.width = w;
+    this.canvas.height = h;
     this.width = w; this.height = h;
     this._bgDirty = true;
   }
 
-  buildPaths() { this.paths = this.currentMap.getPaths(this.width, this.height); }
+  buildPaths() {
+    const HUD = 52, BAR = 82, PAD = 14;
+    const safeTop = HUD + PAD;
+    const safeBot = this.height - BAR - PAD;
+    const safeH = safeBot - safeTop;
+
+    const rawPaths = this.currentMap.getPaths(this.width, this.height);
+    this.paths = rawPaths.map(path =>
+      path.map(pt => ({
+        x: pt.x,
+        y: safeTop + (pt.y / this.height) * safeH,
+      }))
+    );
+  }
   buildTowerSlots() {
-    this.towerSlots = this.currentMap.getSlots(this.width, this.height).map(p => ({
-      x:p.x, y:p.y, occupied:false, tower:null
-    }));
+    const HUD = 52, BAR = 82, PAD = 14;
+    const safeTop = HUD + PAD;
+    const safeBot = this.height - BAR - PAD;
+    const safeH = safeBot - safeTop;
+
+    this.towerSlots = this.currentMap.getSlots(this.width, this.height).map(p => {
+      // 슬롯 y를 safe zone(HUD아래~타워바위)으로 리매핑
+      const ratio = p.y / this.height;
+      const safeY = safeTop + ratio * safeH;
+      return { x: p.x, y: safeY, occupied: false, tower: null };
+    });
   }
 
   start() { this.running = true; this.lastTime = performance.now(); requestAnimationFrame(t=>this.loop(t)); }
