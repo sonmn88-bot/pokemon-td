@@ -379,7 +379,7 @@ class App {
     const gradeSound = {normal:'pull_normal', rare:'pull_rare', epic:'pull_epic', legend:'pull_epic', unique:'merge'};
     this.SFX.play(gradeSound[towerDef.grade] || 'pull_normal');
     if (towerDef.grade !== 'normal') {
-      this.showWaveAnnounce(`${towerDef.emoji} ${grade.name}! ${towerDef.name}`, grade.color);
+      const g = window.GRADES?.[towerDef.grade]; this.showWaveAnnounce(`${towerDef.emoji} ${g?.name||""} ${towerDef.name}`, g?.color||"#ffd60a");
     }
 
     // 미션 트래킹
@@ -424,8 +424,7 @@ class App {
 
     const title = document.createElement('div');
     title.className = 'skilltree-title';
-    title.innerHTML = `🌟 10연 뽑기 결과 — 전부 보관함에 추가됨<br>
-      <span style="font-size:10px;color:#aaa;font-family:sans-serif">슬롯 클릭 후 보관함 버튼으로 꺼내 배치하세요</span>`;
+    title.innerHTML = `🌟 10연 뽑기 — 배치할 타워 선택 (나머지→보관함)`;
     overlay.appendChild(title);
 
     const grid = document.createElement('div');
@@ -443,15 +442,28 @@ class App {
         <div class="tp-grade">${'★'.repeat(grade.stars)}</div>
         <div class="tp-grade-name">${grade.name}</div>
       `;
+      card.style.cursor = 'pointer';
+      card.title = '클릭해서 배치';
+      card.addEventListener('click', () => {
+        overlay.remove();
+        this.engine.selectedSlotIdx = slotIdx;
+        this._placePulledTower(def, slotIdx);
+        const gd = window.GRADES?.[def.grade];
+        this.showWaveAnnounce(`${def.emoji} ${def.name} 배치!`, gd?.color||'#ffd60a');
+        const others = results.filter(r => r !== def);
+        this._inventory.push(...others);
+        this._refreshInventoryBtn();
+      });
       grid.appendChild(card);
     }
     overlay.appendChild(grid);
 
     const closeBtn = document.createElement('button');
     closeBtn.className = 'skin-picker-close';
-    closeBtn.textContent = `확인 (보관함 ${this._inventory.length}개)`;
+    closeBtn.textContent = '전부 보관함에 넣기';
     closeBtn.addEventListener('click', () => {
       overlay.remove();
+      this._inventory.push(...results);
       this._refreshInventoryBtn();
     });
     overlay.appendChild(closeBtn);
@@ -810,22 +822,25 @@ class App {
       `;
 
       panel.querySelector('[data-action="merge"]')?.addEventListener('click', () => {
-        const slots = this.engine.towerSlots.filter(s => s.occupied && s.tower?._gachaId === t._gachaId).slice(0,3);
-        if (slots.length < 3 || !evolveDef) return;
-        // 1번 슬롯에 진화 타워, 나머지 2개 제거
+        const allSameSlots = this.engine.towerSlots.filter(s => s.occupied && s.tower?._gachaId === t._gachaId);
+        if (allSameSlots.length < 3 || !evolveDef) return;
+        // 현재 선택 슬롯을 항상 진화 위치로 고정
+        const currentSlot = this.engine.towerSlots[slotIdx];
+        const otherSlots = allSameSlots.filter(s => s !== currentSlot).slice(0, 2);
+        const mergeSlots = [currentSlot, ...otherSlots];
         for (let i = 1; i < 3; i++) {
-          this.engine.towers = this.engine.towers.filter(x => x !== slots[i].tower);
-          slots[i].occupied = false; slots[i].tower = null;
+          this.engine.towers = this.engine.towers.filter(x => x !== mergeSlots[i].tower);
+          mergeSlots[i].occupied = false; mergeSlots[i].tower = null;
         }
-        const evoTower = window._createGachaTower(evolveDef, slots[0].x, slots[0].y);
-        this.engine.towers = this.engine.towers.filter(x => x !== slots[0].tower);
+        const evoTower = window._createGachaTower(evolveDef, currentSlot.x, currentSlot.y);
+        this.engine.towers = this.engine.towers.filter(x => x !== currentSlot.tower);
         this.engine.towers.push(evoTower);
-        slots[0].tower = evoTower;
+        currentSlot.tower = evoTower;
         this.engine.selectedTower = evoTower;
         if (window.applyTowerSynergies) window.applyTowerSynergies(this.engine.towers);
         const evoGrade = window.GRADES[evolveDef.grade];
-        this.engine.spawnFloatingText(`✨ ${evolveDef.name}!`, slots[0].x, slots[0].y-40, evoGrade.color);
-        this.engine.particles.push(new BurstRing(slots[0].x, slots[0].y, 70, evoGrade.color));
+        this.engine.spawnFloatingText(`✨ ${evolveDef.name}!`, currentSlot.x, currentSlot.y-40, evoGrade.color);
+        this.engine.particles.push(new BurstRing(currentSlot.x, currentSlot.y, 70, evoGrade.color));
         this.engine.triggerScreenShake(6, 0.25);
         if (this.missionTracker) { this.missionTracker.stats.mergeCount++; this.missionTracker.check(); }
         this.SFX.play('merge');
@@ -988,7 +1003,7 @@ class App {
       const grid = document.createElement('div');
       grid.className = 'skilltree-grid';
 
-      for (let row = 0; row < 3; row++) {
+      for (let row = 0; row < 4; row++) {
         for (let col = 0; col < 3; col++) {
           const node = tree.nodes.find(n => n.col === col && n.row === row);
           const cell = document.createElement('div');
@@ -1135,11 +1150,11 @@ class App {
           this.showWaveAnnounce('골드가 부족합니다', '#ff6b6b');
           return;
         }
-        if (item.use(this.engine)) {
-          this.engine.spendGold(item.cost);
+        this.engine.spendGold(item.cost);
+          item.buy(this.engine);
           title.textContent = `🛒 상점 (보유 골드: ${this.engine.gold}g)`;
+          this.SFX.play('buy');
           this.showWaveAnnounce(`${item.emoji} ${item.name} 사용!`, '#06d6a0');
-        }
       });
       grid.appendChild(card);
     }
