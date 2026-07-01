@@ -2,45 +2,32 @@
 
 // ===== 웨이브 데이터 20개 =====
 const WaveData = [
-  /* W1 */ [ ...seq('abo', 8, 1.5, 0) ],
-  /* W2 */ [ ...seq('abo', 5, 1.2, 0), ...seq('jigglypuff', 3, 2.0, 0, 9) ],
-  /* W3 */ [ ...seq('abo', 6, 1.0, 0), ...seq('rattata', 6, 0.6, 0, 4), ...seq('paras', 4, 2.0, 0, 9) ],
-  /* W4 */ [ ...seq('jigglypuff', 5, 1.5, 0), ...seq('paras', 4, 1.5, 0, 6), ...seq('abo', 4, 0.8, 0, 12), ...seq('zubat', 4, 1.0, 0, 14) ],
-  /* W5 */ [ ...seq('abo', 10, 0.7, 0), ...seq('jigglypuff', 5, 1.5, 0, 4), ...seq('koffing', 3, 2.0, 0, 10), ...seq('paras', 4, 2.0, 0, 14) ],
-
-  /* W6 */ [ ...seq('gastly', 6, 1.5, 0), ...seq('lapras', 3, 2.0, 0, 8), ...seq('zubat', 5, 1.0, 0, 12) ],
-  /* W7 */ [ ...seq('golbat', 6, 1.0, 0), ...seq('gastly', 5, 1.2, 0, 5), ...seq('magnemite', 4, 1.5, 0, 10) ],
-  /* W8 */ [ ...seq('phantump', 4, 2.0, 0), ...seq('lapras', 5, 1.5, 0, 6), ...seq('haunter', 4, 1.8, 0, 12) ],
-  /* W9 */ [ ...seq('gastly', 8, 0.8, 0), ...seq('phantump', 4, 2.0, 0, 6), ...seq('golbat', 4, 1.0, 0, 12), ...seq('electrode', 3, 2.0, 0, 16) ],
-  /* W10 - 갸라도스 중간보스 */ [
-    ...seq('abo', 6, 1.0, 0), ...seq('lapras', 4, 1.5, 0, 6),
-    { type: 'gyarados', delay: 12 },
-    ...seq('gastly', 5, 1.0, 0, 14),
+  /* W1  */ [ ...seq('abo',14,1.2,0) ],
+  /* W2  */ [ ...seq('abo',10,1.0,0), ...seq('jigglypuff',6,1.8,0,8) ],
+  /* W3  */ [ ...seq('abo',10,0.9,0), ...seq('rattata',8,0.6,0,4), ...seq('paras',6,1.8,0,9) ],
+  /* W4  */ [ ...seq('jigglypuff',8,1.3,0), ...seq('paras',6,1.3,0,6), ...seq('abo',6,0.7,0,12), ...seq('zubat',6,1.0,0,14) ],
+  /* W5  */ [ ...seq('abo',15,0.6,0), ...seq('jigglypuff',8,1.3,0,4), ...seq('koffing',5,1.8,0,10), ...seq('paras',6,1.8,0,14) ],
+  /* W6  */ [ ...seq('gastly',10,1.3,0), ...seq('lapras',5,1.8,0,8), ...seq('zubat',8,1.0,0,12) ],
+  /* W7  */ [ ...seq('golbat',10,0.9,0), ...seq('gastly',8,1.1,0,5), ...seq('magnemite',6,1.3,0,10) ],
+  /* W8  */ [ ...seq('phantump',6,1.8,0), ...seq('lapras',7,1.3,0,6), ...seq('haunter',6,1.6,0,12) ],
+  /* W9  */ [ ...seq('gastly',12,0.7,0), ...seq('phantump',6,1.8,0,6), ...seq('golbat',6,0.9,0,12), ...seq('electrode',4,1.8,0,16) ],
+  /* W10 */ [ ...seq('abo',8,1.0,0), ...seq('lapras',6,1.3,0,6), {type:'gyarados',delay:12}, ...seq('gastly',7,0.9,0,14) ],
+  /* W11 */ [ ...seq('weezing',8,1.8,0), ...seq('paras',8,1.3,0,8), ...seq('onix',5,1.8,0,14) ],
+  /* W12 */ [ ...seq('scyther',6,2.2,0), ...seq('weezing',6,1.8,0,8), ...seq('electrode',6,1.3,0,14) ],
+  /* W13 */ [ ...seq('scyther',5,1.8,0), ...seq('weezing',8,1.3,0,5), ...seq('onix',5,1.8,0,10), {type:'gyarados',delay:18} ],
+  /* W14 */ [ ...seq('weezing',9,1.1,0), ...seq('scyther',8,1.6,0,6), ...seq('golbat',9,0.7,0,14), ...seq('haunter',7,1.1,0,18) ],
+  /* W15 */ [ ...seq('scyther',8,1.3,0), ...seq('weezing',8,1.3,0,6), ...seq('phantump',6,1.8,0,10), ...seq('onix',5,1.8,0,16), {type:'gyarados',delay:24} ],
+  /* W16 */ [ ...seq('golbat',12,0.7,0), ...seq('gastly',12,0.7,0,5), ...seq('dragonite',2,0,0,12), {type:'lugia',delay:18} ],
+  /* W17 */ [ ...seq('abo',8,0.7,0), ...seq('scyther',6,1.3,0,3), ...seq('weezing',6,1.3,0,8), ...seq('dragonite',3,2.8,0,12), ...seq('gyarados',3,3.5,0,16) ],
+  /* W18 */ [ ...seq('gastly',10,0.7,0), ...seq('phantump',8,1.3,0,4), ...seq('lapras',9,0.9,0,10), ...seq('onix',6,1.3,0,16), {type:'lugia',delay:22} ],
+  /* W19 */ [ ...seq('scyther',9,0.9,0), ...seq('weezing',9,0.9,0,5), ...seq('gyarados',4,2.8,0,10), ...seq('dragonite',3,2.8,0,18), ...seq('golbat',12,0.5,0,22), {type:'lugia',delay:28} ],
+  /* W20 */ [
+    ...seq('gastly',12,0.5,0), ...seq('scyther',9,0.9,0,4),
+    ...seq('weezing',9,0.9,0,8), {type:'gyarados',delay:12},
+    ...seq('dragonite',4,2.5,0,16), {type:'lugia',delay:22},
+    {type:'mewtwo',delay:36},
   ],
-
-  /* W11 */ [ ...seq('weezing', 5, 2.0, 0), ...seq('paras', 5, 1.5, 0, 8), ...seq('onix', 3, 2.0, 0, 14) ],
-  /* W12 */ [ ...seq('scyther', 4, 2.5, 0), ...seq('weezing', 4, 2.0, 0, 8), ...seq('electrode', 4, 1.5, 0, 14) ],
-  /* W13 */ [ ...seq('scyther', 3, 2.0, 0), ...seq('weezing', 5, 1.5, 0, 5), ...seq('onix', 3, 2.0, 0, 10), ...seq('gyarados', 1, 0, 0, 18) ],
-  /* W14 */ [ ...seq('weezing', 6, 1.2, 0), ...seq('scyther', 5, 1.8, 0, 6), ...seq('golbat', 6, 0.8, 0, 14), ...seq('haunter', 5, 1.2, 0, 18) ],
-  /* W15 */ [ ...seq('scyther', 5, 1.5, 0), ...seq('weezing', 5, 1.5, 0, 6), ...seq('phantump', 4, 2.0, 0, 10), ...seq('onix', 3, 2.0, 0, 16), ...seq('gyarados', 1, 0, 0, 24) ],
-
-  /* W16 - 루기아 준보스 */ [
-    ...seq('golbat', 8, 0.8, 0), ...seq('gastly', 8, 0.8, 0, 5), ...seq('dragonite', 1, 0, 0, 12),
-    { type: 'lugia', delay: 18 },
-  ],
-
-  /* W17 */ [ ...seq('abo', 5, 0.8, 0), ...seq('scyther', 4, 1.5, 0, 3), ...seq('weezing', 4, 1.5, 0, 8), ...seq('dragonite', 2, 3.0, 0, 12), ...seq('gyarados', 2, 4.0, 0, 16) ],
-  /* W18 */ [ ...seq('gastly', 6, 0.8, 0), ...seq('phantump', 5, 1.5, 0, 4), ...seq('lapras', 6, 1.0, 0, 10), ...seq('onix', 4, 1.5, 0, 16), { type: 'lugia', delay: 22 } ],
-  /* W19 */ [ ...seq('scyther', 6, 1.0, 0), ...seq('weezing', 6, 1.0, 0, 5), ...seq('gyarados', 3, 3.0, 0, 10), ...seq('dragonite', 2, 3.0, 0, 18), ...seq('golbat', 8, 0.6, 0, 22), { type: 'lugia', delay: 28 } ],
-
-  /* W20 - 뮤츠 최종보스 */ [
-    ...seq('gastly', 8, 0.6, 0), ...seq('scyther', 6, 1.0, 0, 4), ...seq('weezing', 6, 1.0, 0, 8),
-    ...seq('dragonite', 2, 4.0, 0, 14),
-    { type: 'gyarados', delay: 18 },
-    { type: 'lugia', delay: 26 },
-    { type: 'mewtwo', delay: 36 },
-  ],
-];
+]
 
 function seq(type, count, interval, pathIdx = 0, startDelay = 0) {
   const arr = [];
@@ -626,6 +613,7 @@ class App {
     this.missionTracker.onComplete = (mission) => this._onMissionComplete(mission);
 
     this.engine.onGoldChange  = g => { this.els.goldVal.textContent = g; this.refreshPullButtons(); };
+    this.engine.onHitSound = () => { if (Math.random() < 0.3) this.SFX.play('hit'); };
     this.engine.onLivesChange = l => {
       this.els.livesVal.textContent = l;
       document.getElementById('hud-lives').style.color = l <= 5 ? '#ff4444' : '';
