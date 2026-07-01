@@ -148,3 +148,4 @@ window.ShopItems = ShopItems;
 window.GlobalSpells = GlobalSpells;
 window.SpellManager = SpellManager;
 window.applyOrbBonuses = applyOrbBonuses;
+
