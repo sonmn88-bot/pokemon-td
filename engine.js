@@ -226,6 +226,7 @@ class GameEngine {
     }
 
     this.enemies.push(enemy);
+    this.activeSpawns--;
     if (enemy.isBoss) this.onBossAppear && this.onBossAppear(enemy);
   }
 
@@ -327,8 +328,38 @@ class GameEngine {
       bc.width = this.width; bc.height = this.height;
       const bctx = bc.getContext('2d');
       const map = this.currentMap;
-      bctx.fillStyle = map.bgColor;
-      bctx.fillRect(0,0,this.width,this.height);
+
+      // 배경 이미지 있으면 사용, 없으면 단색
+      if (map.bgImage) {
+        if (!this._bgImg || this._bgImg._src !== map.bgImage) {
+          const im = new Image();
+          im._src = map.bgImage;
+          im.src = map.bgImage;
+          this._bgImg = im;
+        }
+        if (this._bgImg.complete && this._bgImg.naturalWidth > 0) {
+          // 커버 방식으로 그리기
+          const ir = this._bgImg.naturalWidth / this._bgImg.naturalHeight;
+          const cr = this.width / this.height;
+          let sx=0,sy=0,sw=this._bgImg.naturalWidth,sh=this._bgImg.naturalHeight;
+          if (ir > cr) { sw = sh*cr; sx=(this._bgImg.naturalWidth-sw)/2; }
+          else { sh=sw/cr; sy=(this._bgImg.naturalHeight-sh)/2; }
+          bctx.drawImage(this._bgImg, sx,sy,sw,sh, 0,0,this.width,this.height);
+          // 어두운 오버레이로 게임과 어우러지게
+          bctx.fillStyle='rgba(0,0,0,0.22)';
+          bctx.fillRect(0,0,this.width,this.height);
+        } else {
+          // 로드 전: 단색 폴백, 로드 완료 후 캐시 무효화
+          bctx.fillStyle = map.bgColor;
+          bctx.fillRect(0,0,this.width,this.height);
+          this._bgImg.onload = () => { this._bgDirty = true; };
+        }
+      } else {
+        bctx.fillStyle = map.bgColor;
+        bctx.fillRect(0,0,this.width,this.height);
+      }
+
+      // 맵별 이모지/장식 오버레이
       if (map.drawBg) map.drawBg(bctx, this.width, this.height);
       this._bgCanvas = bc; this._bgDirty = false;
     }
