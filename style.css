@@ -315,9 +315,10 @@ html, body {
 
 /* ===== SPELL BAR ===== */
 #spell-bar {
-  position:absolute; left:10px;
+  position:absolute; right:10px;
   bottom:calc(var(--bar-h) + 54px);
   z-index:15; display:flex; flex-direction:column; gap:7px;
+  align-items:flex-end;
 }
 .spell-btn {
   position:relative; display:flex; align-items:center; gap:6px;
