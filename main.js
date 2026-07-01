@@ -519,7 +519,7 @@ class App {
           this.placingHero = null;
           this._towerBarScroll.querySelectorAll('.tower-btn').forEach(b => b.classList.remove('active'));
           this.buildHeroSkillBar();
-          this.refreshTowerBarAffordability();
+          this.refreshPullButtons();
         }
         return;
       }
