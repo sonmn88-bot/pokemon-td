@@ -77,7 +77,27 @@ class App {
 
     this.bindMapSelect();
     this.bindButtons();
+    this.bindSpeedButtons();
     this.buildTowerBar();
+    this.bindTitleScreen();
+  }
+
+  bindTitleScreen() {
+    const startBtn = document.getElementById('btn-start');
+    if (startBtn) {
+      startBtn.addEventListener('click', () => {
+        document.getElementById('title-screen').classList.remove('active');
+        document.getElementById('map-select-screen').classList.add('active');
+      });
+    }
+    const backBtn = document.getElementById('btn-title-back');
+    if (backBtn) {
+      backBtn.addEventListener('click', () => {
+        document.getElementById('map-select-screen').classList.remove('active');
+        document.getElementById('title-screen').classList.add('active');
+        initTitleCanvas();
+      });
+    }
   }
 
   bindMapSelect() {
@@ -90,6 +110,20 @@ class App {
     this.els.btnWave.addEventListener('click', () => this.sendWave());
     this.els.btnBack.addEventListener('click', () => this.backToMapSelect());
     this.els.btnMenu.addEventListener('click', () => this.togglePause());
+    const btnMission = document.getElementById('btn-mission');
+    if (btnMission) btnMission.addEventListener('click', () => this.openMissionBoard());
+  }
+
+  bindSpeedButtons() {
+    document.querySelectorAll('.speed-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (!this.engine) return;
+        const speed = parseFloat(btn.dataset.speed);
+        this.engine.speedMul = speed;
+        document.querySelectorAll('.speed-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+      });
+    });
   }
 
   buildTowerBar() {
@@ -97,36 +131,63 @@ class App {
     this.els.towerBar.classList.add('tower-bar-real');
 
     const scroll = document.createElement('div');
-    scroll.className = 'tower-bar-scroll';
+    scroll.className = 'tower-bar-scroll gacha-bar';
 
-    for (const meta of window.TowerMeta) {
+    // 뽑기 버튼 3종
+    const pulls = [
+      { key:'normal',  label:'일반 뽑기',  cost:50,  color:'#9e9e9e', emoji:'🎰' },
+      { key:'premium', label:'프리미엄',   cost:120, color:'#4fc3f7', emoji:'💎' },
+      { key:'gamble',  label:'도박 뽑기',  cost:200, color:'#ffd60a', emoji:'🎲' },
+      { key:'ten',     label:'10연 뽑기',  cost:450, color:'#ce93d8', emoji:'🌟', ten:true },
+    ];
+
+    for (const p of pulls) {
       const btn = document.createElement('button');
-      btn.className = 'tower-btn';
-      btn.dataset.towerKey = meta.key;
+      btn.className = 'tower-btn gacha-btn';
+      btn.dataset.pullKey = p.key;
+      btn.style.borderColor = p.color + '60';
       btn.innerHTML = `
-        <span class="tower-btn-emoji">${meta.emoji}</span>
-        <span class="tower-btn-name">${meta.name}</span>
-        <span class="tower-btn-cost">💰${meta.cost}</span>
+        <span class="tower-btn-emoji">${p.emoji}</span>
+        <span class="tower-btn-name" style="color:${p.color}">${p.label}</span>
+        <span class="tower-btn-cost">💰${p.cost}</span>
       `;
-      btn.title = meta.desc;
-      btn.addEventListener('click', () => this.selectTowerType(meta.key, btn));
+      btn.title = p.key === 'gamble' ? '에픽~레전드 확률 높음!' :
+                  p.key === 'ten'    ? '10개! 에픽 1개 보장' :
+                  p.key === 'premium'? '레어~에픽 위주' : '노말~레어 위주';
+      btn.addEventListener('click', () => this.doPull(p.key, btn));
       scroll.appendChild(btn);
     }
 
+    // 구분선
+    const sep = document.createElement('div');
+    sep.style.cssText = 'width:1px;background:rgba(255,255,255,0.1);margin:4px 2px;flex-shrink:0';
+    scroll.appendChild(sep);
+
+    // 영웅 버튼들
+    const heroUnlockWave = { pikachu:0, mew:5, togepi:10 };
     for (const heroId of ['pikachu', 'mew', 'togepi']) {
       const def = window.HeroDefs[heroId];
       const btn = document.createElement('button');
-      btn.className = 'tower-btn hero-btn';
+      const unlockWave = heroUnlockWave[heroId];
+      const unlocked = !this.engine || this.engine.currentWave >= unlockWave;
+      btn.className = 'tower-btn hero-btn' + (unlocked ? '' : ' hero-btn-locked');
       btn.dataset.heroKey = heroId;
       const skinId = this.selectedHeroSkins[heroId];
       const skin = window.SkinDefs[heroId][skinId];
       btn.innerHTML = `
         <span class="tower-btn-emoji">${skin.emoji}</span>
         <span class="tower-btn-name">${def.name}</span>
-        <span class="tower-btn-cost">영웅</span>
+        <span class="tower-btn-cost">${unlocked ? '영웅' : `🔒W${unlockWave}`}</span>
+        ${!unlocked ? '<span class="lock-badge">🔒</span>' : ''}
       `;
-      btn.title = def.passive;
-      btn.addEventListener('click', () => this.selectHeroToPlace(heroId, btn));
+      btn.title = unlocked ? def.passive : `웨이브 ${unlockWave} 이후 해금`;
+      btn.addEventListener('click', () => {
+        if (!unlocked && this.engine && this.engine.currentWave < unlockWave) {
+          this.showWaveAnnounce(`웨이브 ${unlockWave} 이후 해금됩니다`, '#ff6b6b');
+          return;
+        }
+        this.selectHeroToPlace(heroId, btn);
+      });
       btn.addEventListener('contextmenu', (e) => { e.preventDefault(); this.openSkinPicker(heroId); });
       let pressTimer;
       btn.addEventListener('touchstart', () => { pressTimer = setTimeout(() => this.openSkinPicker(heroId), 500); });
@@ -136,30 +197,143 @@ class App {
 
     this.els.towerBar.appendChild(scroll);
     this._towerBarScroll = scroll;
+    this.refreshPullButtons();
   }
 
-  refreshTowerBarAffordability() {
-    if (!this.engine || !this._towerBarScroll) return;
-    const gold = this.engine.gold;
-    this._towerBarScroll.querySelectorAll('.tower-btn').forEach(btn => {
-      const key = btn.dataset.towerKey;
-      if (key) {
-        const meta = window.TowerMeta.find(m => m.key === key);
-        btn.disabled = gold < meta.cost;
-      } else if (btn.dataset.heroKey) {
-        const placed = this.engine.heroes.some(h => h.id === btn.dataset.heroKey);
-        btn.disabled = placed;
-      }
+  refreshPullButtons() {
+    if (!this._towerBarScroll) return;
+    const gold = this.engine ? this.engine.gold : 999;
+    this._towerBarScroll.querySelectorAll('.gacha-btn').forEach(btn => {
+      const key = btn.dataset.pullKey;
+      const cost = key === 'ten' ? window.PULL_COSTS.ten : window.PULL_COSTS[key];
+      btn.disabled = gold < cost;
     });
   }
 
-  selectTowerType(key, btnEl) {
+  doPull(pullKey, btnEl) {
     if (!this.engine) return;
-    this.placingHero = null;
-    this.engine.selectedTowerType = this.engine.selectedTowerType === key ? null : key;
+    const slotIdx = this.engine.selectedSlotIdx;
+    if (slotIdx === null || this.engine.towerSlots[slotIdx]?.occupied) {
+      this.showWaveAnnounce('빈 슬롯을 먼저 클릭하세요! 🎯', '#ffd60a');
+      return;
+    }
+
+    const cost = pullKey === 'ten' ? window.PULL_COSTS.ten : window.PULL_COSTS[pullKey];
+    if (!this.engine.spendGold(cost)) {
+      this.showWaveAnnounce('골드가 부족합니다', '#ff6b6b');
+      return;
+    }
+
+    if (pullKey === 'ten') {
+      const results = [];
+      for (let i = 0; i < 10; i++) {
+        // 8번째(index 7)는 에픽 보장
+        results.push(i === 7 ? window.rollTower('gamble') : window.rollTower('normal'));
+      }
+      this._showTenPullResult(results, slotIdx);
+      if (this.missionTracker) {
+        this.missionTracker.stats.tenPullCount++;
+        this.missionTracker.check();
+      }
+      return;
+    }
+
+    // 단일 뽑기
+    const towerDef = window.rollTower(pullKey);
+    this._placePulledTower(towerDef, slotIdx);
+
+    // 뽑기 등급 팝업
+    const grade = window.GRADES[towerDef.grade];
+    if (towerDef.grade !== 'normal') {
+      this.showWaveAnnounce(`${towerDef.emoji} ${grade.name}! ${towerDef.name}`, grade.color);
+    }
+
+    // 미션 트래킹
+    if (this.missionTracker) {
+      if (towerDef.grade === 'rare' || towerDef.grade === 'epic' || towerDef.grade === 'legend' || towerDef.grade === 'unique')
+        this.missionTracker.stats.totalRareCount++;
+      if (towerDef.grade === 'epic' || towerDef.grade === 'legend' || towerDef.grade === 'unique')
+        this.missionTracker.stats.totalEpicCount++;
+      if (towerDef.grade === 'legend' || towerDef.grade === 'unique')
+        this.missionTracker.stats.totalLegendCount++;
+      if (towerDef.grade === 'unique')
+        this.missionTracker.stats.totalUniqueCount++;
+      if (pullKey === 'gamble') this.missionTracker.stats.gambleCount++;
+      this.missionTracker.check();
+    }
+
+    btnEl.classList.add('active');
+    setTimeout(() => btnEl.classList.remove('active'), 300);
+  }
+
+  _placePulledTower(def, slotIdx) {
+    const slot = this.engine.towerSlots[slotIdx];
+    if (!slot || slot.occupied) return;
+    const tower = window._createGachaTower(def, slot.x, slot.y);
+    slot.occupied = true;
+    slot.tower = tower;
+    this.engine.towers.push(tower);
+    this.engine.selectedSlotIdx = null;
     this.engine.selectedTower = null;
-    this._towerBarScroll.querySelectorAll('.tower-btn').forEach(b => b.classList.remove('active'));
-    if (this.engine.selectedTowerType) btnEl.classList.add('active');
+
+    if (window.applyTowerSynergies) window.applyTowerSynergies(this.engine.towers);
+    this.refreshPullButtons();
+  }
+
+  _showTenPullResult(results, slotIdx) {
+    // 10연 결과 팝업 — 그 중 하나를 선택해서 슬롯에 배치
+    const overlay = document.createElement('div');
+    overlay.className = 'tenpull-overlay';
+
+    const title = document.createElement('div');
+    title.className = 'skilltree-title';
+    title.innerHTML = '🌟 10연 뽑기 결과 — 하나를 선택하세요!';
+    overlay.appendChild(title);
+
+    const grid = document.createElement('div');
+    grid.className = 'tenpull-grid';
+
+    for (const def of results) {
+      const grade = window.GRADES[def.grade];
+      const card = document.createElement('div');
+      card.className = `tenpull-card grade-${def.grade}`;
+      card.style.borderColor = grade.color;
+      card.style.boxShadow = `0 0 12px ${grade.glow}`;
+      card.innerHTML = `
+        <div class="tp-emoji">${def.emoji}</div>
+        <div class="tp-name" style="color:${grade.color}">${def.name}</div>
+        <div class="tp-grade">${'★'.repeat(grade.stars)}</div>
+        <div class="tp-grade-name">${grade.name}</div>
+      `;
+      card.addEventListener('click', () => {
+        overlay.remove();
+        // 선택된 것만 배치
+        this.engine.selectedSlotIdx = slotIdx;
+        this._placePulledTower(def, slotIdx);
+        this.showWaveAnnounce(`${def.emoji} ${def.name} 배치!`, grade.color);
+
+        // 미션
+        if (this.missionTracker) {
+          if (def.grade !== 'normal') this.missionTracker.stats.totalRareCount++;
+          if (['epic','legend','unique'].includes(def.grade)) this.missionTracker.stats.totalEpicCount++;
+          if (['legend','unique'].includes(def.grade)) this.missionTracker.stats.totalLegendCount++;
+          if (def.grade === 'unique') this.missionTracker.stats.totalUniqueCount++;
+          this.missionTracker.stats.tenPullCount++;
+          this.missionTracker.check();
+        }
+      });
+      grid.appendChild(card);
+    }
+
+    overlay.appendChild(grid);
+
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'skin-picker-close';
+    closeBtn.textContent = '취소 (골드 환불 없음)';
+    closeBtn.addEventListener('click', () => overlay.remove());
+    overlay.appendChild(closeBtn);
+
+    document.getElementById('game-screen').appendChild(overlay);
   }
 
   selectHeroToPlace(heroId, btnEl) {
@@ -234,7 +408,11 @@ class App {
     this.engine.spellMgr = this.spellMgr;
     this.spellMgr.cooldowns = { pokecenter: 0, masterball: 0 };
 
-    this.engine.onGoldChange  = g => { this.els.goldVal.textContent = g; this.refreshTowerBarAffordability(); };
+    // 미션 트래커 초기화
+    this.missionTracker = new MissionTracker();
+    this.missionTracker.onComplete = (mission) => this._onMissionComplete(mission);
+
+    this.engine.onGoldChange  = g => { this.els.goldVal.textContent = g; this.refreshPullButtons(); };
     this.engine.onLivesChange = l => {
       this.els.livesVal.textContent = l;
       document.getElementById('hud-lives').style.color = l <= 5 ? '#ff4444' : '';
@@ -243,12 +421,41 @@ class App {
       this.els.waveVal.textContent = w;
       this.els.waveTotal.textContent = t;
     };
+    this.engine.onComboChange = (count, mul) => {
+      const comboCell = document.getElementById('hud-combo');
+      const comboVal = document.getElementById('combo-val');
+      const comboMul = document.getElementById('combo-mul');
+      if (count > 0) {
+        comboCell.style.display = 'flex';
+        comboVal.textContent = count;
+        comboMul.textContent = `×${mul.toFixed(1)}`;
+        comboCell.style.borderColor = count >= 20 ? 'rgba(255,60,60,0.5)' : count >= 10 ? 'rgba(255,214,10,0.4)' : 'rgba(255,143,0,0.3)';
+      } else {
+        comboCell.style.display = 'none';
+      }
+    };
+    this.engine.onBossAppear = (boss) => {
+      const el = document.createElement('div');
+      el.className = 'wave-announce boss';
+      el.innerHTML = `${boss.def.emoji} ${boss.name} 등장!<br><span style="font-size:0.7em">⚠️ 보스</span>`;
+      document.getElementById('game-screen').appendChild(el);
+      setTimeout(() => el.remove(), 2800);
+      this.engine.triggerScreenShake(10, 0.4);
+    };
     this.engine.onWaveComplete = (wave, bonus) => {
       this.els.btnWave.disabled = false;
       this.els.btnWave.textContent = wave >= this.engine.totalWaves ? '🏆 완료!' : `▶ 웨이브 ${wave + 1}`;
       this.showWaveAnnounce(`Wave ${wave} 클리어! +${bonus}g`, '#ffd60a');
+      if (wave === 5)  this.showWaveAnnounce('✨ 뮤 해금!', '#f48fb1');
+      if (wave === 10) this.showWaveAnnounce('✨ 토게피 해금!', '#fff9c4');
+      this.buildTowerBar();
+      // 미션 트래킹
+      if (this.missionTracker) {
+        this.missionTracker.stats.wavesCleared = wave;
+        this.missionTracker.check();
+      }
       if (wave % 5 === 0 && wave < this.engine.totalWaves) {
-        setTimeout(() => this.openShop(), 600);
+        setTimeout(() => this.openShop(), 700);
       }
     };
     this.engine.onGameOver = () => this.showEndScreen(false, 0);
@@ -295,8 +502,7 @@ class App {
     this.engine.placeTower = (TowerClass, slotIdx) => {
       const result = origPlace(TowerClass, slotIdx);
       if (result) {
-        const slot = this.engine.towerSlots[slotIdx];
-        window.applyOrbBonuses(slot.tower, this.engine);
+        window.applyTowerSynergies(this.engine.towers);
       }
       return result;
     };
@@ -318,42 +524,114 @@ class App {
         return;
       }
       origTap(x, y);
+      // 빈 슬롯 선택 시 뽑기 버튼 강조
+      const selIdx = this.engine.selectedSlotIdx;
+      if (selIdx !== null && !this.engine.towerSlots[selIdx].occupied) {
+        document.querySelectorAll('.gacha-btn').forEach(b => b.classList.add('slot-ready'));
+        this.showWaveAnnounce('🎯 뽑기 버튼을 클릭!', '#4cc9f0');
+      } else {
+        document.querySelectorAll('.gacha-btn').forEach(b => b.classList.remove('slot-ready'));
+      }
       this.syncTowerPanel();
     };
   }
 
-  // ===== 타워 업그레이드/판매 패널 =====
+  // ===== 타워 패널 (가챠 전용) =====
   syncTowerPanel() {
     let panel = document.getElementById('tower-panel');
-    if (this.engine.selectedTower) {
-      const t = this.engine.selectedTower;
-      const slotIdx = this.engine.towerSlots.findIndex(s => s.tower === t);
-      if (!panel) {
-        panel = document.createElement('div');
-        panel.id = 'tower-panel';
-        document.getElementById('game-screen').appendChild(panel);
-      }
-      const upgCost = t.upgradeCost();
+    if (!this.engine.selectedTower) { panel?.remove(); return; }
+
+    const t = this.engine.selectedTower;
+    const slotIdx = this.engine.towerSlots.findIndex(s => s.tower === t);
+    if (!panel) {
+      panel = document.createElement('div');
+      panel.id = 'tower-panel';
+      document.getElementById('game-screen').appendChild(panel);
+    }
+
+    const def = t.def || t;
+    const isGacha = !!t._gachaId;
+
+    if (isGacha) {
+      // ===== 가챠 타워 패널 =====
+      const grade = window.GRADES?.[def.grade] || { name:'?', color:'#fff', stars:1 };
+      const dps = (t.damage * t.fireRate).toFixed(1);
+      const sameSlots = this.engine.towerSlots.filter(s => s.occupied && s.tower?._gachaId === t._gachaId);
+      const sameCount = sameSlots.length;
+      const canMerge = sameCount >= 3;
+      const evolveId = window.MERGE_EVOLUTION?.[t._gachaId];
+      const evolveDef = evolveId ? window.GachaTowerDefs?.[evolveId] : null;
+      const synergyInfo = t.synergyBonus > 0
+        ? `<span style="color:#ffd60a;font-size:10px">⚡시너지 +${t.synergyBonus}</span>` : '';
+      const refundCosts = {normal:35, rare:84, epic:140, legend:240, unique:420};
+      const refund = refundCosts[def.grade] || 35;
+
       panel.innerHTML = `
-        <div class="tower-panel-name">${t.def.evolutions[t.level - 1]} ${t.name}</div>
-        <div class="tower-panel-stats">⚔️ ${Math.round(t.damage)}  ·  📏 ${Math.round(t.range)}  ·  ⏱️ ${t.fireRate.toFixed(1)}/s</div>
+        <div class="tower-panel-name" style="color:${grade.color}">
+          ${def.emoji} ${def.name} ${'★'.repeat(grade.stars)} <span style="font-size:10px">${grade.name}</span>
+        </div>
+        <div class="tower-panel-stats">⚔️${Math.round(t.damage)} · ⏱️${t.fireRate.toFixed(1)}/s · DPS:${dps} · 📏${Math.round(t.range)} ${synergyInfo}</div>
+        <div style="font-size:10px;color:#aaa;margin:2px 0">${def.desc||''}</div>
+        <div style="font-size:10px;margin:3px 0;color:${canMerge?'#ffd60a':'#888'}">
+          ${canMerge
+            ? `✅ 합치기 가능! (${sameCount}/3)${evolveDef?' → '+evolveDef.emoji+evolveDef.name:''}`
+            : `동일 타워 ${sameCount}/3${evolveDef?' (목표: '+evolveDef.emoji+evolveDef.name+')':''}`}
+        </div>
         <div class="tower-panel-btns">
-          ${upgCost !== null ? `<button class="tp-btn tp-upgrade">⬆ 강화 (💰${upgCost})</button>` : `<button class="tp-btn tp-maxed" disabled>MAX</button>`}
-          <button class="tp-btn tp-sell">💸 판매 (+${Math.floor(t.totalSpent * 0.7)}g)</button>
+          ${canMerge
+            ? `<button class="tp-btn tp-upgrade" data-action="merge">✨ 합치기 진화!</button>`
+            : `<button class="tp-btn tp-maxed" disabled>합치기 ${sameCount}/3</button>`}
+          <button class="tp-btn tp-sell" data-action="sell">💸 +${refund}g</button>
         </div>
       `;
-      panel.querySelector('.tp-upgrade')?.addEventListener('click', () => {
-        if (t.upgrade(this.engine)) this.syncTowerPanel();
+
+      panel.querySelector('[data-action="merge"]')?.addEventListener('click', () => {
+        const slots = this.engine.towerSlots.filter(s => s.occupied && s.tower?._gachaId === t._gachaId).slice(0,3);
+        if (slots.length < 3 || !evolveDef) return;
+        // 1번 슬롯에 진화 타워, 나머지 2개 제거
+        for (let i = 1; i < 3; i++) {
+          this.engine.towers = this.engine.towers.filter(x => x !== slots[i].tower);
+          slots[i].occupied = false; slots[i].tower = null;
+        }
+        const evoTower = window._createGachaTower(evolveDef, slots[0].x, slots[0].y);
+        this.engine.towers = this.engine.towers.filter(x => x !== slots[0].tower);
+        this.engine.towers.push(evoTower);
+        slots[0].tower = evoTower;
+        this.engine.selectedTower = evoTower;
+        if (window.applyTowerSynergies) window.applyTowerSynergies(this.engine.towers);
+        const evoGrade = window.GRADES[evolveDef.grade];
+        this.engine.spawnFloatingText(`✨ ${evolveDef.name}!`, slots[0].x, slots[0].y-40, evoGrade.color);
+        this.engine.particles.push(new BurstRing(slots[0].x, slots[0].y, 70, evoGrade.color));
+        this.engine.triggerScreenShake(6, 0.25);
+        if (this.missionTracker) { this.missionTracker.stats.mergeCount++; this.missionTracker.check(); }
+        this.syncTowerPanel();
       });
-      panel.querySelector('.tp-sell').addEventListener('click', () => {
-        this.engine.sellTower(slotIdx);
+
+      panel.querySelector('[data-action="sell"]')?.addEventListener('click', () => {
+        // 실제 gold 환급
+        this.engine.addGold(refund);
+        this.engine.towers = this.engine.towers.filter(x => x !== t);
+        const slot = this.engine.towerSlots[slotIdx];
+        if (slot) { slot.occupied = false; slot.tower = null; }
+        if (window.applyTowerSynergies) window.applyTowerSynergies(this.engine.towers);
         this.engine.selectedTower = null;
-        this.engine.selectedSlotIdx = null;
         panel.remove();
+        this.refreshPullButtons();
       });
-      panel.style.display = 'flex';
-    } else if (panel) {
-      panel.remove();
+    } else {
+      // ===== 기존 업그레이드 타워 패널 (영웅 슬롯 등) =====
+      const dps = (t.damage * t.fireRate).toFixed(1);
+      panel.innerHTML = `
+        <div class="tower-panel-name">${t.name}</div>
+        <div class="tower-panel-stats">⚔️${Math.round(t.damage)} · ⏱️${t.fireRate.toFixed(1)}/s · DPS:${dps}</div>
+        <div class="tower-panel-btns">
+          <button class="tp-btn tp-sell" data-action="sell">💸 판매</button>
+        </div>
+      `;
+      panel.querySelector('[data-action="sell"]')?.addEventListener('click', () => {
+        this.engine.sellTower(slotIdx);
+        this.engine.selectedTower = null; panel.remove();
+      });
     }
   }
 
@@ -370,8 +648,10 @@ class App {
       wrap.className = 'hero-skills-group';
       const label = document.createElement('div');
       label.className = 'hero-skills-label';
-      label.textContent = `${hero.skin.emoji} ${hero.name}`;
+      label.textContent = `${hero.skin.emoji} ${hero.name} Lv${hero.level}`;
       wrap.appendChild(label);
+
+      // 스킬 버튼
       hero.def.skills.forEach((skill, idx) => {
         const btn = document.createElement('button');
         btn.className = 'skill-btn';
@@ -386,6 +666,17 @@ class App {
         });
         wrap.appendChild(btn);
       });
+
+      // 스킬트리 버튼 (SP 있을 때만 강조)
+      const treeBtn = document.createElement('button');
+      treeBtn.className = 'skill-btn skill-tree-btn';
+      treeBtn.dataset.heroId = hero.id;
+      treeBtn.innerHTML = `<span class="skill-emoji">${hero.skillPoints > 0 ? '🌟' : '📊'}</span>`;
+      treeBtn.title = `스킬트리 (SP: ${hero.skillPoints})`;
+      if (hero.skillPoints > 0) treeBtn.style.borderColor = '#ffd60a';
+      treeBtn.addEventListener('click', () => this.openSkillTree(hero));
+      wrap.appendChild(treeBtn);
+
       bar.appendChild(wrap);
     }
   }
@@ -446,6 +737,122 @@ class App {
         cdEl.textContent = '';
       }
     }
+  }
+
+  openSkillTree(hero) {
+    const existing = document.querySelector('.skilltree-overlay');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.className = 'skilltree-overlay';
+
+    const title = document.createElement('div');
+    title.className = 'skilltree-title';
+    title.innerHTML = `${hero.skin.emoji} ${hero.name} 스킬트리 <span class="sp-badge">SP: ${hero.skillPoints}</span>`;
+    overlay.appendChild(title);
+
+    const tree = window.SkillTrees[hero.id];
+    if (tree) {
+      const grid = document.createElement('div');
+      grid.className = 'skilltree-grid';
+
+      for (let row = 0; row < 3; row++) {
+        for (let col = 0; col < 3; col++) {
+          const node = tree.nodes.find(n => n.col === col && n.row === row);
+          const cell = document.createElement('div');
+          if (node) {
+            const isUnlocked = hero.unlockedSkills.has(node.id);
+            const canUnlock = !isUnlocked && hero.skillPoints >= node.cost &&
+                              (!node.requires || hero.unlockedSkills.has(node.requires));
+            cell.className = `st-node ${isUnlocked ? 'unlocked' : ''} ${canUnlock ? 'available' : ''} ${!isUnlocked && !canUnlock ? 'locked' : ''}`;
+            cell.innerHTML = `
+              <div class="st-emoji">${node.emoji}</div>
+              <div class="st-name">${node.name}</div>
+              <div class="st-cost">${isUnlocked ? '✅' : `💎${node.cost}`}</div>
+            `;
+            cell.title = node.desc;
+            if (canUnlock) {
+              cell.addEventListener('click', () => {
+                if (hero.unlockSkillNode(node.id, this.engine)) {
+                  this.openSkillTree(hero); // 새로고침
+                  this.buildHeroSkillBar();
+                }
+              });
+            }
+          } else {
+            cell.className = 'st-node empty';
+          }
+          grid.appendChild(cell);
+        }
+      }
+      overlay.appendChild(grid);
+    }
+
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'skin-picker-close';
+    closeBtn.textContent = '닫기';
+    closeBtn.addEventListener('click', () => overlay.remove());
+    overlay.appendChild(closeBtn);
+
+    document.getElementById('game-screen').appendChild(overlay);
+  }
+
+  _onMissionComplete(mission) {
+    // 보상 지급
+    if (mission.rewardType === 'gold' && this.engine) {
+      this.engine.addGold(mission.reward);
+    }
+    // 팝업
+    const el = document.createElement('div');
+    el.className = 'mission-popup';
+    el.innerHTML = `
+      <div class="mission-popup-title">🎯 미션 완료!</div>
+      <div class="mission-popup-name">${mission.name}</div>
+      <div class="mission-popup-reward">+${mission.reward}g 획득!</div>
+    `;
+    document.getElementById('game-screen').appendChild(el);
+    setTimeout(() => el.remove(), 3000);
+  }
+
+  openMissionBoard() {
+    const existing = document.querySelector('.mission-overlay');
+    if (existing) { existing.remove(); return; }
+
+    const overlay = document.createElement('div');
+    overlay.className = 'mission-overlay';
+
+    const title = document.createElement('div');
+    title.className = 'skilltree-title';
+    title.textContent = '🎯 미션 보드';
+    overlay.appendChild(title);
+
+    const list = document.createElement('div');
+    list.className = 'mission-list';
+
+    const tracker = this.missionTracker;
+    for (const m of window.MissionDefs) {
+      const done = tracker && tracker.completed.has(m.id);
+      const item = document.createElement('div');
+      item.className = `mission-item ${done ? 'done' : ''}`;
+      item.innerHTML = `
+        <span class="mission-status">${done ? '✅' : '⬜'}</span>
+        <div class="mission-info">
+          <div class="mission-name">${m.name}</div>
+          <div class="mission-desc">${m.desc}</div>
+        </div>
+        <div class="mission-reward">💰${m.reward}</div>
+      `;
+      list.appendChild(item);
+    }
+    overlay.appendChild(list);
+
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'skin-picker-close';
+    closeBtn.textContent = '닫기';
+    closeBtn.addEventListener('click', () => overlay.remove());
+    overlay.appendChild(closeBtn);
+
+    document.getElementById('game-screen').appendChild(overlay);
   }
 
   openShop() {
@@ -557,10 +964,21 @@ class App {
     let wave = WaveData[waveIdx];
     if (this.currentMapId === 'cave') wave = splitForCave(wave);
 
+    // 보스 웨이브 경고
+    const bossWaves = { 10: '⚠️ 갸라도스 중간보스 등장!', 16: '☠️ 루기아 준보스 등장!', 20: '🔮 최종보스 뮤츠!' };
+    const nextWave = waveIdx + 1;
+    if (bossWaves[nextWave]) {
+      const el = document.createElement('div');
+      el.className = 'wave-announce boss';
+      el.textContent = bossWaves[nextWave];
+      document.getElementById('game-screen').appendChild(el);
+      setTimeout(() => el.remove(), 2500);
+    }
+
     if (e.startWave(wave)) {
       this.els.btnWave.disabled = true;
       this.els.btnWave.textContent = '⏳ 진행 중...';
-      this.showWaveAnnounce(`Wave ${e.currentWave}`, '#ffd60a');
+      setTimeout(() => this.showWaveAnnounce(`Wave ${e.currentWave}`, '#ffd60a'), 100);
     }
   }
 
@@ -610,21 +1028,29 @@ class App {
 
   backToMapSelect() {
     if (this.engine) { this.engine.stop(); this.engine = null; }
+    // 배속 초기화
+    document.querySelectorAll('.speed-btn').forEach(b => b.classList.toggle('active', b.dataset.speed === '1'));
+    document.querySelectorAll('.gacha-btn').forEach(b => b.classList.remove('slot-ready'));
     this.els.gameScreen.classList.remove('active');
     this.els.mapSelect.classList.add('active');
 
     const ctx = this.els.canvas.getContext('2d');
     ctx.clearRect(0, 0, this.els.canvas.width, this.els.canvas.height);
 
-    document.querySelectorAll('.end-overlay').forEach(el => el.remove());
-    document.querySelectorAll('.wave-announce').forEach(el => el.remove());
-    document.querySelectorAll('.shop-overlay').forEach(el => el.remove());
-    document.querySelectorAll('.skin-picker').forEach(el => el.remove());
+    document.querySelectorAll('.end-overlay,.wave-announce,.shop-overlay,.skin-picker,.skilltree-overlay').forEach(el => el.remove());
+    const tp = document.getElementById('tower-panel');
+    if (tp) tp.remove();
 
     const skillBar = document.getElementById('hero-skill-bar');
     if (skillBar) skillBar.innerHTML = '';
     const spellBar = document.getElementById('spell-bar');
     if (spellBar) spellBar.innerHTML = '';
+
+    // 콤보 숨김
+    const comboCell = document.getElementById('hud-combo');
+    if (comboCell) comboCell.style.display = 'none';
+
+    this.buildTowerBar();
   }
 
   togglePause() {
@@ -643,8 +1069,97 @@ class App {
 
 // ===== BOOT =====
 window.addEventListener('DOMContentLoaded', () => {
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js').catch(() => {});
-  }
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
   window.app = new App();
+  initTitleCanvas();
 });
+
+// ===== 타이틀 화면 파티클 =====
+function initTitleCanvas() {
+  const canvas = document.getElementById('title-canvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  let W = canvas.clientWidth, H = canvas.clientHeight;
+  canvas.width = W; canvas.height = H;
+
+  const particles = [];
+  const COLORS = ['#ffd60a','#4cc9f0','#f48fb1','#06d6a0','#c084fc','#ff6b6b'];
+  const EMOJIS = ['⭐','✨','💫','🌟','⚡','💎'];
+
+  for (let i = 0; i < 60; i++) {
+    particles.push({
+      x: Math.random() * W, y: Math.random() * H,
+      vx: (Math.random()-0.5) * 20, vy: -15 - Math.random() * 25,
+      r: 1 + Math.random() * 2.5,
+      alpha: 0.3 + Math.random() * 0.5,
+      color: COLORS[Math.floor(Math.random()*COLORS.length)],
+      emoji: Math.random() < 0.15 ? EMOJIS[Math.floor(Math.random()*EMOJIS.length)] : null,
+      size: 10 + Math.random() * 14,
+      spin: (Math.random()-0.5) * 0.05,
+      rot: Math.random() * Math.PI * 2,
+    });
+  }
+
+  // 큰 배경 원들 (성운 느낌)
+  const orbs = Array.from({length:5}, () => ({
+    x: Math.random()*W, y: Math.random()*H,
+    r: 80 + Math.random()*160,
+    color: COLORS[Math.floor(Math.random()*COLORS.length)],
+    phase: Math.random()*Math.PI*2, speed: 0.003 + Math.random()*0.004
+  }));
+
+  let frame = 0;
+  function loop() {
+    if (!document.getElementById('title-screen')?.classList.contains('active')) return;
+    requestAnimationFrame(loop);
+    frame++;
+
+    W = canvas.clientWidth; H = canvas.clientHeight;
+    if (canvas.width !== W || canvas.height !== H) { canvas.width=W; canvas.height=H; }
+
+    // 배경
+    ctx.fillStyle = '#030612';
+    ctx.fillRect(0, 0, W, H);
+
+    // 성운 orb
+    for (const o of orbs) {
+      o.phase += o.speed;
+      const pulse = Math.sin(o.phase) * 0.15 + 0.85;
+      const g = ctx.createRadialGradient(o.x,o.y,0,o.x,o.y,o.r*pulse);
+      g.addColorStop(0, o.color + '12');
+      g.addColorStop(0.5, o.color + '06');
+      g.addColorStop(1, 'transparent');
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(o.x,o.y,o.r*pulse,0,Math.PI*2); ctx.fill();
+    }
+
+    // 파티클
+    for (const p of particles) {
+      p.x += p.vx * 0.016; p.y += p.vy * 0.016;
+      p.rot += p.spin;
+      if (p.y < -30) { p.y = H + 10; p.x = Math.random()*W; }
+
+      ctx.save();
+      ctx.globalAlpha = p.alpha * (0.7 + Math.sin(frame*0.04 + p.rot)*0.3);
+      if (p.emoji) {
+        ctx.translate(p.x, p.y); ctx.rotate(p.rot);
+        ctx.font = `${p.size}px serif`;
+        ctx.textAlign='center'; ctx.textBaseline='middle';
+        ctx.fillText(p.emoji, 0, 0);
+      } else {
+        ctx.fillStyle = p.color;
+        ctx.shadowColor = p.color; ctx.shadowBlur = 8;
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI*2); ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    // 하단 그라디언트 오버레이
+    const grad = ctx.createLinearGradient(0, H*0.6, 0, H);
+    grad.addColorStop(0, 'transparent');
+    grad.addColorStop(1, 'rgba(3,6,18,0.6)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, H*0.6, W, H*0.4);
+  }
+  loop();
+}
