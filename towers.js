@@ -875,4 +875,3 @@ window.applyTowerSynergies = applyTowerSynergies;
 window.AoeBurst = AoeBurst;
 window.ChainBolt = ChainBolt;
 window.Projectile = Projectile;
-

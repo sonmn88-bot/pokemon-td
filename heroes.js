@@ -24,6 +24,9 @@ const SkinDefs = {
   blastoise: {
     default: { name:'기본', emoji:'🐢', color:'#0288d1', unlocked:true, fxColor:'#81d4fa' },
   },
+  eevee: {
+    default: { name:'기본', emoji:'🦊', color:'#a1887f', unlocked:true, fxColor:'#d7ccc8' },
+  },
 };
 
 // ===== 스킬트리 정의 =====
@@ -133,15 +136,36 @@ SkillTrees.blastoise = {
   ]
 };
 
+// ===== 이브이 (만능형 - 진화로 특화됨) =====
+SkillTrees.eevee = {
+  nodes: [
+    {id:'ev_dmg1',  name:'몸통박치기', emoji:'⭐', desc:'기본공격 데미지 +15%',   cost:1, requires:null, col:0, row:0, type:'atkDmg', value:0.15},
+    {id:'ev_rng1',  name:'예민한감각', emoji:'👁️', desc:'기본공격 사거리 +16%',   cost:1, requires:null, col:1, row:0, type:'atkRange', value:0.16},
+    {id:'ev_spd1',  name:'기민함',   emoji:'💨', desc:'공격속도 +18%',           cost:1, requires:null, col:2, row:0, type:'fireRate', value:0.18},
+    {id:'ev_crit2', name:'약점포착', emoji:'💥', desc:'25% 확률 2.2배 크리',      cost:1, requires:'ev_dmg1', col:0, row:1, type:'crit', value:{chance:0.25, mul:2.2}},
+    {id:'ev_skr2',  name:'집중',     emoji:'🔵', desc:'스킬 범위 +45%',          cost:1, requires:'ev_rng1', col:1, row:1, type:'skillRange', value:0.45},
+    {id:'ev_cd2',   name:'순응',     emoji:'⏱️', desc:'모든 스킬 쿨다운 -20%',   cost:1, requires:'ev_spd1', col:2, row:1, type:'cdReduce', value:0.20},
+    {id:'ev_glb3',  name:'유대',     emoji:'💗', desc:'타워 전체 데미지 +10%',    cost:2, requires:'ev_crit2', col:0, row:2, type:'globalDmg', value:0.10},
+    {id:'ev_multi3',name:'다재다능', emoji:'🌈', desc:'기본공격 2타겟 동시 공격', cost:2, requires:'ev_skr2', col:1, row:2, type:'multiTarget', value:2},
+    {id:'ev_life3', name:'생명력',   emoji:'❤️', desc:'라이프 최대 +5',          cost:2, requires:'ev_cd2', col:2, row:2, type:'maxLives', value:5},
+    {id:'ev_final4',name:'진화의빛', emoji:'✨', desc:'모든 스킬 쿨다운 -35%',    cost:2, requires:'ev_glb3', col:0, row:3, type:'cdReduce', value:0.35},
+    {id:'ev_king4', name:'베테랑',   emoji:'👑', desc:'기본공격 데미지 +25%',     cost:2, requires:'ev_multi3', col:1, row:3, type:'atkDmg', value:0.25},
+    {id:'ev_tank4', name:'수호본능', emoji:'🛡️', desc:'라이프 최대 +8',          cost:2, requires:'ev_life3', col:2, row:3, type:'maxLives', value:8},
+  ]
+};
+
 // ===== 영웅 기본 정의 =====
 const HeroDefs = {
   pikachu: {
     id:'pikachu', name:'피카츄', baseColor:'#ffd600',
     role:'전기 딜러',
     passive:'전기 타워 데미지 +15%',
+    evolution:{ level:15, options:[
+      { id:'raichu', name:'라이츄', color:'#ff9800', statMul:1.20 },
+    ]},
     attack:{
       baseRange:200, baseDamage:15, baseFireRate:1.4,
-      rangePerLevel:15, damagePerLevel:7,
+      rangePerLevel:7, damagePerLevel:3,
       projColor:'#fff176', projEmoji:'⚡', dmgType:'special',
       status:{type:'stun', duration:0.15},
     },
@@ -193,7 +217,7 @@ const HeroDefs = {
     passive:'모든 타워 사거리 +10%',
     attack:{
       baseRange:220, baseDamage:12, baseFireRate:1.1,
-      rangePerLevel:18, damagePerLevel:6,
+      rangePerLevel:8, damagePerLevel:3,
       projColor:'#ce93d8', projEmoji:'🔮', dmgType:'special',
       status:{type:'slow', duration:1.5, factor:0.7},
     },
@@ -240,9 +264,12 @@ const HeroDefs = {
     id:'togepi', name:'토게피', baseColor:'#fff9c4',
     role:'서포터 / 행운',
     passive:'피격 반사 데미지 + 골드 보너스',
+    evolution:{ level:15, options:[
+      { id:'togetic', name:'토게틱', color:'#f8bbd0', statMul:1.20 },
+    ]},
     attack:{
       baseRange:185, baseDamage:10, baseFireRate:1.3,
-      rangePerLevel:14, damagePerLevel:5,
+      rangePerLevel:6, damagePerLevel:2,
       projColor:'#fff59d', projEmoji:'✨', dmgType:'special',
     },
     passiveApply(engine, hero) {
@@ -293,7 +320,7 @@ HeroDefs.charizard = {
   passive:'불꽃 타입 타워 데미지 +15%',
   attack:{
     baseRange:210, baseDamage:18, baseFireRate:1.2,
-    rangePerLevel:14, damagePerLevel:8,
+    rangePerLevel:6, damagePerLevel:4,
     projColor:'#ff7043', projEmoji:'🔥', dmgType:'special',
     status:{type:'burn', duration:2, factor:8},
   },
@@ -341,7 +368,7 @@ HeroDefs.blastoise = {
   passive:'물 타입 타워 사거리 +10%',
   attack:{
     baseRange:220, baseDamage:14, baseFireRate:1.1,
-    rangePerLevel:16, damagePerLevel:6,
+    rangePerLevel:7, damagePerLevel:3,
     projColor:'#4fc3f7', projEmoji:'💧', dmgType:'special',
     status:{type:'slow', duration:1.8, factor:0.65},
   },
@@ -383,6 +410,53 @@ HeroDefs.blastoise = {
   ],
 };
 
+// ===== 이브이 (만능형, 레벨12에 3갈래 진화 선택) =====
+HeroDefs.eevee = {
+  id:'eevee', name:'이브이', baseColor:'#a1887f',
+  role:'만능형 (진화로 특화)',
+  passive:'모든 타워 데미지 +5%',
+  attack:{
+    baseRange:190, baseDamage:11, baseFireRate:1.2,
+    rangePerLevel:6, damagePerLevel:2,
+    projColor:'#d7ccc8', projEmoji:'⭐', dmgType:'special',
+  },
+  evolution:{ level:12, options:[
+    { id:'vaporeon', name:'샤미드',   color:'#29b6f6', statMul:1.28, focus:'물(사거리 특화)' },
+    { id:'jolteon',  name:'쥬피썬더', color:'#ffd600', statMul:1.28, focus:'전기(공속 특화)' },
+    { id:'flareon',  name:'부스터',   color:'#ff5722', statMul:1.28, focus:'불(데미지 특화)' },
+  ]},
+  passiveApply(engine, hero) {
+    const mul = 1.05 + (hero ? hero._skillVal('passiveRange', 0) : 0);
+    for (const t of engine.towers) t.buffDmgMul = Math.max(t.buffDmgMul || 1, mul);
+  },
+  skills:[
+    {
+      name:'적응', emoji:'🌀', baseCooldown:14,
+      desc:'범위 내 모든 적 슬로우 + 소량 피해',
+      cast(hero, engine) {
+        const r = (140 + hero.level * 8) * (1 + hero._skillVal('skillRange', 0));
+        for (const e of engine.enemies) {
+          if (e.dead||e.reachedEnd) continue;
+          if (Math.hypot(e.x-hero.x,e.y-hero.y) <= r) {
+            e.takeDamage(18 + hero.level * 6, 'special');
+            e.applyStatus('slow', 2.5, 0.5);
+          }
+        }
+        engine.particles.push(new AoeBurst(hero.x, hero.y, r, hero._evoColor || '#a1887f'));
+        engine.spawnFloatingText('🌀적응!', hero.x, hero.y-32, '#d7ccc8');
+      }
+    },
+    {
+      name:'재빠른몸놀림', emoji:'💨', baseCooldown:20,
+      desc:'모든 스킬 쿨다운 즉시 30% 감소',
+      cast(hero, engine) {
+        for (const h of engine.heroes) h.cooldowns = h.cooldowns.map(c => c * 0.7);
+        engine.spawnFloatingText('💨재빠른몸놀림!', hero.x, hero.y-32, '#fff59d');
+      }
+    },
+  ],
+};
+
 // ===== HERO CLASS =====
 class Hero {
   constructor(heroId, x, y, skinId='default') {
@@ -418,12 +492,12 @@ class Hero {
   get attackRange() {
     const a = this.def.attack;
     if (!a) return 0;
-    return (a.baseRange + (this.level-1)*a.rangePerLevel) * (1 + this._skillVal('atkRange', 0));
+    return (a.baseRange + (this.level-1)*a.rangePerLevel) * (1 + this._skillVal('atkRange', 0)) * (this._evoStatMul || 1);
   }
   get attackDamage() {
     const a = this.def.attack;
     if (!a) return 0;
-    return (a.baseDamage + (this.level-1)*a.damagePerLevel) * (1 + this._skillVal('atkDmg', 0));
+    return (a.baseDamage + (this.level-1)*a.damagePerLevel) * (1 + this._skillVal('atkDmg', 0)) * (this._evoStatMul || 1);
   }
   get attackFireRate() {
     const a = this.def.attack;
@@ -473,14 +547,44 @@ class Hero {
 
   gainExp(amount, engine) {
     this.exp += amount;
-    while (this.exp >= this.expToNext && this.level < 10) {
+    while (this.exp >= this.expToNext && this.level < 25) {
       this.exp -= this.expToNext;
       this.level++;
       this.skillPoints++;
-      this.expToNext = Math.floor(this.expToNext * 1.35);
+      this.expToNext = Math.floor(this.expToNext * 1.30);
       engine && engine.spawnFloatingText(`${this.def.name} Lv${this.level}! +SP`, this.x, this.y-42, '#ffd60a');
       engine && engine.particles && engine.particles.push(new AoeBurst(this.x, this.y, 50, '#ffd60a'));
+
+      // 진화 체크 (스킬트리로 전략 짜다가 한참 뒤에 진화하도록 레벨 게이트)
+      const evo = this.def.evolution;
+      if (evo && !this.evolved && !this.evolutionPending && this.level >= evo.level) {
+        if (evo.options.length === 1) {
+          this._evolve(evo.options[0], engine);
+        } else {
+          this.evolutionPending = true;
+          engine && engine.onHeroEvolutionReady && engine.onHeroEvolutionReady(this);
+        }
+      }
     }
+  }
+
+  // 진화 실행 (단일 경로는 자동, 다중 경로는 evolutionPending 상태에서 evolve() 수동 호출)
+  _evolve(option, engine) {
+    this.evolved = option.id;
+    this.evolutionPending = false;
+    this._evoStatMul = option.statMul || 1.2;
+    this._evoColor = option.color;
+    engine && engine.spawnFloatingText(`✨ ${option.name}(으)로 진화!`, this.x, this.y-46, option.color);
+    engine && engine.particles && engine.particles.push(new AoeBurst(this.x, this.y, 70, option.color));
+    engine && engine.triggerScreenShake && engine.triggerScreenShake(6, 0.3);
+  }
+  evolve(optionId, engine) {
+    const evo = this.def.evolution;
+    if (!evo || !this.evolutionPending) return false;
+    const option = evo.options.find(o => o.id === optionId);
+    if (!option) return false;
+    this._evolve(option, engine);
+    return true;
   }
 
   _skinHueShift() {
@@ -596,6 +700,51 @@ class Hero {
       ctx.restore();
     }
 
+    const auraColor = this._evoColor || skin.color;
+    const spriteKey = this.evolved || this.id;
+    const spritePath = window.HeroSpriteImages && window.HeroSpriteImages[spriteKey];
+    const spriteImg = spritePath ? window.loadSpriteImage(spritePath) : null;
+
+    if (spriteImg && spriteImg.complete && spriteImg.naturalWidth > 0) {
+      ctx.save();
+      // 오라 (진화했으면 진화 타입 색, 아니면 스킨 색)
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.evolved ? 36 : 30, 0, Math.PI * 2);
+      const grad = ctx.createRadialGradient(this.x,this.y,5,this.x,this.y,this.evolved?36:30);
+      grad.addColorStop(0, auraColor + (this.evolved ? '60' : '40'));
+      grad.addColorStop(1, auraColor + '00');
+      ctx.fillStyle = grad;
+      ctx.fill();
+      if (this.evolved) {
+        ctx.strokeStyle = auraColor + '80'; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.arc(this.x, this.y, 30 + Math.sin(Date.now()*0.004)*3, 0, Math.PI*2); ctx.stroke();
+      }
+      ctx.restore();
+
+      const drawSize = 46;
+      ctx.save();
+      ctx.drawImage(spriteImg, this.x - drawSize/2, this.y - drawSize/2, drawSize, drawSize);
+      ctx.restore();
+
+      if (skin.badge) {
+        ctx.save();
+        ctx.font = '13px serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(skin.badge, this.x+17, this.y-17);
+        ctx.restore();
+      }
+
+      ctx.save();
+      ctx.font = 'bold 10px -apple-system, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.shadowColor = 'rgba(0,0,0,0.9)';
+      ctx.shadowBlur = 4;
+      ctx.fillStyle = this.skillPoints > 0 ? '#ffd60a' : '#fff';
+      ctx.fillText(`Lv${this.level}${this.skillPoints>0?' ✦':''}`, this.x, this.y+34);
+      ctx.restore();
+      return;
+    }
+
     if (this.rig) {
       ctx.save();
       // 오라
@@ -658,6 +807,16 @@ const HeroProgress = {
     if (!this.unlockedSkins[heroId].includes(skinId)) this.unlockedSkins[heroId].push(skinId);
   },
   isUnlocked(heroId, skinId) { return this.unlockedSkins[heroId].includes(skinId); },
+};
+
+// ===== 영웅 이미지 (기본형은 SpriteRig/이모지 폴백 유지, 진화형+이브이 계열은 실제 이미지) =====
+window.HeroSpriteImages = {
+  raichu:'assets/heroes/raichu.png',
+  togetic:'assets/heroes/togetic.png',
+  eevee:'assets/heroes/eevee.png',
+  vaporeon:'assets/heroes/vaporeon.png',
+  jolteon:'assets/heroes/jolteon.png',
+  flareon:'assets/heroes/flareon.png',
 };
 
 window.HeroDefs = HeroDefs;

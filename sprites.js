@@ -409,4 +409,3 @@ window.drawBlobBody = drawBlobBody;
 window.drawEyes = drawEyes;
 window.HeroDrawFns = HeroDrawFns;
 
-

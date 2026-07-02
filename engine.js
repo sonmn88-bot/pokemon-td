@@ -86,6 +86,7 @@ class GameEngine {
     this.onWaveTimerChange = null;
     this.onWaveTimeout = null;
     this.onEliteKill = null;
+    this.onHeroEvolutionReady = null;
 
     // 캐시
     this._bgCanvas = null;

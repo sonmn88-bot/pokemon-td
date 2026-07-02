@@ -49,7 +49,7 @@ class App {
     this.engine = null;
     this.currentMapId = null;
     this.spellMgr = new SpellManager();
-    this.selectedHeroSkins = { pikachu: 'default', mew: 'default', togepi: 'default', charizard: 'default', blastoise: 'default' };
+    this.selectedHeroSkins = { pikachu: 'default', mew: 'default', togepi: 'default', charizard: 'default', blastoise: 'default', eevee: 'default' };
     this.placingHero = null;
     this._autoWaveTimer = null;
     this._inventory = [];
@@ -354,8 +354,8 @@ class App {
     scroll.appendChild(sep);
 
     // 영웅 버튼들
-    const heroUnlockWave = { pikachu:0, mew:5, togepi:10, charizard:8, blastoise:13 };
-    for (const heroId of ['pikachu', 'mew', 'togepi', 'charizard', 'blastoise']) {
+    const heroUnlockWave = { pikachu:0, mew:5, togepi:10, charizard:8, blastoise:13, eevee:3 };
+    for (const heroId of ['pikachu', 'mew', 'togepi', 'charizard', 'blastoise', 'eevee']) {
       const def = window.HeroDefs[heroId];
       const btn = document.createElement('button');
       const unlockWave = heroUnlockWave[heroId];
@@ -618,6 +618,40 @@ class App {
     }
   }
 
+  openEvolutionPicker(hero) {
+    const existing = document.querySelector('.skin-picker');
+    if (existing) existing.remove();
+    if (this.engine) this.engine.stop();
+
+    const overlay = document.createElement('div');
+    overlay.className = 'skin-picker';
+    const title = document.createElement('div');
+    title.className = 'skin-picker-title';
+    title.textContent = `✨ ${hero.def.name} 진화! 어떤 모습으로 진화할까?`;
+    overlay.appendChild(title);
+
+    const grid = document.createElement('div');
+    grid.className = 'skin-grid';
+    for (const option of hero.def.evolution.options) {
+      const card = document.createElement('div');
+      card.className = 'skin-card';
+      card.style.borderColor = option.color;
+      card.innerHTML = `
+        <div class="skin-emoji" style="color:${option.color}">✨</div>
+        <div class="skin-name">${option.name}</div>
+        <div style="font-size:10px;color:${option.color};margin-top:2px">${option.focus || ''}</div>
+      `;
+      card.addEventListener('click', () => {
+        hero.evolve(option.id, this.engine);
+        overlay.remove();
+        if (this.engine) this.engine.start();
+      });
+      grid.appendChild(card);
+    }
+    overlay.appendChild(grid);
+    document.getElementById('game-screen').appendChild(overlay);
+  }
+
   openSkinPicker(heroId) {
     const existing = document.querySelector('.skin-picker');
     if (existing) existing.remove();
@@ -713,6 +747,7 @@ class App {
       this.missionTracker.stats.eliteGoldKills = (this.missionTracker.stats.eliteGoldKills||0) + 1;
       this.missionTracker.check();
     };
+    this.engine.onHeroEvolutionReady = (hero) => this.openEvolutionPicker(hero);
     this.engine.onComboChange = (count, mul) => {
       const comboCell = document.getElementById('hud-combo');
       const comboVal = document.getElementById('combo-val');

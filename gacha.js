@@ -150,6 +150,11 @@ const GachaTowerDefs = {
     damage:26, range:200, fireRate:1.5, desc:'체인 번개 3연쇄',
     fire(t,e){ e.projectiles.push(new Projectile(t.x,t.y,t.target,{engine:e,speed:600,damage:t.damage,color:'#ffeb3b',size:5,dmgType:'special',emoji:'⚡',status:{type:'stun',duration:0.6},chain:3,chainRange:150})); }
   },
+  dratini: {
+    id:'dratini', name:'미뇽', emoji:'🐉', grade:'rare', type:'water', pokemonId:'dratini',
+    damage:22, range:195, fireRate:1.3, desc:'용의숨결 관통',
+    fire(t,e){ _shot(t,e,'#4dd0e1','🌊',{type:'slow',duration:1.8,factor:0.5},450); }
+  },
 
   // ===== 에픽 (6종) =====
   charizard: {
@@ -195,6 +200,11 @@ const GachaTowerDefs = {
     damage:42, range:260, fireRate:1.8, desc:'고속 관통타',
     fire(t,e){ e.projectiles.push(new Projectile(t.x,t.y,t.target,{engine:e,speed:620,damage:t.damage,color:'#78909c',size:6,dmgType:'physical',emoji:'🪨',piercing:true,pierceWidth:30,status:{type:'stun',duration:0.5}})); }
   },
+  dragonair: {
+    id:'dragonair', name:'신뇽', emoji:'🐲', grade:'epic', type:'water', pokemonId:'dragonair',
+    damage:52, range:250, fireRate:1.5, desc:'용의파동 관통+슬로우',
+    fire(t,e){ e.projectiles.push(new Projectile(t.x,t.y,t.target,{engine:e,speed:500,damage:t.damage,color:'#4dd0e1',size:6,dmgType:'special',emoji:'🌊',piercing:true,pierceWidth:26,status:{type:'slow',duration:2.2,factor:0.45}})); }
+  },
 
   // ===== 레전드 (3종) =====
   articuno: {
@@ -222,6 +232,14 @@ const GachaTowerDefs = {
     fire(t,e){
       e.projectiles.push(new Projectile(t.x,t.y,t.target,{engine:e,speed:540,damage:t.damage,color:'#ff7043',size:6,dmgType:'special',emoji:'🔥',piercing:true,pierceWidth:30,status:{type:'burn',duration:4,factor:18},
         onHit:(en)=>{ if(Math.random()<0.4){ for(const e2 of e.enemies) if(Math.hypot(e2.x-en.x,e2.y-en.y)<90) e2.takeDamage(t.damage*1.3,'special'); e.particles.push(new AoeBurst(en.x,en.y,90,'#ff6f00')); }}}));
+    }
+  },
+  dragonite: {
+    id:'dragonite', name:'망나뇽', emoji:'🐉', grade:'legend', type:'water', pokemonId:'dragonite',
+    damage:80, range:300, fireRate:1.8, desc:'용의분노 관통+광역폭발',
+    fire(t,e){
+      e.projectiles.push(new Projectile(t.x,t.y,t.target,{engine:e,speed:560,damage:t.damage,color:'#fb8c00',size:7,dmgType:'special',emoji:'🐉',piercing:true,pierceWidth:32,
+        onHit:(en)=>{ e.particles.push(new AoeBurst(en.x,en.y,80,'#fb8c00')); for(const e2 of e.enemies) if(e2!==en&&!e2.dead&&Math.hypot(e2.x-en.x,e2.y-en.y)<80) e2.takeDamage(t.damage*0.6,'special'); }}));
     }
   },
 
@@ -269,9 +287,9 @@ const PULL_COSTS = { normal:50, premium:120, gamble:200, ten:450 };
 
 const GRADE_POOLS = {
   normal:  ['bulbasaur','charmander','squirtle','pidgey','rattata','clefairy','oddish','diglett','psyduck','growlithe','abra','magnemite'],
-  rare:    ['charmeleon','wartortle','kadabra','geodude','gastly','lickitung','horsea','magneton'],
-  epic:    ['charizard','blastoise','alakazam','gyarados','lapras','aerodactyl'],
-  legend:  ['articuno','zapdos','moltres'],
+  rare:    ['charmeleon','wartortle','kadabra','geodude','gastly','lickitung','horsea','magneton','dratini'],
+  epic:    ['charizard','blastoise','alakazam','gyarados','lapras','aerodactyl','dragonair'],
+  legend:  ['articuno','zapdos','moltres','dragonite'],
   unique:  ['mewtwo','mew'],
 };
 
@@ -286,11 +304,14 @@ const MERGE_EVOLUTION = {
   charmeleon:'charizard',wartortle:'blastoise',   kadabra:'alakazam',
   geodude:'aerodactyl',  gastly:'alakazam',       lickitung:'blastoise',
   horsea:'gyarados',     magneton:'zapdos',
+  dratini:'dragonair',
   // 에픽 3개 → 레전드
   charizard:'moltres',   blastoise:'articuno',    alakazam:'mewtwo',
   gyarados:'articuno',   lapras:'articuno',       aerodactyl:'zapdos',
+  dragonair:'dragonite',
   // 레전드 3개 → 유니크
   articuno:'mew',        zapdos:'mewtwo',         moltres:'mew',
+  dragonite:'mewtwo',
 };
 
 // ===== 뽑기 함수 =====
@@ -527,6 +548,9 @@ window.TowerSpriteImages = {
   wartortle:'assets/towers/wartortle.png',   blastoise:'assets/towers/blastoise.png',
   kadabra:'assets/towers/kadabra.png',       alakazam:'assets/towers/alakazam.png',
   magneton:'assets/towers/magneton.png',
+  dratini:'assets/towers/dratini.png', dragonair:'assets/towers/dragonair.png',
+  dragonite:'assets/enemies/dragonite.png',
+  mew:'assets/heroes/mew.png',
 };
 
 // ===== 전역 등록 =====
