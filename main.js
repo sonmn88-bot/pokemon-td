@@ -35,8 +35,12 @@ function seq(type, count, interval, pathIdx = 0, startDelay = 0) {
   return arr;
 }
 
-function splitForCave(wave) {
-  return wave.map((item, i) => ({ ...item, pathIdx: i % 2 === 0 ? 0 : 1 }));
+// 순환 트랙 제한시간: 마지막 스폰 시각 + 처치 여유시간(난이도별 가감)
+function waveTimeLimit(wave, difficulty) {
+  const lastDelay = wave.reduce((m, item) => Math.max(m, item.delay), 0);
+  const dm = (window.DifficultyMods && window.DifficultyMods[difficulty]) || { timeBonus: 0 };
+  const killBuffer = 26 + dm.timeBonus;
+  return Math.max(15, Math.round(lastDelay + killBuffer));
 }
 
 // ===== APP CONTROLLER =====
@@ -45,7 +49,7 @@ class App {
     this.engine = null;
     this.currentMapId = null;
     this.spellMgr = new SpellManager();
-    this.selectedHeroSkins = { pikachu: 'default', mew: 'default', togepi: 'default' };
+    this.selectedHeroSkins = { pikachu: 'default', mew: 'default', togepi: 'default', charizard: 'default', blastoise: 'default' };
     this.placingHero = null;
     this._autoWaveTimer = null;
     this._inventory = [];
@@ -61,31 +65,37 @@ class App {
           g.connect(ctx.destination);
           const o = ctx.createOscillator();
           o.connect(g);
+          // 부드러운 사운드로 전면 교체: square/sawtooth(거친 지지직 소리) → sine/triangle
           const configs = {
-            shoot:      { freq:[440,220],   dur:0.08, vol:0.12, type:'square' },
-            hit:        { freq:[200,100],   dur:0.10, vol:0.15, type:'sawtooth' },
-            wave_clear: { freq:[523,659,784],dur:0.5, vol:0.18, type:'sine' },
-            wave_start: { freq:[330,440],   dur:0.2,  vol:0.15, type:'sine' },
-            pull_normal:{ freq:[440,550],   dur:0.15, vol:0.14, type:'sine' },
-            pull_rare:  { freq:[550,700,880],dur:0.3, vol:0.18, type:'sine' },
-            pull_epic:  { freq:[440,660,880,1100],dur:0.5,vol:0.20,type:'sine' },
-            merge:      { freq:[523,659,784,1047],dur:0.6,vol:0.22,type:'sine' },
-            boss:       { freq:[110,90,80], dur:0.8,  vol:0.25, type:'sawtooth' },
-            buy:        { freq:[440,550],   dur:0.15, vol:0.14, type:'sine' },
-            life_lost:  { freq:[220,180,140],dur:0.4, vol:0.20, type:'sawtooth' },
-            skill:      { freq:[660,880],   dur:0.2,  vol:0.18, type:'sine' },
+            shoot:      { freq:[440,300],   dur:0.09, vol:0.09, type:'triangle' },
+            hit:        { freq:[260,160],   dur:0.11, vol:0.10, type:'sine' },
+            wave_clear: { freq:[523,659,784],dur:0.55, vol:0.15, type:'sine' },
+            wave_start: { freq:[330,440],   dur:0.22, vol:0.13, type:'sine' },
+            pull_normal:{ freq:[440,550],   dur:0.16, vol:0.11, type:'sine' },
+            pull_rare:  { freq:[550,700,880],dur:0.32, vol:0.14, type:'sine' },
+            pull_epic:  { freq:[440,660,880,1100],dur:0.5,vol:0.16,type:'sine' },
+            merge:      { freq:[523,659,784,1047],dur:0.6,vol:0.17,type:'sine' },
+            boss:       { freq:[150,120,100],dur:0.85, vol:0.16, type:'triangle' },
+            buy:        { freq:[440,550],   dur:0.16, vol:0.11, type:'sine' },
+            life_lost:  { freq:[260,210,170],dur:0.45, vol:0.13, type:'sine' },
+            skill:      { freq:[660,880],   dur:0.22, vol:0.13, type:'sine' },
           };
           const cfg = configs[type] || configs.hit;
           o.type = cfg.type;
           const freqs = cfg.freq;
           const stepDur = cfg.dur / freqs.length;
+          const t0 = ctx.currentTime;
+          o.frequency.setValueAtTime(freqs[0], t0);
           freqs.forEach((f, i) => {
-            o.frequency.setValueAtTime(f, ctx.currentTime + i * stepDur);
+            // 계단식(끊김/지지직) 대신 부드러운 선형 램프로 주파수 전환
+            o.frequency.linearRampToValueAtTime(f, t0 + i * stepDur + stepDur * 0.9);
           });
-          g.gain.setValueAtTime(cfg.vol, ctx.currentTime);
-          g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + cfg.dur);
-          o.start(ctx.currentTime);
-          o.stop(ctx.currentTime + cfg.dur + 0.05);
+          // 어택 램프: 0에서 시작해 살짝 올라갔다 내려가는 자연스러운 엔벨로프 (클릭/팝 노이즈 방지)
+          g.gain.setValueAtTime(0.0001, t0);
+          g.gain.exponentialRampToValueAtTime(cfg.vol, t0 + 0.012);
+          g.gain.exponentialRampToValueAtTime(0.0008, t0 + cfg.dur);
+          o.start(t0);
+          o.stop(t0 + cfg.dur + 0.05);
         } catch(e) {}
       }
     };
@@ -108,7 +118,7 @@ class App {
           // 맵별 음계/템포
           const themes = {
             forest: { notes:[261,294,330,349,392,440,494,523], tempo:0.4, vol:0.06, wave:'sine' },
-            city:   { notes:[220,247,262,294,330,370,392,440], tempo:0.3, vol:0.07, wave:'sawtooth' },
+            city:   { notes:[220,247,262,294,330,370,392,440], tempo:0.3, vol:0.06, wave:'triangle' },
             cave:   { notes:[196,220,233,261,294,311,349,392], tempo:0.5, vol:0.05, wave:'sine' },
           };
           const theme = themes[mapId] || themes.forest;
@@ -179,7 +189,10 @@ class App {
     };
 
     this.bindMapSelect();
+    this.difficulty = 'normal';
+    this.bindDifficultySelect();
     this.bindButtons();
+    this.bindHotkeys();
     this.bindSpeedButtons();
     this.buildTowerBar();
     this.bindTitleScreen();
@@ -206,6 +219,63 @@ class App {
   bindMapSelect() {
     document.querySelectorAll('.map-card').forEach(card => {
       card.addEventListener('click', () => this.startGame(card.dataset.map));
+    });
+  }
+
+  bindDifficultySelect() {
+    document.querySelectorAll('.diff-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        this.difficulty = btn.dataset.diff;
+        document.querySelectorAll('.diff-btn').forEach(b => b.classList.toggle('active', b === btn));
+      });
+    });
+  }
+
+  // ===== PC 단축키 =====
+  // 슬롯을 마우스로 선택한 뒤 숫자키로 즉시 뽑기, X로 즉시 판매, 스페이스로 웨이브 시작, QWER로 영웅 스킬
+  bindHotkeys() {
+    window.addEventListener('keydown', (e) => {
+      if (!this.engine || !this.els.gameScreen.classList.contains('active')) return;
+      // 입력창/오버레이가 떠 있으면 무시
+      if (document.querySelector('.shop-overlay, .skilltree-overlay, .tenpull-overlay, .mission-overlay, .end-overlay')) return;
+      const k = e.key.toLowerCase();
+
+      // 1~4: 선택된 슬롯에 즉시 뽑기
+      if (['1','2','3','4'].includes(k)) {
+        const map = { '1':'normal', '2':'premium', '3':'gamble', '4':'ten' };
+        e.preventDefault();
+        this.doPull(map[k]);
+        return;
+      }
+      // X / Delete / Backspace: 선택된 타워 즉시 판매
+      if (k === 'x' || k === 'delete' || k === 'backspace') {
+        if (this.engine.selectedTower && this.engine.selectedSlotIdx !== null) {
+          e.preventDefault();
+          this.engine.sellTower(this.engine.selectedSlotIdx);
+          this.engine.selectedTower = null; this.engine.selectedSlotIdx = null;
+          document.querySelector('.tower-info-panel')?.remove();
+        }
+        return;
+      }
+      // 스페이스: 웨이브 시작 (idle일 때만)
+      if (k === ' ') {
+        if (this.engine.state === 'idle') { e.preventDefault(); this.sendWave(); }
+        return;
+      }
+      // QWER: 배치된 영웅 순서대로 스킬1/스킬2
+      const skillKeyMap = { q:[0,0], w:[0,1], e:[1,0], r:[1,1] };
+      if (skillKeyMap[k]) {
+        const [heroIdx, skillIdx] = skillKeyMap[k];
+        const hero = this.engine.heroes[heroIdx];
+        if (hero) {
+          e.preventDefault();
+          if (hero.cast(skillIdx, this.engine)) {
+            const skill = hero.def.skills[skillIdx];
+            this.showWaveAnnounce(`${skill.emoji} ${skill.name}!`, '#ffd60a');
+          }
+        }
+        return;
+      }
     });
   }
 
@@ -254,10 +324,10 @@ class App {
 
     // 뽑기 버튼 3종
     const pulls = [
-      { key:'normal',  label:'일반 뽑기',  cost:50,  color:'#9e9e9e', emoji:'🎰' },
-      { key:'premium', label:'프리미엄',   cost:120, color:'#4fc3f7', emoji:'💎' },
-      { key:'gamble',  label:'도박 뽑기',  cost:200, color:'#ffd60a', emoji:'🎲' },
-      { key:'ten',     label:'10연 뽑기',  cost:450, color:'#ce93d8', emoji:'🌟', ten:true },
+      { key:'normal',  label:'일반 뽑기',  cost:50,  color:'#9e9e9e', emoji:'🎰', hotkey:'1' },
+      { key:'premium', label:'프리미엄',   cost:120, color:'#4fc3f7', emoji:'💎', hotkey:'2' },
+      { key:'gamble',  label:'도박 뽑기',  cost:200, color:'#ffd60a', emoji:'🎲', hotkey:'3' },
+      { key:'ten',     label:'10연 뽑기',  cost:450, color:'#ce93d8', emoji:'🌟', ten:true, hotkey:'4' },
     ];
 
     for (const p of pulls) {
@@ -266,13 +336,14 @@ class App {
       btn.dataset.pullKey = p.key;
       btn.style.borderColor = p.color + '60';
       btn.innerHTML = `
+        <span class="hotkey-badge">${p.hotkey}</span>
         <span class="tower-btn-emoji">${p.emoji}</span>
         <span class="tower-btn-name" style="color:${p.color}">${p.label}</span>
         <span class="tower-btn-cost">💰${p.cost}</span>
       `;
-      btn.title = p.key === 'gamble' ? '에픽~레전드 확률 높음!' :
-                  p.key === 'ten'    ? '10개! 에픽 1개 보장' :
-                  p.key === 'premium'? '레어~에픽 위주' : '노말~레어 위주';
+      btn.title = p.key === 'gamble' ? '에픽~레전드 확률 높음! (단축키: ' + p.hotkey + ')' :
+                  p.key === 'ten'    ? '10개! 에픽 1개 보장 (단축키: ' + p.hotkey + ')' :
+                  p.key === 'premium'? '레어~에픽 위주 (단축키: ' + p.hotkey + ')' : '노말~레어 위주 (단축키: ' + p.hotkey + ')';
       btn.addEventListener('click', () => this.doPull(p.key, btn));
       scroll.appendChild(btn);
     }
@@ -283,8 +354,8 @@ class App {
     scroll.appendChild(sep);
 
     // 영웅 버튼들
-    const heroUnlockWave = { pikachu:0, mew:5, togepi:10 };
-    for (const heroId of ['pikachu', 'mew', 'togepi']) {
+    const heroUnlockWave = { pikachu:0, mew:5, togepi:10, charizard:8, blastoise:13 };
+    for (const heroId of ['pikachu', 'mew', 'togepi', 'charizard', 'blastoise']) {
       const def = window.HeroDefs[heroId];
       const btn = document.createElement('button');
       const unlockWave = heroUnlockWave[heroId];
@@ -622,6 +693,26 @@ class App {
       this.els.waveVal.textContent = w;
       this.els.waveTotal.textContent = t;
     };
+    const hudTimer = document.getElementById('hud-timer');
+    const timerVal = document.getElementById('timer-val');
+    this.engine.onWaveTimerChange = (remaining, total) => {
+      if (!hudTimer) return;
+      if (remaining <= 0 && this.engine.state !== 'wave') { hudTimer.style.display = 'none'; return; }
+      hudTimer.style.display = 'flex';
+      timerVal.textContent = Math.ceil(remaining);
+      hudTimer.classList.toggle('timer-danger', remaining <= 8);
+      hudTimer.classList.toggle('timer-warn', remaining > 8 && remaining <= 18);
+    };
+    this.engine.onWaveTimeout = (penalty, survivorCount) => {
+      if (hudTimer) hudTimer.style.display = 'none';
+      this.showWaveAnnounce(`⏱ 시간 초과! 놓친 ${survivorCount}마리 -${penalty} 라이프`, '#ff4444');
+      if (this.missionTracker) { this.missionTracker.stats.timeouts = (this.missionTracker.stats.timeouts||0) + 1; }
+    };
+    this.engine.onEliteKill = () => {
+      if (!this.missionTracker) return;
+      this.missionTracker.stats.eliteGoldKills = (this.missionTracker.stats.eliteGoldKills||0) + 1;
+      this.missionTracker.check();
+    };
     this.engine.onComboChange = (count, mul) => {
       const comboCell = document.getElementById('hud-combo');
       const comboVal = document.getElementById('combo-val');
@@ -646,18 +737,24 @@ class App {
     };
     const origLoseLife = this.engine.loseLife.bind(this.engine);
     this.engine.loseLife = (n) => { this.SFX.play('life_lost'); origLoseLife(n); };
-    this.engine.onWaveComplete = (wave, bonus) => {
+    this.engine.onWaveComplete = (wave, bonus, timedOut) => {
+      if (hudTimer) hudTimer.style.display = 'none';
       this.els.btnWave.disabled = false;
-      this.SFX.play('wave_clear');
+      if (!timedOut) this.SFX.play('wave_clear');
       if (wave >= this.engine.totalWaves) {
         this.els.btnWave.textContent = '🏆 완료!';
       } else {
         // 자동 웨이브 카운트다운 10초
         this._startAutoWaveCountdown(wave + 1);
       }
-      this.showWaveAnnounce(`Wave ${wave} 클리어! +${bonus}g`, '#ffd60a');
+      if (!timedOut) this.showWaveAnnounce(`Wave ${wave} 클리어! +${bonus}g`, '#ffd60a');
       if (wave === 5)  this.showWaveAnnounce('✨ 뮤 해금!', '#f48fb1');
+      if (wave === 8)  { this.showWaveAnnounce('🔥 리자몽 해금!', '#ff5722'); if (this.missionTracker) this.missionTracker.stats.heroCharizard = true; }
       if (wave === 10) this.showWaveAnnounce('✨ 토게피 해금!', '#fff9c4');
+      if (wave === 13) { this.showWaveAnnounce('🌊 거북왕 해금!', '#0288d1'); if (this.missionTracker) this.missionTracker.stats.heroBlastoise = true; }
+      if (this.missionTracker && this.difficulty === 'hard' && !timedOut) {
+        this.missionTracker.stats.hardWavesCleared = (this.missionTracker.stats.hardWavesCleared||0) + 1;
+      }
       this.buildTowerBar();
       if (this.missionTracker) {
         this.missionTracker.stats.wavesCleared = wave;
@@ -674,6 +771,10 @@ class App {
     };
 
     this.engine.totalWaves = 20;
+    const dm = (window.DifficultyMods && window.DifficultyMods[this.difficulty]) || { livesStart:20, goldStart:250 };
+    this.engine.difficulty = this.difficulty;
+    this.engine.lives = dm.livesStart;
+    this.engine.gold = dm.goldStart;
     this.engine.init(mapId);
 
     this.els.goldVal.textContent = this.engine.gold;
@@ -881,13 +982,15 @@ class App {
       wrap.appendChild(label);
 
       // 스킬 버튼
+      const heroIdx = this.engine.heroes.indexOf(hero);
+      const hotkeyMap = [['Q','W'],['E','R']][heroIdx] || [];
       hero.def.skills.forEach((skill, idx) => {
         const btn = document.createElement('button');
         btn.className = 'skill-btn';
         btn.dataset.heroId = hero.id;
         btn.dataset.skillIdx = idx;
-        btn.innerHTML = `<span class="skill-emoji">${skill.emoji}</span><span class="skill-cd"></span>`;
-        btn.title = `${skill.name}: ${skill.desc}`;
+        btn.innerHTML = `<span class="hotkey-badge">${hotkeyMap[idx]||''}</span><span class="skill-emoji">${skill.emoji}</span><span class="skill-cd"></span>`;
+        btn.title = `${skill.name}: ${skill.desc}${hotkeyMap[idx] ? ` (단축키: ${hotkeyMap[idx]})` : ''}`;
         btn.addEventListener('click', () => {
           if (hero.cast(idx, this.engine)) {
             this.showWaveAnnounce(`${skill.emoji} ${skill.name}!`, '#ffd60a');
@@ -1168,26 +1271,34 @@ class App {
 
     const grid = document.createElement('div');
     grid.className = 'shop-grid';
+    if (!this.engine._shopBuyCount) this.engine._shopBuyCount = {};
     for (const item of window.ShopItems) {
       const card = document.createElement('div');
       card.className = 'shop-card';
+      const bought = this.engine._shopBuyCount[item.key] || 0;
+      const soldOut = item.maxBuys && bought >= item.maxBuys;
       card.innerHTML = `
         <div class="shop-emoji">${item.emoji}</div>
         <div class="shop-name">${item.name}</div>
         <div class="shop-desc">${item.desc}</div>
-        <button class="shop-buy-btn">💰${item.cost}</button>
+        <button class="shop-buy-btn" ${soldOut ? 'disabled' : ''}>${soldOut ? '품절' : `💰${item.cost}`}</button>
       `;
       const buyBtn = card.querySelector('.shop-buy-btn');
       buyBtn.addEventListener('click', () => {
+        if (soldOut) return;
         if (this.engine.gold < item.cost) {
           this.showWaveAnnounce('골드가 부족합니다', '#ff6b6b');
           return;
         }
         this.engine.spendGold(item.cost);
           item.buy(this.engine);
+          this.engine._shopBuyCount[item.key] = (this.engine._shopBuyCount[item.key] || 0) + 1;
           title.textContent = `🛒 상점 (보유 골드: ${this.engine.gold}g)`;
           this.SFX.play('buy');
           this.showWaveAnnounce(`${item.emoji} ${item.name} 사용!`, '#06d6a0');
+          if (item.maxBuys && this.engine._shopBuyCount[item.key] >= item.maxBuys) {
+            buyBtn.disabled = true; buyBtn.textContent = '품절';
+          }
       });
       grid.appendChild(card);
     }
@@ -1265,7 +1376,6 @@ class App {
     if (waveIdx >= WaveData.length) return;
 
     let wave = WaveData[waveIdx];
-    if (this.currentMapId === 'cave') wave = splitForCave(wave);
 
     // 보스 웨이브 경고
     const bossWaves = { 10: '⚠️ 갸라도스 중간보스 등장!', 16: '☠️ 루기아 준보스 등장!', 20: '🔮 최종보스 뮤츠!' };
@@ -1278,7 +1388,8 @@ class App {
       setTimeout(() => el.remove(), 2500);
     }
 
-    if (e.startWave(wave)) {
+    const timeLimit = waveTimeLimit(wave, this.difficulty);
+    if (e.startWave(wave, timeLimit)) {
       this.els.btnWave.disabled = true;
       this.els.btnWave.textContent = '⏳ 진행 중...';
       setTimeout(() => this.showWaveAnnounce(`Wave ${e.currentWave}`, '#ffd60a'), 100);
