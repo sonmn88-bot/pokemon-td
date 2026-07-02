@@ -55,12 +55,14 @@ function totalPathLength(path) {
 // ===== 적 타입 정의 =====
 const EnemyTypes = {
   // ─── 1~5웨이브 메인 ───
+    type: 'grass',
   abo: {
     name: '아보',     emoji: '🐍',
     hp: 112,  speed: 88, reward: 8,  size: 18,
     color: '#8bc34a',
     special: null,
   },
+    type: 'psychic',
   golbat: {
     name: '골뱃',     emoji: '🦇',
     hp: 84,  speed: 118, reward: 12, size: 20,
@@ -68,12 +70,14 @@ const EnemyTypes = {
     special: 'flying',   // 배리어 무시
     flyHeight: 8,        // 위아래 흔들림
   },
+    type: 'normal',
   jigglypuff: {
     name: '질퍽이',   emoji: '🔴',
     hp: 168, speed: 64, reward: 10, size: 22,
     color: '#f48fb1',
     special: 'poisonImmune',
   },
+    type: 'psychic',
   gastly: {
     name: '고오스',   emoji: '👻',
     hp: 98,  speed: 94, reward: 15, size: 20,
@@ -81,6 +85,7 @@ const EnemyTypes = {
     special: 'ghost',    // 물리 데미지 50% 감소
     ghostAlpha: 0.65,
   },
+    type: 'grass',
   paras: {
     name: '파라스',   emoji: '🍄',
     hp: 125,  speed: 70, reward: 12, size: 20,
@@ -91,6 +96,7 @@ const EnemyTypes = {
   },
 
   // ─── 6~10웨이브 ───
+    type: 'grass',
   phantump: {
     name: '팬텀',     emoji: '🌲',
     hp: 280, speed: 53, reward: 25, size: 24,
@@ -98,12 +104,14 @@ const EnemyTypes = {
     special: 'regen',    // 초당 HP 5 재생
     regenRate: 5,
   },
+    type: 'water',
   lapras: {
     name: '라프라스', emoji: '🦭',
     hp: 182, speed: 82, reward: 20, size: 22,
     color: '#ce93d8',
     special: 'iceImmune',
   },
+    type: 'water',
   gyarados: {
     name: '갸라도스',  emoji: '🐲',
     hp: 489, speed: 59, reward: 40, size: 30,
@@ -113,6 +121,7 @@ const EnemyTypes = {
   },
 
   // ─── 11~15웨이브 ───
+    type: 'psychic',
   weezing: {
     name: '또가스',   emoji: '💨',
     hp: 210, speed: 64, reward: 30, size: 26,
@@ -120,6 +129,7 @@ const EnemyTypes = {
     special: 'explode',  // 사망 시 범위 데미지
     explodeRadius: 60, explodeDamage: 30,
   },
+    type: 'grass',
   scyther: {
     name: '스라크',   emoji: '🦗',
     hp: 392, speed: 88, reward: 35, size: 26,
@@ -128,6 +138,7 @@ const EnemyTypes = {
   },
 
   // ─── 보스 ───
+    type: 'water',
   lugia: {
     name: '루기아',   emoji: '🕊️',
     hp: 2520, speed: 47, reward: 120, size: 40,
@@ -135,6 +146,7 @@ const EnemyTypes = {
     special: 'boss',
     isBoss: true,
   },
+    type: 'psychic',
   mewtwo: {
     name: '뮤츠',    emoji: '🔮',
     hp: 7000, speed: 64, reward: 300, size: 44,
@@ -147,12 +159,14 @@ const EnemyTypes = {
   },
 
   // ─── 콘텐츠 확장: 추가 포켓몬 8종 ───
+    type: 'normal',
   rattata: {
     name: '꼬렛',     emoji: '🐭',
     hp: 56,  speed: 140, reward: 6, size: 16,
     color: '#a1887f',
     special: 'swift',     // 매우 빠름, 타겟팅 우선순위 낮춤 트릭용
   },
+    type: 'psychic',
   zubat: {
     name: '주뱃',     emoji: '🦋',
     hp: 70,  speed: 112, reward: 9, size: 18,
@@ -160,6 +174,7 @@ const EnemyTypes = {
     special: 'flying',
     flyHeight: 6,
   },
+    type: 'psychic',
   koffing: {
     name: '또도가스', emoji: '☁️',
     hp: 140, speed: 59, reward: 14, size: 20,
@@ -167,6 +182,7 @@ const EnemyTypes = {
     special: 'poisonAura',  // 주변 적 면역 부여(단순화: 자기 자신만 면역 적용은 poisonImmune로 처리)
     poisonImmune: true,
   },
+    type: 'electric',
   magnemite: {
     name: '코일(야생)', emoji: '🧲',
     hp: 118,  speed: 76, reward: 13, size: 18,
@@ -174,12 +190,14 @@ const EnemyTypes = {
     special: 'shockImmune',  // 스턴 저항 50%
     stunResist: 0.5,
   },
+    type: 'normal',
   onix: {
     name: '롱스톤',   emoji: '🪨',
     hp: 364, speed: 47, reward: 28, size: 28,
     color: '#8d6e63',
     special: 'armor',
   },
+    type: 'psychic',
   haunter: {
     name: '고우스트', emoji: '👤',
     hp: 196, speed: 100, reward: 22, size: 22,
@@ -187,6 +205,7 @@ const EnemyTypes = {
     special: 'ghost',
     ghostAlpha: 0.6,
   },
+    type: 'electric',
   electrode: {
     name: '마그넷',   emoji: '🔴',
     hp: 154, speed: 106, reward: 18, size: 20,
@@ -194,6 +213,7 @@ const EnemyTypes = {
     special: 'explode',
     explodeRadius: 70, explodeDamage: 40,
   },
+    type: 'water',
   dragonite: {
     name: '망나뇽',   emoji: '🐉',
     hp: 1260, speed: 70, reward: 80, size: 34,
@@ -225,6 +245,7 @@ class Enemy {
     this.size = def.size;
     this.color = def.color;
     this.isBoss = !!def.isBoss;
+    this.typeTag = def.type || 'normal';
 
     // 동굴 맵 유령 보너스
     if (engine.currentMap.ghostBonus && (def.special === 'ghost' || typeId === 'gastly' || typeId === 'phantump')) {

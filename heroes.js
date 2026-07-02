@@ -164,7 +164,7 @@ const HeroDefs = {
       { id:'raichu', name:'라이츄', color:'#ff9800', statMul:1.20 },
     ]},
     attack:{
-      baseRange:200, baseDamage:15, baseFireRate:1.4,
+      baseRange:175, baseDamage:10, baseFireRate:1.1,
       rangePerLevel:7, damagePerLevel:3,
       projColor:'#fff176', projEmoji:'⚡', dmgType:'special',
       status:{type:'stun', duration:0.15},
@@ -268,7 +268,7 @@ const HeroDefs = {
       { id:'togetic', name:'토게틱', color:'#f8bbd0', statMul:1.20 },
     ]},
     attack:{
-      baseRange:185, baseDamage:10, baseFireRate:1.3,
+      baseRange:165, baseDamage:7, baseFireRate:1.0,
       rangePerLevel:6, damagePerLevel:2,
       projColor:'#fff59d', projEmoji:'✨', dmgType:'special',
     },
@@ -416,7 +416,7 @@ HeroDefs.eevee = {
   role:'만능형 (진화로 특화)',
   passive:'모든 타워 데미지 +5%',
   attack:{
-    baseRange:190, baseDamage:11, baseFireRate:1.2,
+    baseRange:170, baseDamage:7, baseFireRate:0.95,
     rangePerLevel:6, damagePerLevel:2,
     projColor:'#d7ccc8', projEmoji:'⭐', dmgType:'special',
   },
@@ -577,6 +577,7 @@ class Hero {
     engine && engine.spawnFloatingText(`✨ ${option.name}(으)로 진화!`, this.x, this.y-46, option.color);
     engine && engine.particles && engine.particles.push(new AoeBurst(this.x, this.y, 70, option.color));
     engine && engine.triggerScreenShake && engine.triggerScreenShake(6, 0.3);
+    engine && engine.onHeroEvolved && engine.onHeroEvolved(this);
   }
   evolve(optionId, engine) {
     const evo = this.def.evolution;

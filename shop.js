@@ -18,12 +18,11 @@ const ShopItems = [
     }
   },
   {
-    key: 'potion', name: '상처약', emoji: '🧪', cost: 60,
-    desc: '영웅 스킬 쿨다운 즉시 50% 감소',
+    key: 'potion', name: '골드 두루마리', emoji: '📜', cost: 90,
+    desc: '다음 웨이브 클리어 보상 골드 2배',
     buy(engine) {
-      for (const h of engine.heroes)
-        h.cooldowns = h.cooldowns.map(c => c * 0.5);
-      engine.spawnFloatingText('🧪 쿨다운 50%↓', engine.width/2, 80, '#06d6a0');
+      engine._nextWaveGoldMul = 2;
+      engine.spawnFloatingText('📜 다음 웨이브 보상 2배!', engine.width/2, 80, '#ffd60a');
     }
   },
   {
@@ -36,12 +35,26 @@ const ShopItems = [
     }
   },
   {
-    key: 'revive', name: '기력의조각', emoji: '💎', cost: 100,
-    desc: '영웅 스킬 쿨다운 전체 초기화',
+    key: 'revive', name: '확장 부지', emoji: '🏗️', cost: 180, maxBuys: 2,
+    desc: '트랙 안쪽에 빈 배치슬롯 1개 즉시 추가 (최대 2회)',
     buy(engine) {
-      for (const h of engine.heroes)
-        h.cooldowns = h.cooldowns.map(() => 0);
-      engine.spawnFloatingText('💎 스킬 초기화!', engine.width/2, 80, '#4fc3f7');
+      const w = engine.width, h = engine.height;
+      const HUD=52, BAR=82, PAD=20;
+      const top = HUD+PAD, bot = h-BAR-PAD;
+      let best = null, bestMinDist = -1;
+      for (let tries=0; tries<40; tries++) {
+        const x = w*0.18 + Math.random()*w*0.64;
+        const y = top + Math.random()*(bot-top);
+        let minDist = Infinity;
+        for (const s of engine.towerSlots) minDist = Math.min(minDist, Math.hypot(s.x-x, s.y-y));
+        if (minDist > bestMinDist) { bestMinDist = minDist; best = {x,y}; }
+      }
+      if (best && bestMinDist > 55) {
+        engine.towerSlots.push({ x: best.x, y: best.y, occupied: false, tower: null });
+        engine.spawnFloatingText('🏗️ 새 슬롯 확보!', best.x, best.y, '#06d6a0');
+      } else {
+        engine.spawnFloatingText('공간이 부족합니다', engine.width/2, 80, '#ff6b6b');
+      }
     }
   },
   {
@@ -65,7 +78,7 @@ const ShopItems = [
     }
   },
   {
-    key: 'oranberry', name: '오카열매', emoji: '🍊', cost: 90,
+    key: 'oranberry', name: '오카열매', emoji: '🍊', cost: 160,
     desc: '라이프 +3 즉시 회복',
     buy(engine) {
       engine.lives = Math.min(engine.lives + 3, 99);
@@ -74,7 +87,7 @@ const ShopItems = [
     }
   },
   {
-    key: 'rarecandy', name: '이상한사탕', emoji: '🍬', cost: 200,
+    key: 'rarecandy', name: '이상한사탕', emoji: '🍬', cost: 350, maxBuys: 1,
     desc: '랜덤 타워 1개를 한 등급 상위로 진화',
     buy(engine) {
       const gachaSlots = engine.towerSlots.filter(s => s.occupied && s.tower?._gachaId);

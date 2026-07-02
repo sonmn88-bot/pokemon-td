@@ -14,18 +14,28 @@ const GRADES = {
 // 사거리는 특히 낮게 캡: '전범위 타워'가 나오지 않도록.
 const BUFF_CAPS = { range: 1.35, damage: 1.9, speed: 1.5 };
 
-// ===== 타입 정의 =====
+// ===== 속성 상성 (6속성 순환: 불→풀→물→전기→에스퍼→노말→불) =====
+// 각 속성은 정확히 하나를 이기고(1.4배) 하나에게 진다(0.7배). 전략적 타워 배치 유도용.
+const TYPE_CYCLE = ['fire','grass','water','electric','psychic','normal'];
+function typeEffectiveness(atkType, defType) {
+  if (!atkType || !defType || atkType === defType) return 1;
+  const ai = TYPE_CYCLE.indexOf(atkType), di = TYPE_CYCLE.indexOf(defType);
+  if (ai < 0 || di < 0) return 1;
+  if ((ai + 1) % TYPE_CYCLE.length === di) return 1.4; // 상성 우위
+  if ((di + 1) % TYPE_CYCLE.length === ai) return 0.7; // 상성 열세
+  return 1;
+}
+window.typeEffectiveness = typeEffectiveness;
+window.TYPE_CYCLE = TYPE_CYCLE;
+
+// ===== 타입 정의 (6종으로 간소화: 고스트→에스퍼, 땅→노말, 얼음→물, 바위→풀 흡수) =====
 const TYPES = {
   fire:    { name:'불꽃', color:'#ff5722', emoji:'🔥', effect:'burn' },
   water:   { name:'물',   color:'#29b6f6', emoji:'💧', effect:'slow' },
   grass:   { name:'풀',   color:'#66bb6a', emoji:'🌿', effect:'poison' },
   electric:{ name:'전기', color:'#ffd600', emoji:'⚡', effect:'stun' },
   psychic: { name:'에스퍼',color:'#ba68c8', emoji:'🔮', effect:'slow_multi' },
-  ice:     { name:'얼음', color:'#80deea', emoji:'❄️', effect:'freeze' },
-  rock:    { name:'바위', color:'#8d6e63', emoji:'🪨', effect:'stun_aoe' },
-  ghost:   { name:'고스트',color:'#5e35b1', emoji:'👻', effect:'pierce' },
   normal:  { name:'노말', color:'#bdbdbd', emoji:'⬜', effect:'basic' },
-  ground:  { name:'땅',   color:'#d4a056', emoji:'🏔️', effect:'knockback' },
 };
 
 // ===== 타워 정의 (31종) =====
@@ -78,7 +88,7 @@ const GachaTowerDefs = {
     }
   },
   diglett: {
-    id:'diglett', name:'디그다', emoji:'🏔️', grade:'normal', type:'ground', pokemonId:'diglett',
+    id:'diglett', name:'디그다', emoji:'🏔️', grade:'normal', type:'normal', pokemonId:'diglett',
     damage:15, range:155, fireRate:1.0, desc:'넉백',
     fire(t,e){ _shot(t,e,'#d4a056','💨',{type:'stun',duration:0.3},300,null,0,0,35); }
   },
@@ -126,12 +136,12 @@ const GachaTowerDefs = {
     }
   },
   geodude: {
-    id:'geodude', name:'꼬마돌', emoji:'🪨', grade:'rare', type:'rock', pokemonId:'geodude',
+    id:'geodude', name:'꼬마돌', emoji:'🪨', grade:'rare', type:'grass', pokemonId:'geodude',
     damage:28, range:175, fireRate:0.95, desc:'범위 스턴',
     fire(t,e){ _shot(t,e,'#a1887f','🪨',{type:'stun',duration:0.6},380,null,55); }
   },
   gastly: {
-    id:'gastly', name:'고우스트', emoji:'👻', grade:'rare', type:'ghost', pokemonId:'gastly',
+    id:'gastly', name:'고우스트', emoji:'👻', grade:'rare', type:'psychic', pokemonId:'gastly',
     damage:22, range:215, fireRate:1.3, desc:'방어 무시',
     fire(t,e){ e.projectiles.push(new Projectile(t.x,t.y,t.target,{engine:e,speed:360,damage:t.damage*1.6,color:'#7c4dff',size:7,dmgType:'special',emoji:'👻',status:{type:'slow',duration:2,factor:0.5}})); }
   },
@@ -188,7 +198,7 @@ const GachaTowerDefs = {
     }
   },
   lapras: {
-    id:'lapras', name:'라프라스', emoji:'🧊', grade:'epic', type:'ice', pokemonId:'lapras',
+    id:'lapras', name:'라프라스', emoji:'🧊', grade:'epic', type:'water', pokemonId:'lapras',
     damage:36, range:250, fireRate:1.2, desc:'빙결+분열 2발',
     fire(t,e){
       const sorted=e.enemies.filter(en=>!en.dead&&!en.reachedEnd&&Math.hypot(en.x-t.x,en.y-t.y)<=t.range).sort((a,b)=>b.distTraveled-a.distTraveled).slice(0,2);
@@ -196,7 +206,7 @@ const GachaTowerDefs = {
     }
   },
   aerodactyl: {
-    id:'aerodactyl', name:'프테라', emoji:'🦅', grade:'epic', type:'rock', pokemonId:'aerodactyl',
+    id:'aerodactyl', name:'프테라', emoji:'🦅', grade:'epic', type:'grass', pokemonId:'aerodactyl',
     damage:42, range:260, fireRate:1.8, desc:'고속 관통타',
     fire(t,e){ e.projectiles.push(new Projectile(t.x,t.y,t.target,{engine:e,speed:620,damage:t.damage,color:'#78909c',size:6,dmgType:'physical',emoji:'🪨',piercing:true,pierceWidth:30,status:{type:'stun',duration:0.5}})); }
   },
@@ -208,7 +218,7 @@ const GachaTowerDefs = {
 
   // ===== 레전드 (3종) =====
   articuno: {
-    id:'articuno', name:'프리져', emoji:'🦅', grade:'legend', type:'ice', pokemonId:'articuno',
+    id:'articuno', name:'프리져', emoji:'🦅', grade:'legend', type:'water', pokemonId:'articuno',
     damage:65, range:310, fireRate:1.3, desc:'눈보라 전체+빙결',
     fire(t,e){
       const sorted=e.enemies.filter(en=>!en.dead&&!en.reachedEnd&&Math.hypot(en.x-t.x,en.y-t.y)<=t.range).sort((a,b)=>b.distTraveled-a.distTraveled).slice(0,3);
@@ -337,7 +347,11 @@ function _createGachaTower(def, x, y) {
     cooldown:0, fireFlash:0, _rotAngle:0,
     synergyBonus:0, buffRangeMul:1, buffDmgMul:1, target:null,
     get range(){ return (def.range+(this.synergyBonus*2))*Math.min(this.buffRangeMul, BUFF_CAPS.range); },
-    get damage(){ return (def.damage+this.synergyBonus)*Math.min(this.buffDmgMul, BUFF_CAPS.damage); },
+    get damage(){
+      const base = (def.damage+this.synergyBonus)*Math.min(this.buffDmgMul, BUFF_CAPS.damage);
+      const mul = window.typeEffectiveness ? window.typeEffectiveness(def.type, this.target && this.target.typeTag) : 1;
+      return base * mul;
+    },
     get fireRate(){ return def.fireRate*Math.min(this._shopSpeedMul||1, BUFF_CAPS.speed); },
     upgradeCost(){ return null; },
     findTarget(enemies){
@@ -357,6 +371,7 @@ function _createGachaTower(def, x, y) {
       this.engine=engine;
       this.cooldown-=dt;
       if(this.fireFlash>0) this.fireFlash-=dt;
+      if(this._typeGlowTimer>0) this._typeGlowTimer-=dt;
       this._rotAngle+=dt*0.5;
       this.target=this.findTarget(enemies);
       if(this.target&&this.cooldown<=0){
@@ -392,6 +407,13 @@ function _createGachaTower(def, x, y) {
         const g=ctx.createRadialGradient(this.x,this.y,4,this.x,this.y,28);
         g.addColorStop(0,grade.color+'28'); g.addColorStop(1,'transparent');
         ctx.fillStyle=g; ctx.fill(); ctx.restore();
+      }
+      // 타입 강화 직후 색깔 링 (어떤 타워가 방금 버프받았는지 명확히 표시)
+      if(this._typeGlowTimer>0){
+        ctx.save(); ctx.globalAlpha=Math.min(1,this._typeGlowTimer/1.6);
+        ctx.beginPath(); ctx.arc(this.x,this.y,25,0,Math.PI*2);
+        ctx.strokeStyle=this._typeGlowColor; ctx.lineWidth=3;
+        ctx.shadowColor=this._typeGlowColor; ctx.shadowBlur=14; ctx.stroke(); ctx.restore();
       }
       // 발사 플래시
       if(this.fireFlash>0){
@@ -455,17 +477,13 @@ function applyTowerSynergies(towers) {
   }
 }
 
-// ===== 타입 업그레이드 =====
+// ===== 타입 업그레이드 (6종) =====
 const TypeUpgrades = {
   fire:     [{cost:200,label:'불꽃 강화 1',buff:'dmg',val:0.15},{cost:400,label:'불꽃 강화 2',buff:'dmg',val:0.20},{cost:800,label:'대화염',buff:'dmg',val:0.30}],
   water:    [{cost:200,label:'물 강화 1',buff:'range',val:0.15},{cost:400,label:'물 강화 2',buff:'slow',val:0.1},{cost:800,label:'대해일',buff:'range',val:0.25}],
   electric: [{cost:200,label:'전기 강화 1',buff:'speed',val:0.15},{cost:400,label:'전기 강화 2',buff:'chain',val:1},{cost:800,label:'초전도',buff:'speed',val:0.25}],
   grass:    [{cost:200,label:'풀 강화 1',buff:'poison',val:0.15},{cost:400,label:'풀 강화 2',buff:'range',val:0.15},{cost:800,label:'대자연',buff:'dmg',val:0.25}],
   psychic:  [{cost:200,label:'에스퍼 강화 1',buff:'target',val:1},{cost:400,label:'에스퍼 강화 2',buff:'dmg',val:0.20},{cost:800,label:'초능력',buff:'target',val:2}],
-  ice:      [{cost:200,label:'얼음 강화 1',buff:'freeze',val:0.3},{cost:400,label:'얼음 강화 2',buff:'split',val:1},{cost:800,label:'절대영도',buff:'freeze',val:0.5}],
-  rock:     [{cost:200,label:'바위 강화 1',buff:'stun',val:0.3},{cost:400,label:'바위 강화 2',buff:'dmg',val:0.20},{cost:800,label:'암석폭발',buff:'splash',val:30}],
-  ghost:    [{cost:200,label:'고스트 강화 1',buff:'pierce',val:1},{cost:400,label:'고스트 강화 2',buff:'dmg',val:0.25},{cost:800,label:'저주',buff:'all',val:0.15}],
-  ground:   [{cost:200,label:'땅 강화 1',buff:'knockback',val:20},{cost:400,label:'땅 강화 2',buff:'splash',val:25},{cost:800,label:'지진',buff:'stun',val:0.5}],
   normal:   [{cost:150,label:'노말 강화 1',buff:'speed',val:0.10},{cost:300,label:'노말 강화 2',buff:'dmg',val:0.10},{cost:600,label:'만능',buff:'all',val:0.10}],
 };
 // 타입별 업그레이드 레벨 추적
@@ -479,14 +497,17 @@ function applyTypeUpgrade(type, engine) {
   const upg = upgrades[level];
   if(!engine.spendGold(upg.cost)) return false;
   TypeUpgradeLevels[type]++;
-  // 해당 타입 타워 전체에 버프 적용
+  const color = TYPES[type].color;
+  // 해당 타입 타워 전체에 버프 적용 + 어떤 타워가 버프받는지 색깔 링으로 명확히 표시
   for(const t of engine.towers){
     if(!t.def||t.def.type!==type) continue;
     if(upg.buff==='dmg'||upg.buff==='all') t.buffDmgMul=(t.buffDmgMul||1)*(1+upg.val);
     if(upg.buff==='range'||upg.buff==='all') t.buffRangeMul=(t.buffRangeMul||1)*(1+upg.val);
     if(upg.buff==='speed'||upg.buff==='all') t._shopSpeedMul=(t._shopSpeedMul||1)*(1+upg.val);
+    if(window.AoeBurst) engine.particles.push(new AoeBurst(t.x,t.y,44,color));
+    t._typeGlowColor = color; t._typeGlowTimer = 1.6; // 잠시 색깔 테두리로 강조
   }
-  engine.spawnFloatingText(`${TYPES[type].emoji} ${upg.label}!`, engine.width/2, 80, TYPES[type].color);
+  engine.spawnFloatingText(`${TYPES[type].emoji} ${upg.label}!`, engine.width/2, 80, color);
   return true;
 }
 
@@ -509,14 +530,13 @@ const MissionDefs = [
   {id:'ten_pull',    name:'10연 도전',  desc:'10연 뽑기 1회',          reward:120, condition:(s)=>s.tenPullCount>=1},
   {id:'perfect5',    name:'완벽한 방어',desc:'시간초과 없이 웨이브 5 클리어',reward:180,condition:(s)=>s.wavesCleared>=5&&!s.timeouts},
   {id:'shadow_hunt', name:'흑화 사냥꾼',desc:'흑화(골드 엘리트) 5마리 처치',reward:200,condition:(s)=>(s.eliteGoldKills||0)>=5},
-  {id:'hero_charizard',name:'화염의 파트너',desc:'리자몽 영웅 해금',    reward:150, condition:(s)=>!!s.heroCharizard},
-  {id:'hero_blastoise',name:'심해의 파트너',desc:'거북왕 영웅 해금',    reward:150, condition:(s)=>!!s.heroBlastoise},
+  {id:'hero_evolve',name:'진화의 순간',desc:'영웅을 진화시키기',        reward:200, condition:(s)=>!!s.heroEvolved},
   {id:'hard_clear',  name:'하드 정복자',desc:'하드 난이도 웨이브 10 클리어',reward:400,condition:(s)=>(s.hardWavesCleared||0)>=10},
 ];
 
 class MissionTracker {
   constructor(){
-    this.stats={totalRareCount:0,totalEpicCount:0,totalLegendCount:0,totalUniqueCount:0,mergeCount:0,maxCombo:0,wavesCleared:0,bossKills:0,livesLost:0,maxTowersDeployed:0,gambleCount:0,tenPullCount:0,typeUpgrades:{},timeouts:0,eliteGoldKills:0,heroCharizard:false,heroBlastoise:false,hardWavesCleared:0};
+    this.stats={totalRareCount:0,totalEpicCount:0,totalLegendCount:0,totalUniqueCount:0,mergeCount:0,maxCombo:0,wavesCleared:0,bossKills:0,livesLost:0,maxTowersDeployed:0,gambleCount:0,tenPullCount:0,typeUpgrades:{},timeouts:0,eliteGoldKills:0,heroEvolved:false,hardWavesCleared:0};
     this.completed=new Set(); this.onComplete=null;
   }
   update(engine){

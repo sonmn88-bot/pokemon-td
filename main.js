@@ -1,33 +1,48 @@
-// ===== MAIN.JS - 화면 관리 + HUD + 웨이브 데이터 20개 + 타워/영웅/상점 통합 =====
+// ===== MAIN.JS - 화면 관리 + HUD + 절차적 웨이브 생성(30웨이브) + 타워/영웅/상점 통합 =====
 
-// ===== 웨이브 데이터 20개 =====
-const WaveData = [
-  /* W1  */ [ ...seq('abo',14,1.2,0) ],
-  /* W2  */ [ ...seq('abo',10,1.0,0), ...seq('jigglypuff',6,1.8,0,8) ],
-  /* W3  */ [ ...seq('abo',10,0.9,0), ...seq('rattata',8,0.6,0,4), ...seq('paras',6,1.8,0,9) ],
-  /* W4  */ [ ...seq('jigglypuff',8,1.3,0), ...seq('paras',6,1.3,0,6), ...seq('abo',6,0.7,0,12), ...seq('zubat',6,1.0,0,14) ],
-  /* W5  */ [ ...seq('abo',15,0.6,0), ...seq('jigglypuff',8,1.3,0,4), ...seq('koffing',5,1.8,0,10), ...seq('paras',6,1.8,0,14) ],
-  /* W6  */ [ ...seq('gastly',10,1.3,0), ...seq('lapras',5,1.8,0,8), ...seq('zubat',8,1.0,0,12) ],
-  /* W7  */ [ ...seq('golbat',10,0.9,0), ...seq('gastly',8,1.1,0,5), ...seq('magnemite',6,1.3,0,10) ],
-  /* W8  */ [ ...seq('phantump',6,1.8,0), ...seq('lapras',7,1.3,0,6), ...seq('haunter',6,1.6,0,12) ],
-  /* W9  */ [ ...seq('gastly',12,0.7,0), ...seq('phantump',6,1.8,0,6), ...seq('golbat',6,0.9,0,12), ...seq('electrode',4,1.8,0,16) ],
-  /* W10 */ [ ...seq('abo',8,1.0,0), ...seq('lapras',6,1.3,0,6), {type:'gyarados',delay:12}, ...seq('gastly',7,0.9,0,14) ],
-  /* W11 */ [ ...seq('weezing',8,1.8,0), ...seq('paras',8,1.3,0,8), ...seq('onix',5,1.8,0,14) ],
-  /* W12 */ [ ...seq('scyther',6,2.2,0), ...seq('weezing',6,1.8,0,8), ...seq('electrode',6,1.3,0,14) ],
-  /* W13 */ [ ...seq('scyther',5,1.8,0), ...seq('weezing',8,1.3,0,5), ...seq('onix',5,1.8,0,10), {type:'gyarados',delay:18} ],
-  /* W14 */ [ ...seq('weezing',9,1.1,0), ...seq('scyther',8,1.6,0,6), ...seq('golbat',9,0.7,0,14), ...seq('haunter',7,1.1,0,18) ],
-  /* W15 */ [ ...seq('scyther',8,1.3,0), ...seq('weezing',8,1.3,0,6), ...seq('phantump',6,1.8,0,10), ...seq('onix',5,1.8,0,16), {type:'gyarados',delay:24} ],
-  /* W16 */ [ ...seq('golbat',12,0.7,0), ...seq('gastly',12,0.7,0,5), ...seq('dragonite',2,0,0,12), {type:'lugia',delay:18} ],
-  /* W17 */ [ ...seq('abo',8,0.7,0), ...seq('scyther',6,1.3,0,3), ...seq('weezing',6,1.3,0,8), ...seq('dragonite',3,2.8,0,12), ...seq('gyarados',3,3.5,0,16) ],
-  /* W18 */ [ ...seq('gastly',10,0.7,0), ...seq('phantump',8,1.3,0,4), ...seq('lapras',9,0.9,0,10), ...seq('onix',6,1.3,0,16), {type:'lugia',delay:22} ],
-  /* W19 */ [ ...seq('scyther',9,0.9,0), ...seq('weezing',9,0.9,0,5), ...seq('gyarados',4,2.8,0,10), ...seq('dragonite',3,2.8,0,18), ...seq('golbat',12,0.5,0,22), {type:'lugia',delay:28} ],
-  /* W20 */ [
-    ...seq('gastly',12,0.5,0), ...seq('scyther',9,0.9,0,4),
-    ...seq('weezing',9,0.9,0,8), {type:'gyarados',delay:12},
-    ...seq('dragonite',4,2.5,0,16), {type:'lugia',delay:22},
-    {type:'mewtwo',delay:36},
-  ],
-]
+const TOTAL_WAVES = 30;
+
+// 웨이브 진행도에 따라 열리는 적 티어 (기존 20웨이브 손수 작성 대신 공식으로 생성 - 튜닝 비용 최소화)
+const ENEMY_TIERS = {
+  t1: ['abo','rattata','jigglypuff','zubat','koffing'],
+  t2: ['golbat','gastly','paras','magnemite','phantump'],
+  t3: ['lapras','weezing','scyther','onix','haunter'],
+  t4: ['gyarados','electrode','dragonite'],
+};
+const BOSS_WAVES = { 10:'gyarados', 16:'lugia', 22:'lugia', 30:'mewtwo' };
+
+function generateWave(n) {
+  const progress = n / TOTAL_WAVES;
+  let pool = [...ENEMY_TIERS.t1];
+  if (progress > 0.15) pool = pool.concat(ENEMY_TIERS.t2);
+  if (progress > 0.42) pool = pool.concat(ENEMY_TIERS.t3);
+  if (progress > 0.68) pool = pool.concat(ENEMY_TIERS.t4);
+
+  // 웨이브가 진행될수록 더 많이, 더 빽빽하게 스폰 (계속 돌면서 잡는 느낌)
+  const enemyCount = Math.round(16 + n * 2.6);
+  const baseInterval = Math.max(0.30, 1.15 - n * 0.022);
+  const streams = 1 + Math.min(3, Math.floor(n / 6)); // 후반엔 여러 갈래로 동시에 몰아침
+
+  const arr = [];
+  for (let s = 0; s < streams; s++) {
+    let delay = s * (baseInterval * 2.2);
+    const countThisStream = Math.round(enemyCount / streams);
+    for (let i = 0; i < countThisStream; i++) {
+      const type = pool[Math.floor(Math.random() * pool.length)];
+      arr.push({ type, delay });
+      delay += baseInterval * streams * (0.75 + Math.random() * 0.5);
+    }
+  }
+  arr.sort((a, b) => a.delay - b.delay);
+
+  // 보스 웨이브
+  const lastDelay = arr.length ? arr[arr.length - 1].delay : 0;
+  if (BOSS_WAVES[n]) arr.push({ type: BOSS_WAVES[n], delay: lastDelay + 4 });
+
+  return arr;
+}
+
+const WaveData = Array.from({ length: TOTAL_WAVES }, (_, i) => generateWave(i + 1));
 
 function seq(type, count, interval, pathIdx = 0, startDelay = 0) {
   const arr = [];
@@ -36,11 +51,20 @@ function seq(type, count, interval, pathIdx = 0, startDelay = 0) {
 }
 
 // 순환 트랙 제한시간: 마지막 스폰 시각 + 처치 여유시간(난이도별 가감)
-function waveTimeLimit(wave, difficulty) {
+// 여유시간은 실제 트랙 한 바퀴 길이(화면 크기에 비례)를 기준으로 계산 — 큰 화면일수록 트랙이 길어지므로 시간도 늘어나야 함
+function waveTimeLimit(wave, difficulty, engine) {
   const lastDelay = wave.reduce((m, item) => Math.max(m, item.delay), 0);
   const dm = (window.DifficultyMods && window.DifficultyMods[difficulty]) || { timeBonus: 0 };
-  const killBuffer = 26 + dm.timeBonus;
-  return Math.max(15, Math.round(lastDelay + killBuffer));
+
+  let lapBuffer = 40; // 폴백값 (engine/paths 없을 때)
+  if (engine && engine.paths && engine.paths[0] && typeof totalPathLength === 'function') {
+    const lapLen = totalPathLength(engine.paths[0]);
+    const baselineSpeed = 75; // 대략적인 평균 이동속도(px/s)
+    const lapTime = lapLen / baselineSpeed;
+    lapBuffer = lapTime * 2.6; // 최소 2.6바퀴는 돌 수 있는 여유
+  }
+  const killBuffer = lapBuffer + dm.timeBonus;
+  return Math.max(30, Math.round(lastDelay + killBuffer));
 }
 
 // ===== APP CONTROLLER =====
@@ -190,7 +214,9 @@ class App {
 
     this.bindMapSelect();
     this.difficulty = 'normal';
+    this.starterHero = 'pikachu';
     this.bindDifficultySelect();
+    this.bindStarterHeroSelect();
     this.bindButtons();
     this.bindHotkeys();
     this.bindSpeedButtons();
@@ -223,10 +249,19 @@ class App {
   }
 
   bindDifficultySelect() {
-    document.querySelectorAll('.diff-btn').forEach(btn => {
+    document.querySelectorAll('.diff-btn[data-diff]').forEach(btn => {
       btn.addEventListener('click', () => {
         this.difficulty = btn.dataset.diff;
-        document.querySelectorAll('.diff-btn').forEach(b => b.classList.toggle('active', b === btn));
+        document.querySelectorAll('.diff-btn[data-diff]').forEach(b => b.classList.toggle('active', b === btn));
+      });
+    });
+  }
+
+  bindStarterHeroSelect() {
+    document.querySelectorAll('#starter-hero-select .diff-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        this.starterHero = btn.dataset.hero;
+        document.querySelectorAll('#starter-hero-select .diff-btn').forEach(b => b.classList.toggle('active', b === btn));
       });
     });
   }
@@ -353,31 +388,22 @@ class App {
     sep.style.cssText = 'width:1px;background:rgba(255,255,255,0.1);margin:4px 2px;flex-shrink:0';
     scroll.appendChild(sep);
 
-    // 영웅 버튼들
-    const heroUnlockWave = { pikachu:0, mew:5, togepi:10, charizard:8, blastoise:13, eevee:3 };
-    for (const heroId of ['pikachu', 'mew', 'togepi', 'charizard', 'blastoise', 'eevee']) {
+    // 영웅 버튼 (게임 시작 시 고른 1명만 - 뮤/리자몽/거북왕은 더 이상 영웅으로 쓰지 않음)
+    {
+      const heroId = this.starterHero || 'pikachu';
       const def = window.HeroDefs[heroId];
       const btn = document.createElement('button');
-      const unlockWave = heroUnlockWave[heroId];
-      const unlocked = !this.engine || this.engine.currentWave >= unlockWave;
-      btn.className = 'tower-btn hero-btn' + (unlocked ? '' : ' hero-btn-locked');
+      btn.className = 'tower-btn hero-btn';
       btn.dataset.heroKey = heroId;
       const skinId = this.selectedHeroSkins[heroId];
       const skin = window.SkinDefs[heroId][skinId];
       btn.innerHTML = `
         <span class="tower-btn-emoji">${skin.emoji}</span>
         <span class="tower-btn-name">${def.name}</span>
-        <span class="tower-btn-cost">${unlocked ? '👆이동 🎨스킨' : `🔒W${unlockWave}`}</span>
-        ${!unlocked ? '<span class="lock-badge">🔒</span>' : ''}
+        <span class="tower-btn-cost">👆이동 🎨스킨</span>
       `;
-      btn.title = unlocked ? def.passive : `웨이브 ${unlockWave} 이후 해금`;
-      btn.addEventListener('click', () => {
-        if (!unlocked && this.engine && this.engine.currentWave < unlockWave) {
-          this.showWaveAnnounce(`웨이브 ${unlockWave} 이후 해금됩니다`, '#ff6b6b');
-          return;
-        }
-        this.selectHeroToPlace(heroId, btn);
-      });
+      btn.title = def.passive;
+      btn.addEventListener('click', () => this.selectHeroToPlace(heroId, btn));
       btn.addEventListener('contextmenu', (e) => { e.preventDefault(); this.openSkinPicker(heroId); });
       let pressTimer;
       btn.addEventListener('touchstart', () => { pressTimer = setTimeout(() => this.openSkinPicker(heroId), 500); });
@@ -454,8 +480,10 @@ class App {
       this.missionTracker.check();
     }
 
-    btnEl.classList.add('active');
-    setTimeout(() => btnEl.classList.remove('active'), 300);
+    if (btnEl) {
+      btnEl.classList.add('active');
+      setTimeout(() => btnEl.classList.remove('active'), 300);
+    }
   }
 
   _placePulledTower(def, slotIdx) {
@@ -748,6 +776,9 @@ class App {
       this.missionTracker.check();
     };
     this.engine.onHeroEvolutionReady = (hero) => this.openEvolutionPicker(hero);
+    this.engine.onHeroEvolved = () => {
+      if (this.missionTracker) { this.missionTracker.stats.heroEvolved = true; this.missionTracker.check(); }
+    };
     this.engine.onComboChange = (count, mul) => {
       const comboCell = document.getElementById('hud-combo');
       const comboVal = document.getElementById('combo-val');
@@ -783,10 +814,6 @@ class App {
         this._startAutoWaveCountdown(wave + 1);
       }
       if (!timedOut) this.showWaveAnnounce(`Wave ${wave} 클리어! +${bonus}g`, '#ffd60a');
-      if (wave === 5)  this.showWaveAnnounce('✨ 뮤 해금!', '#f48fb1');
-      if (wave === 8)  { this.showWaveAnnounce('🔥 리자몽 해금!', '#ff5722'); if (this.missionTracker) this.missionTracker.stats.heroCharizard = true; }
-      if (wave === 10) this.showWaveAnnounce('✨ 토게피 해금!', '#fff9c4');
-      if (wave === 13) { this.showWaveAnnounce('🌊 거북왕 해금!', '#0288d1'); if (this.missionTracker) this.missionTracker.stats.heroBlastoise = true; }
       if (this.missionTracker && this.difficulty === 'hard' && !timedOut) {
         this.missionTracker.stats.hardWavesCleared = (this.missionTracker.stats.hardWavesCleared||0) + 1;
       }
@@ -805,7 +832,7 @@ class App {
       this.showEndScreen(true, stars);
     };
 
-    this.engine.totalWaves = 20;
+    this.engine.totalWaves = TOTAL_WAVES;
     const dm = (window.DifficultyMods && window.DifficultyMods[this.difficulty]) || { livesStart:20, goldStart:250 };
     this.engine.difficulty = this.difficulty;
     this.engine.lives = dm.livesStart;
@@ -815,7 +842,7 @@ class App {
     this.els.goldVal.textContent = this.engine.gold;
     this.els.livesVal.textContent = this.engine.lives;
     this.els.waveVal.textContent = 0;
-    this.els.waveTotal.textContent = 20;
+    this.els.waveTotal.textContent = TOTAL_WAVES;
     this.els.btnWave.textContent = '▶ 웨이브 1';
     this.els.btnWave.disabled = false;
 
@@ -1399,7 +1426,7 @@ class App {
     window.addEventListener('resize', () => {
       this.engine.resize();
       this.engine.buildPaths();
-      // 슬롯은 재빌드하지 않음 - 타워 배치 유지
+      this.engine.buildTowerSlots();
       this.engine._bgDirty = true;
     });
   }
@@ -1413,7 +1440,7 @@ class App {
     let wave = WaveData[waveIdx];
 
     // 보스 웨이브 경고
-    const bossWaves = { 10: '⚠️ 갸라도스 중간보스 등장!', 16: '☠️ 루기아 준보스 등장!', 20: '🔮 최종보스 뮤츠!' };
+    const bossWaves = { 10: '⚠️ 갸라도스 중간보스 등장!', 16: '☠️ 루기아 준보스 등장!', 22: '☠️ 루기아 재등장!', 30: '🔮 최종보스 뮤츠!' };
     const nextWave = waveIdx + 1;
     if (bossWaves[nextWave]) {
       const el = document.createElement('div');
@@ -1423,7 +1450,7 @@ class App {
       setTimeout(() => el.remove(), 2500);
     }
 
-    const timeLimit = waveTimeLimit(wave, this.difficulty);
+    const timeLimit = waveTimeLimit(wave, this.difficulty, this.engine);
     if (e.startWave(wave, timeLimit)) {
       this.els.btnWave.disabled = true;
       this.els.btnWave.textContent = '⏳ 진행 중...';

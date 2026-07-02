@@ -87,6 +87,7 @@ class GameEngine {
     this.onWaveTimeout = null;
     this.onEliteKill = null;
     this.onHeroEvolutionReady = null;
+    this.onHeroEvolved = null;
 
     // 캐시
     this._bgCanvas = null;
@@ -131,11 +132,16 @@ class GameEngine {
     const safeBot = this.height - BAR - PAD;
     const safeH = safeBot - safeTop;
 
-    this.towerSlots = this.currentMap.getSlots(this.width, this.height).map(p => {
-      // 슬롯 y를 safe zone(HUD아래~타워바위)으로 리매핑
+    const rawSlots = this.currentMap.getSlots(this.width, this.height);
+    const prevSlots = this.towerSlots;
+    this.towerSlots = rawSlots.map((p, i) => {
       const ratio = p.y / this.height;
       const safeY = safeTop + ratio * safeH;
-      return { x: p.x, y: safeY, occupied: false, tower: null };
+      const prev = prevSlots && prevSlots[i];
+      const slot = { x: p.x, y: safeY, occupied: !!(prev && prev.occupied), tower: (prev && prev.tower) || null };
+      // 기존에 배치된 타워가 있으면 새 좌표로 이동시켜서 트랙과 어긋나지 않게 함
+      if (slot.tower) { slot.tower.x = slot.x; slot.tower.y = slot.y; }
+      return slot;
     });
   }
 
@@ -303,7 +309,8 @@ class GameEngine {
 
   waveCleared() {
     this.state = 'idle';
-    const bonus = 20 + this.currentWave * 7;
+    let bonus = 14 + this.currentWave * 5;
+    if (this._nextWaveGoldMul) { bonus = Math.round(bonus * this._nextWaveGoldMul); this._nextWaveGoldMul = null; }
     this.addGold(bonus);
     this.onWaveComplete && this.onWaveComplete(this.currentWave, bonus, false);
     if (this.currentWave >= this.totalWaves) this.triggerVictory();
