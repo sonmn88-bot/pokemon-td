@@ -80,6 +80,20 @@ html, body {
   margin-top:12px;
 }
 
+.difficulty-select {
+  display:flex; gap:10px; justify-content:center; margin:4px 0 18px;
+}
+.diff-btn {
+  font-size:14px; font-weight:800; padding:9px 20px;
+  border-radius:var(--radius-sm); cursor:pointer;
+  background:rgba(255,255,255,0.06); border:1.5px solid rgba(255,255,255,0.12);
+  color:var(--text-mid); transition:transform 0.15s, border-color 0.15s, background 0.15s;
+}
+.diff-btn:hover { transform:translateY(-2px); }
+.diff-btn.active[data-diff="easy"]   { background:rgba(76,201,240,0.15); border-color:#4cc9f0; color:#4cc9f0; }
+.diff-btn.active[data-diff="normal"] { background:rgba(255,214,10,0.15); border-color:#ffd60a; color:#ffd60a; }
+.diff-btn.active[data-diff="hard"]   { background:rgba(255,68,68,0.15); border-color:#ff4444; color:#ff4444; }
+
 .map-cards {
   display:flex; gap:16px; flex-wrap:wrap;
   justify-content:center; width:100%; max-width:960px;
@@ -152,6 +166,10 @@ html, body {
 #hud-lives  { color:#ff6b6b; border-color:rgba(255,100,100,0.2); }
 #hud-gold   { color:var(--accent-yel); border-color:rgba(255,214,10,0.2); }
 #hud-wave   { color:var(--accent-blu); border-color:rgba(76,201,240,0.2); }
+#hud-timer  { color:#ffd60a; border-color:rgba(255,214,10,0.25); transition:color 0.2s, border-color 0.2s; }
+#hud-timer.timer-warn { color:#ff8f00; border-color:rgba(255,143,0,0.4); }
+#hud-timer.timer-danger { color:#ff4444; border-color:rgba(255,68,68,0.5); animation:timerPulse 0.6s infinite; }
+@keyframes timerPulse { 0%,100%{opacity:1;} 50%{opacity:0.55;} }
 
 /* 배속 버튼 */
 #hud-speed {
@@ -240,6 +258,15 @@ html, body {
 .tower-btn-emoji  { font-size:24px; }
 .tower-btn-name   { font-size:8px; color:var(--text-mid); white-space:nowrap; overflow:hidden; width:100%; text-align:center; }
 .tower-btn-cost   { font-size:9px; color:var(--accent-yel); font-weight:700; }
+.hotkey-badge {
+  position:absolute; top:2px; left:3px;
+  font-size:9px; font-weight:800; color:#0a0a0f;
+  background:rgba(255,214,10,0.92);
+  border-radius:4px; padding:1px 4px; line-height:1.3;
+  pointer-events:none; letter-spacing:0;
+  box-shadow:0 1px 3px rgba(0,0,0,0.4);
+}
+@media (hover:none) and (pointer:coarse) { .hotkey-badge { display:none; } }
 .hero-btn         { border-color:rgba(255,214,10,0.25); }
 .hero-btn .tower-btn-cost { color:var(--accent-pur); }
 .hero-btn-locked .tower-btn-cost { color:var(--accent-red); }
