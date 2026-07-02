@@ -18,6 +18,12 @@ const SkinDefs = {
     christmas: { name:'크리스마스',emoji:'⛄', color:'#81d4fa', unlocked:false, fxColor:'#e1f5fe', badge:'🎄' },
     sakura:    { name:'벚꽃',     emoji:'🌺', color:'#ffab91', unlocked:false, fxColor:'#fbe9e7', badge:'🌸' },
   },
+  charizard: {
+    default: { name:'기본', emoji:'🔥', color:'#ff5722', unlocked:true, fxColor:'#ffab91' },
+  },
+  blastoise: {
+    default: { name:'기본', emoji:'🐢', color:'#0288d1', unlocked:true, fxColor:'#81d4fa' },
+  },
 };
 
 // ===== 스킬트리 정의 =====
@@ -89,6 +95,42 @@ const SkillTrees = {
       {id:'harmony4',name:'조화',     emoji:'🌟', desc:'모든 영웅 스킬 쿨다운 공유 -20%',cost:2, requires:'togetic3',col:2, row:3, type:'harmonyAura', value:0.20},
     ]
   }
+};
+
+// ===== 리자몽 (불꽃 딜러) =====
+SkillTrees.charizard = {
+  nodes: [
+    {id:'cz_dmg1',  name:'불꽃엄니', emoji:'🔥', desc:'기본공격 데미지 +18%',   cost:1, requires:null, col:0, row:0, type:'atkDmg', value:0.18},
+    {id:'cz_rng1',  name:'비행',     emoji:'🦇', desc:'기본공격 사거리 +15%',   cost:1, requires:null, col:1, row:0, type:'atkRange', value:0.15},
+    {id:'cz_spd1',  name:'질풍날개', emoji:'💨', desc:'공격속도 +20%',          cost:1, requires:null, col:2, row:0, type:'fireRate', value:0.20},
+    {id:'cz_crit2', name:'급소각오', emoji:'💥', desc:'30% 확률 2.5배 크리',    cost:1, requires:'cz_dmg1', col:0, row:1, type:'crit', value:{chance:0.30, mul:2.5}},
+    {id:'cz_aoe2',  name:'화염방사', emoji:'🌋', desc:'불꽃보라기 범위 +50%',   cost:1, requires:'cz_rng1', col:1, row:1, type:'skillRange', value:0.50},
+    {id:'cz_cd2',   name:'속공',     emoji:'⏱️', desc:'모든 스킬 쿨다운 -20%', cost:1, requires:'cz_spd1', col:2, row:1, type:'cdReduce', value:0.20},
+    {id:'cz_glb3',  name:'투지',     emoji:'💪', desc:'타워 전체 데미지 +12%',  cost:2, requires:'cz_crit2', col:0, row:2, type:'globalDmg', value:0.12},
+    {id:'cz_multi3',name:'멀티스케일',emoji:'🛡️',desc:'기본공격 3타겟 동시 공격',cost:2, requires:'cz_aoe2', col:1, row:2, type:'multiTarget', value:3},
+    {id:'cz_life3', name:'생명력',   emoji:'❤️', desc:'라이프 최대 +5',        cost:2, requires:'cz_cd2', col:2, row:2, type:'maxLives', value:5},
+    {id:'cz_mega4', name:'메가진화X',emoji:'⭐', desc:'모든 스킬 쿨다운 -40%',  cost:2, requires:'cz_glb3', col:0, row:3, type:'cdReduce', value:0.40},
+    {id:'cz_king4', name:'불꽃의왕', emoji:'👑', desc:'기본공격 데미지 +30%',   cost:2, requires:'cz_multi3', col:1, row:3, type:'atkDmg', value:0.30},
+    {id:'cz_tank4', name:'용의보호막',emoji:'🐉',desc:'라이프 최대 +8',        cost:2, requires:'cz_life3', col:2, row:3, type:'maxLives', value:8},
+  ]
+};
+
+// ===== 거북왕 (물 제어/서포터) =====
+SkillTrees.blastoise = {
+  nodes: [
+    {id:'bs_dmg1',  name:'수포',     emoji:'💧', desc:'기본공격 데미지 +15%',    cost:1, requires:null, col:0, row:0, type:'atkDmg', value:0.15},
+    {id:'bs_rng1',  name:'조준사격', emoji:'🎯', desc:'기본공격 사거리 +18%',    cost:1, requires:null, col:1, row:0, type:'atkRange', value:0.18},
+    {id:'bs_slow1', name:'급류',     emoji:'🌊', desc:'타워 전체 슬로우 효과 강화',cost:1, requires:null, col:2, row:0, type:'slowBoost', value:0.10},
+    {id:'bs_range2',name:'수압포',   emoji:'🔵', desc:'타워 전체 사거리 +8%p',   cost:1, requires:'bs_dmg1', col:0, row:1, type:'passiveRange', value:0.08},
+    {id:'bs_skr2',  name:'해일',     emoji:'🌊', desc:'하이드로펌프 범위 +55%',  cost:1, requires:'bs_rng1', col:1, row:1, type:'skillRange', value:0.55},
+    {id:'bs_life2', name:'등껍질',   emoji:'🛡️', desc:'라이프 최대 +5',        cost:1, requires:'bs_slow1', col:2, row:1, type:'maxLives', value:5},
+    {id:'bs_glb3',  name:'격려',     emoji:'📣', desc:'타워 전체 데미지 +12%',   cost:2, requires:'bs_range2', col:0, row:2, type:'globalDmg', value:0.12},
+    {id:'bs_cd3',   name:'재정비',   emoji:'⏱️', desc:'모든 스킬 쿨다운 -25%',  cost:2, requires:'bs_skr2', col:1, row:2, type:'cdReduce', value:0.25},
+    {id:'bs_wheal3',name:'치유의물', emoji:'💚', desc:'웨이브 클리어시 라이프 +2',cost:2, requires:'bs_life2', col:2, row:2, type:'waveHeal', value:2},
+    {id:'bs_mega4', name:'메가진화X',emoji:'⭐', desc:'모든 스킬 쿨다운 -40%',   cost:2, requires:'bs_glb3', col:0, row:3, type:'cdReduce', value:0.40},
+    {id:'bs_king4', name:'심해의왕', emoji:'👑', desc:'기본공격 데미지 +30%',    cost:2, requires:'bs_cd3', col:1, row:3, type:'atkDmg', value:0.30},
+    {id:'bs_tank4', name:'철벽방어', emoji:'🏰', desc:'라이프 최대 +8',         cost:2, requires:'bs_wheal3', col:2, row:3, type:'maxLives', value:8},
+  ]
 };
 
 // ===== 영웅 기본 정의 =====
@@ -242,6 +284,103 @@ const HeroDefs = {
       },
     ],
   },
+};
+
+// ===== 리자몽 (불꽃 타입 영웅) =====
+HeroDefs.charizard = {
+  id:'charizard', name:'리자몽', baseColor:'#ff5722',
+  role:'화염 딜러',
+  passive:'불꽃 타입 타워 데미지 +15%',
+  attack:{
+    baseRange:210, baseDamage:18, baseFireRate:1.2,
+    rangePerLevel:14, damagePerLevel:8,
+    projColor:'#ff7043', projEmoji:'🔥', dmgType:'special',
+    status:{type:'burn', duration:2, factor:8},
+  },
+  passiveApply(engine, hero) {
+    const dmgMul = 1.15 + (hero ? hero._skillVal('passiveRange', 0) : 0);
+    for (const t of engine.towers) if (t.def?.type === 'fire') t.buffDmgMul = dmgMul;
+  },
+  skills:[
+    {
+      name:'불꽃보라기', emoji:'🔥', baseCooldown:13,
+      desc:'범위 내 모든 적에게 화염 데미지 + 화상',
+      cast(hero, engine) {
+        const r = (150 + hero.level * 10) * (1 + hero._skillVal('skillRange', 0));
+        for (const e of engine.enemies) {
+          if (e.dead||e.reachedEnd) continue;
+          if (Math.hypot(e.x-hero.x,e.y-hero.y) <= r) {
+            e.takeDamage(36 + hero.level * 13, 'special');
+            e.applyStatus('burn', 3, 12 + hero.level);
+          }
+        }
+        engine.particles.push(new AoeBurst(hero.x, hero.y, r, '#ff5722'));
+        engine.spawnFloatingText('🔥불꽃보라기!', hero.x, hero.y-32, '#ff7043');
+      }
+    },
+    {
+      name:'용의날개', emoji:'🐉', baseCooldown:19,
+      desc:'모든 적에게 큰 피해 + 3초 슬로우',
+      cast(hero, engine) {
+        for (const e of engine.enemies) {
+          if (e.dead||e.reachedEnd) continue;
+          e.takeDamage(70 + hero.level * 24, 'special');
+          e.applyStatus('slow', 3, 0.45);
+        }
+        engine.particles.push(new AoeBurst(hero.x, hero.y, Math.max(engine.width,engine.height), '#ff3d00'));
+        engine.spawnFloatingText('🐉용의날개!', hero.x, hero.y-32, '#ff5722');
+      }
+    },
+  ],
+};
+
+// ===== 거북왕 (물 타입 영웅) =====
+HeroDefs.blastoise = {
+  id:'blastoise', name:'거북왕', baseColor:'#0288d1',
+  role:'제어 / 서포터',
+  passive:'물 타입 타워 사거리 +10%',
+  attack:{
+    baseRange:220, baseDamage:14, baseFireRate:1.1,
+    rangePerLevel:16, damagePerLevel:6,
+    projColor:'#4fc3f7', projEmoji:'💧', dmgType:'special',
+    status:{type:'slow', duration:1.8, factor:0.65},
+  },
+  passiveApply(engine, hero) {
+    const bonus = 0.10 + (hero ? hero._skillVal('passiveRange', 0) : 0);
+    for (const t of engine.towers) if (t.def?.type === 'water') t.buffRangeMul = 1 + bonus;
+  },
+  skills:[
+    {
+      name:'하이드로펌프', emoji:'🌊', baseCooldown:13,
+      desc:'범위 내 모든 적 큰 슬로우 + 데미지',
+      cast(hero, engine) {
+        const r = (150 + hero.level * 10) * (1 + hero._skillVal('skillRange', 0));
+        for (const e of engine.enemies) {
+          if (e.dead||e.reachedEnd) continue;
+          if (Math.hypot(e.x-hero.x,e.y-hero.y) <= r) {
+            e.applyStatus('slow', 3.5, 0.35);
+            e.takeDamage(24 + hero.level * 9, 'special');
+          }
+        }
+        engine.particles.push(new AoeBurst(hero.x, hero.y, r, '#0288d1'));
+        engine.spawnFloatingText('🌊하이드로펌프!', hero.x, hero.y-32, '#4fc3f7');
+      }
+    },
+    {
+      name:'쉘아머', emoji:'🛡️', baseCooldown:20,
+      desc:'라이프 +4 회복 + 주변 적 2.5초 스턴',
+      cast(hero, engine) {
+        engine.lives = Math.min(engine.lives + 4, 99);
+        engine.onLivesChange && engine.onLivesChange(engine.lives);
+        const r = 130 + hero.level * 8;
+        for (const e of engine.enemies) {
+          if (e.dead||e.reachedEnd) continue;
+          if (Math.hypot(e.x-hero.x,e.y-hero.y) <= r) e.applyStatus('stun', 2.5, 0);
+        }
+        engine.spawnFloatingText('🛡️쉘아머! 라이프+4', hero.x, hero.y-32, '#81d4fa');
+      }
+    },
+  ],
 };
 
 // ===== HERO CLASS =====
