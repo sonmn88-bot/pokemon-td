@@ -304,10 +304,12 @@ class Enemy {
       this.flyOffset = Math.sin(this.flyTime) * this.def.flyHeight;
     }
 
-    // 도착 체크
+    // 순환 트랙: 한 바퀴 돌면 처음으로 (더 이상 도착=라이프 손실 아님)
     if (pos.ratio >= 1) {
-      this.reachedEnd = true;
-      return;
+      this.laps = (this.laps || 0) + 1;
+      this.distTraveled = this.distTraveled % this.totalLen;
+      const wrapped = pathProgress(this.path, this.distTraveled);
+      this.x = wrapped.x; this.y = wrapped.y;
     }
 
     // DoT 처리
@@ -492,6 +494,11 @@ class Enemy {
     const imgPath = EnemySpriteImages[this.typeId];
     const img = imgPath ? window.loadSpriteImage(imgPath) : null;
 
+    if (this._elite === 'gold') {
+      // 골드 엘리트 = 흑화(섀도) 버전: 어둡고 채도 높은 필터로 위압감 연출
+      ctx.filter = 'brightness(0.45) saturate(2.1) hue-rotate(265deg) contrast(1.25)';
+    }
+
     if (img && img.complete && img.naturalWidth > 0) {
       const drawSize = s * 1.7;
       if (this.flashTimer > 0) {
@@ -591,4 +598,3 @@ function roundRect(ctx, x, y, w, h, r) {
   ctx.arcTo(x, y, x + r, y, r);
   ctx.closePath();
 }
-
