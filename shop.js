@@ -1,4 +1,3 @@
-// v2
 // ===== SHOP.JS - 상점 아이템 + 글로벌 스펠 =====
 
 const ShopItems = [
@@ -28,12 +27,12 @@ const ShopItems = [
     }
   },
   {
-    key: 'superpotion', name: '고급상처약', emoji: '💊', cost: 140,
-    desc: '모든 타워 데미지 영구 +20%',
+    key: 'superpotion', name: '고급상처약', emoji: '💊', cost: 140, maxBuys: 3,
+    desc: '모든 타워 데미지 영구 +12% (최대 3회, 상한 있음)',
     buy(engine) {
-      for (const t of engine.towers) t.buffDmgMul = (t.buffDmgMul || 1) * 1.20;
-      engine._shopDmgMul = (engine._shopDmgMul || 1) * 1.20;
-      engine.spawnFloatingText('💊 전체 데미지 +20%!', engine.width/2, 80, '#ce93d8');
+      for (const t of engine.towers) t.buffDmgMul = (t.buffDmgMul || 1) * 1.12;
+      engine._shopDmgMul = (engine._shopDmgMul || 1) * 1.12;
+      engine.spawnFloatingText('💊 전체 데미지 +12%!', engine.width/2, 80, '#ce93d8');
     }
   },
   {
@@ -46,23 +45,23 @@ const ShopItems = [
     }
   },
   {
-    key: 'rangeorb', name: '사거리 구슬', emoji: '🔵', cost: 120,
-    desc: '모든 타워 사거리 영구 +20%',
+    key: 'rangeorb', name: '사거리 구슬', emoji: '🔵', cost: 120, maxBuys: 2,
+    desc: '모든 타워 사거리 영구 +8% (최대 2회, 상한 있음 - 전범위 방지)',
     buy(engine) {
-      for (const t of engine.towers) t.buffRangeMul = (t.buffRangeMul || 1) * 1.20;
-      engine._shopRangeMul = (engine._shopRangeMul || 1) * 1.20;
-      engine.spawnFloatingText('🔵 전체 사거리 +20%!', engine.width/2, 80, '#4fc3f7');
+      for (const t of engine.towers) t.buffRangeMul = (t.buffRangeMul || 1) * 1.08;
+      engine._shopRangeMul = (engine._shopRangeMul || 1) * 1.08;
+      engine.spawnFloatingText('🔵 전체 사거리 +8%!', engine.width/2, 80, '#4fc3f7');
     }
   },
   {
-    key: 'speedorb', name: '속도 구슬', emoji: '🟢', cost: 130,
-    desc: '모든 타워 공격속도 영구 +15%',
+    key: 'speedorb', name: '속도 구슬', emoji: '🟢', cost: 130, maxBuys: 3,
+    desc: '모든 타워 공격속도 영구 +10% (최대 3회, 상한 있음)',
     buy(engine) {
       for (const t of engine.towers) {
-        t._shopSpeedMul = (t._shopSpeedMul || 1) * 1.15;
+        t._shopSpeedMul = (t._shopSpeedMul || 1) * 1.10;
       }
-      engine._shopSpeedMul = (engine._shopSpeedMul || 1) * 1.15;
-      engine.spawnFloatingText('🟢 공격속도 +15%!', engine.width/2, 80, '#06d6a0');
+      engine._shopSpeedMul = (engine._shopSpeedMul || 1) * 1.10;
+      engine.spawnFloatingText('🟢 공격속도 +10%!', engine.width/2, 80, '#06d6a0');
     }
   },
   {
