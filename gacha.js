@@ -12,7 +12,8 @@ const GRADES = {
 
 // ===== 영구 버프 상한선 (상점/타입강화 중첩으로 인한 밸런스 붕괴 방지) =====
 // 사거리는 특히 낮게 캡: '전범위 타워'가 나오지 않도록.
-const BUFF_CAPS = { range: 1.35, damage: 1.9, speed: 1.5 };
+// v27: 영구강화 상한 제거 (기존엔 range1.35/dmg1.9/speed1.5로 막혀있었음) - 대신 상점 가격이 살수록 비싸짐
+const BUFF_CAPS = { range: 999, damage: 999, speed: 999 };
 
 // ===== 속성 상성 (6속성 순환: 불→풀→물→전기→에스퍼→노말→불) =====
 // 각 속성은 정확히 하나를 이기고(1.4배) 하나에게 진다(0.7배). 전략적 타워 배치 유도용.
@@ -276,6 +277,14 @@ const GachaTowerDefs = {
   },
 };
 
+// ===== v27: 밸런스 재설계 - 기본 스탯 전체 하향 (초반엔 약하게, 업그레이드 투자가 중요해지도록) =====
+for (const id in GachaTowerDefs) {
+  const d = GachaTowerDefs[id];
+  d.damage   = Math.round(d.damage * 0.80 * 10) / 10;
+  d.fireRate = Math.round(d.fireRate * 0.88 * 100) / 100;
+  d.range    = Math.round(d.range * 0.93);
+}
+
 // ===== 헬퍼 =====
 function _shot(tower, engine, color, emoji, status, speed, onHit, splash, knockback) {
   if (!tower.target) return;
@@ -339,13 +348,28 @@ function rollTower(tableKey) {
   return {...GachaTowerDefs[id], _starLevel:1};
 }
 
+// v27: 이미 구매한 타입강화를 새 타워 생성시점에 소급 적용 (이게 없어서 업그레이드가 안 먹는 것처럼 보였음)
+function _computeTypeBuffMuls(type) {
+  const level = TypeUpgradeLevels[type] || 0;
+  const upgrades = (typeof TypeUpgrades !== 'undefined' ? TypeUpgrades[type] : null) || [];
+  let dmg = 1, range = 1, speed = 1;
+  for (let i = 0; i < level && i < upgrades.length; i++) {
+    const u = upgrades[i];
+    if (u.buff === 'dmg' || u.buff === 'all')   dmg   *= (1 + u.val);
+    if (u.buff === 'range' || u.buff === 'all') range *= (1 + u.val);
+    if (u.buff === 'speed' || u.buff === 'all') speed *= (1 + u.val);
+  }
+  return { dmg, range, speed };
+}
+
 // ===== 타워 생성 =====
-function _createGachaTower(def, x, y) {
+function _createGachaTower(def, x, y, engine) {
+  const muls = _computeTypeBuffMuls(def.type);
   const t = {
     x, y, _gachaId:def.id, def,
     name:def.name, level:1, path:null, totalSpent:0,
     cooldown:0, fireFlash:0, _rotAngle:0,
-    synergyBonus:0, buffRangeMul:1, buffDmgMul:1, target:null,
+    synergyBonus:0, buffRangeMul:muls.range, buffDmgMul:muls.dmg, _shopSpeedMul:muls.speed, target:null,
     get range(){ return (def.range+(this.synergyBonus*2))*Math.min(this.buffRangeMul, BUFF_CAPS.range); },
     get damage(){
       const base = (def.damage+this.synergyBonus)*Math.min(this.buffDmgMul, BUFF_CAPS.damage);
@@ -454,6 +478,7 @@ function _createGachaTower(def, x, y) {
       ctx.restore();
     },
   };
+  if (engine && window.applyShopBuffs) window.applyShopBuffs(t, engine);
   return t;
 }
 
@@ -477,14 +502,14 @@ function applyTowerSynergies(towers) {
   }
 }
 
-// ===== 타입 업그레이드 (6종) =====
+// ===== 타입 업그레이드 (6종, v27: 3단계 -> 5단계 확장 + 가격 상향) =====
 const TypeUpgrades = {
-  fire:     [{cost:200,label:'불꽃 강화 1',buff:'dmg',val:0.15},{cost:400,label:'불꽃 강화 2',buff:'dmg',val:0.20},{cost:800,label:'대화염',buff:'dmg',val:0.30}],
-  water:    [{cost:200,label:'물 강화 1',buff:'range',val:0.15},{cost:400,label:'물 강화 2',buff:'slow',val:0.1},{cost:800,label:'대해일',buff:'range',val:0.25}],
-  electric: [{cost:200,label:'전기 강화 1',buff:'speed',val:0.15},{cost:400,label:'전기 강화 2',buff:'chain',val:1},{cost:800,label:'초전도',buff:'speed',val:0.25}],
-  grass:    [{cost:200,label:'풀 강화 1',buff:'poison',val:0.15},{cost:400,label:'풀 강화 2',buff:'range',val:0.15},{cost:800,label:'대자연',buff:'dmg',val:0.25}],
-  psychic:  [{cost:200,label:'에스퍼 강화 1',buff:'target',val:1},{cost:400,label:'에스퍼 강화 2',buff:'dmg',val:0.20},{cost:800,label:'초능력',buff:'target',val:2}],
-  normal:   [{cost:150,label:'노말 강화 1',buff:'speed',val:0.10},{cost:300,label:'노말 강화 2',buff:'dmg',val:0.10},{cost:600,label:'만능',buff:'all',val:0.10}],
+  fire:     [{cost:220,label:'불꽃 강화 1',buff:'dmg',val:0.14},{cost:480,label:'불꽃 강화 2',buff:'dmg',val:0.16},{cost:900,label:'불꽃 강화 3',buff:'dmg',val:0.18},{cost:1500,label:'불꽃 강화 4',buff:'dmg',val:0.20},{cost:2400,label:'대화염',buff:'dmg',val:0.28}],
+  water:    [{cost:220,label:'물 강화 1',buff:'range',val:0.12},{cost:480,label:'물 강화 2',buff:'slow',val:0.08},{cost:900,label:'물 강화 3',buff:'range',val:0.15},{cost:1500,label:'물 강화 4',buff:'slow',val:0.10},{cost:2400,label:'대해일',buff:'range',val:0.22}],
+  electric: [{cost:220,label:'전기 강화 1',buff:'speed',val:0.13},{cost:480,label:'전기 강화 2',buff:'chain',val:1},{cost:900,label:'전기 강화 3',buff:'speed',val:0.15},{cost:1500,label:'전기 강화 4',buff:'chain',val:1},{cost:2400,label:'초전도',buff:'speed',val:0.22}],
+  grass:    [{cost:220,label:'풀 강화 1',buff:'poison',val:0.13},{cost:480,label:'풀 강화 2',buff:'range',val:0.13},{cost:900,label:'풀 강화 3',buff:'poison',val:0.15},{cost:1500,label:'풀 강화 4',buff:'range',val:0.13},{cost:2400,label:'대자연',buff:'dmg',val:0.22}],
+  psychic:  [{cost:220,label:'에스퍼 강화 1',buff:'target',val:1},{cost:480,label:'에스퍼 강화 2',buff:'dmg',val:0.16},{cost:900,label:'에스퍼 강화 3',buff:'target',val:1},{cost:1500,label:'에스퍼 강화 4',buff:'dmg',val:0.18},{cost:2400,label:'초능력',buff:'target',val:2}],
+  normal:   [{cost:180,label:'노말 강화 1',buff:'speed',val:0.09},{cost:360,label:'노말 강화 2',buff:'dmg',val:0.09},{cost:700,label:'노말 강화 3',buff:'speed',val:0.11},{cost:1200,label:'노말 강화 4',buff:'dmg',val:0.11},{cost:2000,label:'만능',buff:'all',val:0.09}],
 };
 // 타입별 업그레이드 레벨 추적
 const TypeUpgradeLevels = {};
@@ -524,6 +549,9 @@ const MissionDefs = [
   {id:'wave5',       name:'웨이브 5',   desc:'웨이브 5 클리어',       reward:120, condition:(s)=>s.wavesCleared>=5},
   {id:'wave10',      name:'웨이브 10',  desc:'웨이브 10 클리어',      reward:200, condition:(s)=>s.wavesCleared>=10},
   {id:'boss1',       name:'보스 처치',  desc:'보스 처치',              reward:250, condition:(s)=>s.bossKills>=1},
+  {id:'bosssummon1', name:'첫 소환!',   desc:'보스 소환 버튼으로 보스 1회 소환', reward:150, condition:(s)=>(s.bossSummons||0)>=1},
+  {id:'bosssummon10',name:'소환술사',   desc:'보스 소환 10회',          reward:400, condition:(s)=>(s.bossSummons||0)>=10},
+  {id:'wave90',      name:'3존 완주',   desc:'웨이브 90 도달 (엔드리스 3존 순환 완료)', reward:600, condition:(s)=>s.wavesCleared>=90},
   {id:'type_fire',   name:'불꽃 마스터',desc:'불꽃 타입 업그레이드 3단계',reward:300,condition:(s)=>(s.typeUpgrades?.fire||0)>=3},
   {id:'type_water',  name:'물 마스터',  desc:'물 타입 업그레이드 3단계',  reward:300,condition:(s)=>(s.typeUpgrades?.water||0)>=3},
   {id:'towers8',     name:'군대 집결',  desc:'타워 8개 배치',          reward:150, condition:(s)=>s.maxTowersDeployed>=8},
@@ -598,7 +626,7 @@ function checkMerge(towers, towerSlots, engine) {
       if(!evoId||!GachaTowerDefs[evoId]) continue;
       const evoDef=GachaTowerDefs[evoId]; const targetSlot=slots[0];
       for(let i=1;i<3;i++){ const s=slots[i]; engine.towers=engine.towers.filter(t=>t!==s.tower); s.occupied=false; s.tower=null; }
-      const evoTower=_createGachaTower(evoDef,targetSlot.x,targetSlot.y);
+      const evoTower=_createGachaTower(evoDef,targetSlot.x,targetSlot.y,engine);
       targetSlot.tower=evoTower; engine.towers=engine.towers.filter(t=>t!==slots[0].tower); engine.towers.push(evoTower);
       engine.spawnFloatingText(`✨ ${evoDef.name} 진화!`,targetSlot.x,targetSlot.y-36,GRADES[evoDef.grade].color);
       engine.particles.push(new BurstRing(targetSlot.x,targetSlot.y,60,GRADES[evoDef.grade].color));

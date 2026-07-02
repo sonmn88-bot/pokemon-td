@@ -1,6 +1,10 @@
-// ===== MAIN.JS - 화면 관리 + HUD + 절차적 웨이브 생성(30웨이브) + 타워/영웅/상점 통합 =====
+// ===== MAIN.JS - 화면 관리 + HUD + 절차적 웨이브 생성(엔드리스) + 타워/영웅/상점 통합 =====
 
-const TOTAL_WAVES = 30;
+const WAVES_PER_ZONE = 30; // v27: 30웨이브씩 3존 순환, 90 이후로도 계속 강해지며 무한 진행
+const ZONE_MAPS = ['forest', 'cave', 'city']; // 1~30 태초마을 숲 / 31~60 라벤더 동굴(우주 성운 테마) / 61~90 홍련체육관 도시(화산)
+const ZONE_LABELS = ['🌲 초원 지대', '🌌 우주 동굴', '🌋 화산 도시'];
+function zoneIndexForWave(n) { return Math.floor((n - 1) / WAVES_PER_ZONE) % ZONE_MAPS.length; }
+function zoneCycleForWave(n) { return Math.floor((n - 1) / WAVES_PER_ZONE); } // 0=1회차, 1=2회차(반복 강화)...
 
 // 웨이브 진행도에 따라 열리는 적 티어 (기존 20웨이브 손수 작성 대신 공식으로 생성 - 튜닝 비용 최소화)
 const ENEMY_TIERS = {
@@ -9,19 +13,22 @@ const ENEMY_TIERS = {
   t3: ['lapras','weezing','scyther','onix','haunter'],
   t4: ['gyarados','electrode','dragonite'],
 };
-const BOSS_WAVES = { 10:'gyarados', 16:'lugia', 22:'lugia', 30:'mewtwo' };
+const MINIBOSS_POOL = ['gyarados', 'dragonite'];
+const BOSS_POOL = ['lugia', 'mewtwo'];
 
 function generateWave(n) {
-  const progress = n / TOTAL_WAVES;
+  const posInZone = ((n - 1) % WAVES_PER_ZONE) + 1; // 1~30, 존이 바뀌어도 난이도 곡선은 동일 패턴 반복
+  const cycle = zoneCycleForWave(n); // 90웨이브 넘어가서 같은 존이 다시 나올 때마다 +1씩 계속 강해짐
+  const progress = posInZone / WAVES_PER_ZONE;
   let pool = [...ENEMY_TIERS.t1];
   if (progress > 0.15) pool = pool.concat(ENEMY_TIERS.t2);
   if (progress > 0.42) pool = pool.concat(ENEMY_TIERS.t3);
   if (progress > 0.68) pool = pool.concat(ENEMY_TIERS.t4);
 
-  // 웨이브가 진행될수록 더 많이, 더 빽빽하게 스폰 (계속 돌면서 잡는 느낌)
-  const enemyCount = Math.round(16 + n * 2.6);
-  const baseInterval = Math.max(0.30, 1.15 - n * 0.022);
-  const streams = 1 + Math.min(3, Math.floor(n / 6)); // 후반엔 여러 갈래로 동시에 몰아침
+  // 웨이브가 진행될수록 더 많이, 더 빽빽하게 스폰 (계속 돌면서 잡는 느낌). cycle이 늘수록(90웨이브 이후 반복) 한번 더 강화
+  const enemyCount = Math.round(16 + n * 2.6 + cycle * 10);
+  const baseInterval = Math.max(0.26, 1.15 - n * 0.014);
+  const streams = 1 + Math.min(4, Math.floor(n / 6));
 
   const arr = [];
   for (let s = 0; s < streams; s++) {
@@ -35,14 +42,16 @@ function generateWave(n) {
   }
   arr.sort((a, b) => a.delay - b.delay);
 
-  // 보스 웨이브
   const lastDelay = arr.length ? arr[arr.length - 1].delay : 0;
-  if (BOSS_WAVES[n]) arr.push({ type: BOSS_WAVES[n], delay: lastDelay + 4 });
+  // 미니보스: 10웨이브마다 / 존보스: 30웨이브마다(존 경계) - 90 이후로도 계속 반복+강화
+  if (n % 30 === 0) {
+    arr.push({ type: BOSS_POOL[Math.floor(Math.random() * BOSS_POOL.length)], delay: lastDelay + 4 });
+  } else if (n % 10 === 0) {
+    arr.push({ type: MINIBOSS_POOL[Math.floor(Math.random() * MINIBOSS_POOL.length)], delay: lastDelay + 4 });
+  }
 
   return arr;
 }
-
-const WaveData = Array.from({ length: TOTAL_WAVES }, (_, i) => generateWave(i + 1));
 
 function seq(type, count, interval, pathIdx = 0, startDelay = 0) {
   const arr = [];
@@ -230,6 +239,7 @@ class App {
       startBtn.addEventListener('click', () => {
         document.getElementById('title-screen').classList.remove('active');
         document.getElementById('map-select-screen').classList.add('active');
+        this._refreshBestWaveLabel();
       });
     }
     const backBtn = document.getElementById('btn-title-back');
@@ -243,9 +253,50 @@ class App {
   }
 
   bindMapSelect() {
-    document.querySelectorAll('.map-card').forEach(card => {
-      card.addEventListener('click', () => this.startGame(card.dataset.map));
-    });
+    const startBtn = document.getElementById('btn-endless-start');
+    if (startBtn) startBtn.addEventListener('click', () => this.startGame());
+    const skinBtn = document.getElementById('btn-title-skin');
+    if (skinBtn) skinBtn.addEventListener('click', () => this.openSkinPicker(this.starterHero || 'pikachu'));
+  }
+
+  // v27: 타이틀 진입/게임오버 후 복귀할 때마다 최고 기록 갱신
+  async _refreshBestWaveLabel() {
+    const label = document.getElementById('best-wave-label');
+    if (!label) return;
+    try {
+      const res = await window.storage.get('best_wave');
+      const val = res ? JSON.parse(res.value) : 0;
+      label.textContent = `🏆 최고 도달 웨이브: ${val || 0}`;
+    } catch (e) { label.textContent = '🏆 최고 도달 웨이브: -'; }
+  }
+
+  async _recordBestWave() {
+    const reached = this.engine ? this.engine.currentWave : 0;
+    try {
+      const res = await window.storage.get('best_wave').catch(() => null);
+      const prevBest = res ? JSON.parse(res.value) : 0;
+      const best = Math.max(prevBest, reached);
+      if (best !== prevBest) await window.storage.set('best_wave', JSON.stringify(best));
+      return best;
+    } catch (e) { return reached; }
+  }
+
+  // v27: 필드 누적 몬스터 경고 배너 (70/80/90 색상 단계, 100에서 게임오버)
+  _showFieldWarning(count, level) {
+    let el = document.getElementById('field-warning-banner');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'field-warning-banner';
+      el.style.cssText = 'position:absolute;top:60px;left:50%;transform:translateX(-50%);z-index:50;padding:8px 18px;border-radius:10px;font-weight:bold;font-size:14px;pointer-events:none;transition:opacity 0.3s;';
+      document.getElementById('game-screen').appendChild(el);
+    }
+    const colors = { 70: ['#3a2f00','#ffd60a'], 80: ['#3a1f00','#ff9800'], 90: ['#3a0000','#ff3b3b'] };
+    const [bg, fg] = colors[level] || colors[70];
+    el.style.background = bg; el.style.color = fg; el.style.border = `1px solid ${fg}`;
+    el.textContent = `⚠️ 필드에 몬스터 ${count}마리 (100마리에서 게임오버!)`;
+    el.style.opacity = '1';
+    clearTimeout(this._fieldWarnHideTimer);
+    this._fieldWarnHideTimer = setTimeout(() => { if (el) el.style.opacity = '0'; }, 4000);
   }
 
   bindDifficultySelect() {
@@ -309,6 +360,22 @@ class App {
             this.showWaveAnnounce(`${skill.emoji} ${skill.name}!`, '#ffd60a');
           }
         }
+        return;
+      }
+      // C: 선택된 타워 합치기 진화 (패널에 합치기 버튼이 떠 있을 때)
+      if (k === 'c') {
+        const mergeBtn = document.querySelector('[data-action="merge"]');
+        if (mergeBtn && !mergeBtn.disabled) { e.preventDefault(); mergeBtn.click(); }
+        return;
+      }
+      // H: 배치된 영웅 이동모드 토글 (여러 영웅이 있으면 순서대로 순환)
+      if (k === 'h') {
+        const placed = this.engine.heroes;
+        if (!placed.length) return;
+        this._heroMoveCycleIdx = ((this._heroMoveCycleIdx ?? -1) + 1) % placed.length;
+        const heroId = placed[this._heroMoveCycleIdx].id;
+        const btn = document.querySelector(`.hero-btn[data-hero-key="${heroId}"]`);
+        if (btn) { e.preventDefault(); this.selectHeroToPlace(heroId, btn); }
         return;
       }
     });
@@ -489,7 +556,7 @@ class App {
   _placePulledTower(def, slotIdx) {
     const slot = this.engine.towerSlots[slotIdx];
     if (!slot || slot.occupied) return;
-    const tower = window._createGachaTower(def, slot.x, slot.y);
+    const tower = window._createGachaTower(def, slot.x, slot.y, this.engine);
     slot.occupied = true;
     slot.tower = tower;
     this.engine.towers.push(tower);
@@ -731,6 +798,9 @@ class App {
   }
 
   startGame(mapId) {
+    // v27: 난이도/맵 선택 화면 제거 - 항상 1존(초원)부터 엔드리스 시작
+    mapId = ZONE_MAPS[0];
+    this._currentZone = 0;
     this.currentMapId = mapId;
     this.els.mapSelect.classList.remove('active');
     this.els.gameScreen.classList.add('active');
@@ -740,12 +810,14 @@ class App {
     this.engine.heroes = [];
     this.engine.spellMgr = this.spellMgr;
     this.spellMgr.cooldowns = { pokecenter: 0, masterball: 0 };
+    // v27: 새 게임 시작시 타입강화 레벨 초기화 (이전 판 값이 남아있던 버그 방지)
+    if (window.TypeUpgradeLevels) { for (const t in window.TypeUpgradeLevels) window.TypeUpgradeLevels[t] = 0; }
 
     // 미션 트래커 초기화
     this.missionTracker = new MissionTracker();
     this.missionTracker.onComplete = (mission) => this._onMissionComplete(mission);
 
-    this.engine.onGoldChange  = g => { this.els.goldVal.textContent = g; this.refreshPullButtons(); };
+    this.engine.onGoldChange  = g => { this.els.goldVal.textContent = g; this.refreshPullButtons(); this.buildShopBar(); };
     this.engine.onHitSound = () => { if (Math.random() < 0.3) this.SFX.play('hit'); };
     this.engine.onLivesChange = l => {
       this.els.livesVal.textContent = l;
@@ -753,7 +825,7 @@ class App {
     };
     this.engine.onWaveChange  = (w, t) => {
       this.els.waveVal.textContent = w;
-      this.els.waveTotal.textContent = t;
+      this.els.waveTotal.textContent = '∞';
     };
     const hudTimer = document.getElementById('hud-timer');
     const timerVal = document.getElementById('timer-val');
@@ -767,9 +839,11 @@ class App {
     };
     this.engine.onWaveTimeout = (penalty, survivorCount) => {
       if (hudTimer) hudTimer.style.display = 'none';
-      this.showWaveAnnounce(`⏱ 시간 초과! 놓친 ${survivorCount}마리 -${penalty} 라이프`, '#ff4444');
+      this.showWaveAnnounce(`⏱ 시간 초과! 남은 ${survivorCount}마리는 필드에 그대로 (페널티 없음)`, '#ffab40');
       if (this.missionTracker) { this.missionTracker.stats.timeouts = (this.missionTracker.stats.timeouts||0) + 1; }
     };
+    this.engine.onFieldWarning = (count, level) => this._showFieldWarning(count, level);
+    this.engine.onZoneChange = (idx, zoneMapId) => { /* sendWave에서 이미 BGM/안내 처리함 */ };
     this.engine.onEliteKill = () => {
       if (!this.missionTracker) return;
       this.missionTracker.stats.eliteGoldKills = (this.missionTracker.stats.eliteGoldKills||0) + 1;
@@ -807,13 +881,9 @@ class App {
       if (hudTimer) hudTimer.style.display = 'none';
       this.els.btnWave.disabled = false;
       if (!timedOut) this.SFX.play('wave_clear');
-      if (wave >= this.engine.totalWaves) {
-        this.els.btnWave.textContent = '🏆 완료!';
-      } else {
-        // 자동 웨이브 카운트다운 10초
-        this._startAutoWaveCountdown(wave + 1);
-      }
-      if (!timedOut) this.showWaveAnnounce(`Wave ${wave} 클리어! +${bonus}g`, '#ffd60a');
+      // v27: 엔드리스 - 클리어 개념 없이 항상 자동으로 다음 웨이브 카운트다운
+      this._startAutoWaveCountdown(wave + 1);
+      if (!timedOut) this.showWaveAnnounce(`Wave ${wave} 완료! +${bonus}g`, '#ffd60a');
       if (this.missionTracker && this.difficulty === 'hard' && !timedOut) {
         this.missionTracker.stats.hardWavesCleared = (this.missionTracker.stats.hardWavesCleared||0) + 1;
       }
@@ -822,17 +892,15 @@ class App {
         this.missionTracker.stats.wavesCleared = wave;
         this.missionTracker.check();
       }
-      if (wave % 5 === 0 && wave < this.engine.totalWaves) {
-        setTimeout(() => this.openShop(), 700);
-      }
     };
-    this.engine.onGameOver = () => this.showEndScreen(false, 0);
+    this.engine.onGameOver = () => this._recordBestWave().then(best => this.showEndScreen(false, 0, best));
     this.engine.onVictory  = (stars) => {
       this.checkSkinUnlocks(stars);
       this.showEndScreen(true, stars);
     };
 
-    this.engine.totalWaves = TOTAL_WAVES;
+    this.engine.totalWaves = 999999; // v27: 엔드리스 - 사실상 무한
+    this.engine.endless = true;
     const dm = (window.DifficultyMods && window.DifficultyMods[this.difficulty]) || { livesStart:20, goldStart:250 };
     this.engine.difficulty = this.difficulty;
     this.engine.lives = dm.livesStart;
@@ -842,7 +910,7 @@ class App {
     this.els.goldVal.textContent = this.engine.gold;
     this.els.livesVal.textContent = this.engine.lives;
     this.els.waveVal.textContent = 0;
-    this.els.waveTotal.textContent = TOTAL_WAVES;
+    this.els.waveTotal.textContent = '∞';
     this.els.btnWave.textContent = '▶ 웨이브 1';
     this.els.btnWave.disabled = false;
 
@@ -850,11 +918,14 @@ class App {
     this.buildTowerBar();
     this.buildSpellBar();
     this.buildTypeUpgradeBar();
+    this.buildShopBar();
+    this.buildBossSummonButton();
     this.startHeroLoop();
   }
 
   startHeroLoop() {
     this._waveTimer = 0;
+    this.engine._bossSummonCooldown = 0;
     const origUpdate = this.engine.update.bind(this.engine);
     this.engine.update = () => {
       origUpdate();
@@ -863,6 +934,10 @@ class App {
         this.spellMgr.update(this.engine.dt);
         this.updateSpellBarUI();
         this.updateHeroSkillBarUI();
+      }
+      if (this.engine._bossSummonCooldown > 0) {
+        this.engine._bossSummonCooldown -= this.engine.dt;
+        this._updateBossSummonUI();
       }
       // 웨이브 진행 중 타이머 + 남은 적 표시
       if (this.engine.state === 'wave') {
@@ -950,15 +1025,30 @@ class App {
       const evolveId = window.MERGE_EVOLUTION?.[t._gachaId];
       const evolveDef = evolveId ? window.GachaTowerDefs?.[evolveId] : null;
       const synergyInfo = t.synergyBonus > 0
-        ? `<span style="color:#ffd60a;font-size:10px">⚡시너지 +${t.synergyBonus}</span>` : '';
+        ? `<span style="color:#ffd60a;font-size:10px">⚡시너지 +${t.synergyBonus}</span>`
+        : `<span style="color:#888;font-size:10px" title="같은 타입 타워를 150px 이내에 배치하면 데미지 시너지가 붙습니다">⚡시너지 없음 (150px 이내 같은 타입 배치시 발동)</span>`;
       const refundCosts = {normal:35, rare:84, epic:140, legend:240, unique:420};
       const refund = refundCosts[def.grade] || 35;
+
+      // v27: 스탯 옆 (+%) 강화 표시 + 다음 강화 힌트
+      const dmgPct = Math.round(((t.buffDmgMul||1) - 1) * 100);
+      const rangePct = Math.round(((t.buffRangeMul||1) - 1) * 100);
+      const spdPct = Math.round(((t._shopSpeedMul||1) - 1) * 100);
+      const dmgTag = dmgPct !== 0 ? ` <span style="color:#4fc3f7">(+${dmgPct}%)</span>` : '';
+      const rangeTag = rangePct !== 0 ? ` <span style="color:#4fc3f7">(+${rangePct}%)</span>` : '';
+      const spdTag = spdPct !== 0 ? ` <span style="color:#4fc3f7">(+${spdPct}%)</span>` : '';
+      const tuLevel = window.TypeUpgradeLevels?.[def.type] || 0;
+      const tuNext = window.TypeUpgrades?.[def.type]?.[tuLevel];
+      const upgradeHint = tuNext
+        ? `<div style="font-size:10px;color:#7fe3ff;margin-top:2px">💡 하단 타입강화바에서 "${tuNext.label}"(💰${tuNext.cost}) 올리면 이 타워가 강해져요</div>`
+        : `<div style="font-size:10px;color:#888;margin-top:2px">💡 이 타입 강화 최대 단계 달성</div>`;
 
       panel.innerHTML = `
         <div class="tower-panel-name" style="color:${grade.color}">
           ${def.emoji} ${def.name} ${'★'.repeat(grade.stars)} <span style="font-size:10px">${grade.name}</span>
         </div>
-        <div class="tower-panel-stats">⚔️${Math.round(t.damage)} · ⏱️${t.fireRate.toFixed(1)}/s · DPS:${dps} · 📏${Math.round(t.range)} ${synergyInfo}</div>
+        <div class="tower-panel-stats">⚔️${Math.round(t.damage)}${dmgTag} · ⏱️${t.fireRate.toFixed(1)}/s${spdTag} · DPS:${dps} · 📏${Math.round(t.range)}${rangeTag} ${synergyInfo}</div>
+        ${upgradeHint}
         <div style="font-size:10px;color:#aaa;margin:2px 0">${def.desc||''}</div>
         <div style="font-size:10px;margin:3px 0;color:${canMerge?'#ffd60a':'#888'}">
           ${canMerge
@@ -984,7 +1074,7 @@ class App {
           this.engine.towers = this.engine.towers.filter(x => x !== mergeSlots[i].tower);
           mergeSlots[i].occupied = false; mergeSlots[i].tower = null;
         }
-        const evoTower = window._createGachaTower(evolveDef, currentSlot.x, currentSlot.y);
+        const evoTower = window._createGachaTower(evolveDef, currentSlot.x, currentSlot.y, this.engine);
         this.engine.towers = this.engine.towers.filter(x => x !== currentSlot.tower);
         this.engine.towers.push(evoTower);
         currentSlot.tower = evoTower;
@@ -1320,59 +1410,77 @@ class App {
     }, 1000);
   }
 
-  openShop() {
-    if (!this.engine) return;
-    this.engine.stop();
-    const overlay = document.createElement('div');
-    overlay.className = 'shop-overlay';
-
-    const title = document.createElement('div');
-    title.className = 'shop-title';
-    title.textContent = `🛒 상점 (보유 골드: ${this.engine.gold}g)`;
-    overlay.appendChild(title);
-
-    const grid = document.createElement('div');
-    grid.className = 'shop-grid';
+  // v27: 상시노출 상점바 (기존 5웨이브마다 뜨던 팝업 대신, 게임 멈추지 않음)
+  buildShopBar() {
+    let bar = document.getElementById('shop-bar');
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.id = 'shop-bar';
+      document.getElementById('game-screen').appendChild(bar);
+    }
+    bar.innerHTML = '';
+    if (!window.ShopItems || !this.engine) return;
     if (!this.engine._shopBuyCount) this.engine._shopBuyCount = {};
     for (const item of window.ShopItems) {
-      const card = document.createElement('div');
-      card.className = 'shop-card';
-      const bought = this.engine._shopBuyCount[item.key] || 0;
-      const soldOut = item.maxBuys && bought >= item.maxBuys;
-      card.innerHTML = `
-        <div class="shop-emoji">${item.emoji}</div>
-        <div class="shop-name">${item.name}</div>
-        <div class="shop-desc">${item.desc}</div>
-        <button class="shop-buy-btn" ${soldOut ? 'disabled' : ''}>${soldOut ? '품절' : `💰${item.cost}`}</button>
-      `;
-      const buyBtn = card.querySelector('.shop-buy-btn');
-      buyBtn.addEventListener('click', () => {
-        if (soldOut) return;
-        if (this.engine.gold < item.cost) {
+      const cost = window.shopItemCost(item, this.engine);
+      const btn = document.createElement('button');
+      btn.className = 'shop-bar-btn';
+      btn.disabled = this.engine.gold < cost;
+      btn.innerHTML = `<span>${item.emoji}</span><span style="font-size:8px;color:#ffd60a">💰${cost}</span>`;
+      btn.title = `${item.name}: ${item.desc}`;
+      btn.addEventListener('click', () => {
+        if (!this.engine.spendGold(cost)) {
           this.showWaveAnnounce('골드가 부족합니다', '#ff6b6b');
           return;
         }
-        this.engine.spendGold(item.cost);
-          item.buy(this.engine);
-          this.engine._shopBuyCount[item.key] = (this.engine._shopBuyCount[item.key] || 0) + 1;
-          title.textContent = `🛒 상점 (보유 골드: ${this.engine.gold}g)`;
-          this.SFX.play('buy');
-          this.showWaveAnnounce(`${item.emoji} ${item.name} 사용!`, '#06d6a0');
-          if (item.maxBuys && this.engine._shopBuyCount[item.key] >= item.maxBuys) {
-            buyBtn.disabled = true; buyBtn.textContent = '품절';
-          }
+        item.buy(this.engine);
+        if (item.scaling) this.engine._shopBuyCount[item.key] = (this.engine._shopBuyCount[item.key] || 0) + 1;
+        this.SFX.play('buy');
+        this.showWaveAnnounce(`${item.emoji} ${item.name} 사용!`, '#06d6a0');
+        this.buildShopBar();
       });
-      grid.appendChild(card);
+      bar.appendChild(btn);
     }
-    overlay.appendChild(grid);
+  }
 
-    const closeBtn = document.createElement('button');
-    closeBtn.className = 'shop-close-btn';
-    closeBtn.textContent = '상점 닫고 계속하기';
-    closeBtn.addEventListener('click', () => { overlay.remove(); this.engine.start(); });
-    overlay.appendChild(closeBtn);
+  // v27: 보스 소환 (스타 UMS 게이트 방식) - 영웅스킬바 옆 상시노출, 레벨별 쿨다운
+  buildBossSummonButton() {
+    let btn = document.getElementById('boss-summon-btn');
+    if (!btn) {
+      btn = document.createElement('button');
+      btn.id = 'boss-summon-btn';
+      btn.style.cssText = 'position:absolute;left:8px;bottom:calc(var(--bar-h,82px) + 100px);z-index:19;padding:8px 12px;border-radius:10px;border:1.5px solid rgba(255,60,60,0.4);background:rgba(40,5,5,0.85);color:#fff;font-size:12px;cursor:pointer;';
+      document.getElementById('game-screen').appendChild(btn);
+      btn.addEventListener('click', () => this._summonBoss());
+    }
+    this._updateBossSummonUI();
+  }
 
-    document.getElementById('game-screen').appendChild(overlay);
+  _summonBoss() {
+    const e = this.engine;
+    if (!e || e.state !== 'wave') { this.showWaveAnnounce('웨이브 진행 중에만 소환 가능', '#ff6b6b'); return; }
+    if (e._bossSummonCooldown > 0) return;
+    const wave = e.currentWave;
+    const pool = wave % 30 === 0 || wave % 10 === 0 ? BOSS_POOL : MINIBOSS_POOL;
+    const type = pool[Math.floor(Math.random() * pool.length)];
+    e._spawnEnemy({ type });
+    // 레벨(웨이브)이 높을수록 쿨다운도 길어짐 - 타이밍 잘 맞춰 계속 소환하는게 실력차
+    e._bossSummonCooldown = e._bossSummonCooldownMax = Math.max(20, 45 - wave * 0.3);
+    this.showWaveAnnounce('🔮 보스 소환!', '#ff6b6b');
+    if (this.missionTracker) { this.missionTracker.stats.bossSummons = (this.missionTracker.stats.bossSummons||0) + 1; this.missionTracker.check(); }
+  }
+
+  _updateBossSummonUI() {
+    const btn = document.getElementById('boss-summon-btn');
+    if (!btn || !this.engine) return;
+    const cd = this.engine._bossSummonCooldown || 0;
+    if (cd > 0) {
+      btn.disabled = true;
+      btn.textContent = `🔮 소환 (${Math.ceil(cd)}s)`;
+    } else {
+      btn.disabled = false;
+      btn.textContent = '🔮 보스 소환 (처치시 보상↑)';
+    }
   }
 
   checkSkinUnlocks(stars) {
@@ -1435,19 +1543,27 @@ class App {
     const e = this.engine;
     if (!e || e.state !== 'idle') return;
     const waveIdx = e.currentWave;
-    if (waveIdx >= WaveData.length) return;
+    const nextWave = waveIdx + 1;
 
-    let wave = WaveData[waveIdx];
+    // v27: 30웨이브 경계에서 존(맵) 전환
+    const nextZone = zoneIndexForWave(nextWave);
+    if (nextZone !== this._currentZone) {
+      this._currentZone = nextZone;
+      const zoneMapId = ZONE_MAPS[nextZone];
+      this.currentMapId = zoneMapId;
+      e.switchZone(zoneMapId, nextZone);
+      this.buildTowerBar();
+      this.BGM.start(zoneMapId);
+      this.showWaveAnnounce(ZONE_LABELS[nextZone], '#7fe3ff');
+    }
+
+    const wave = generateWave(nextWave);
 
     // 보스 웨이브 경고
-    const bossWaves = { 10: '⚠️ 갸라도스 중간보스 등장!', 16: '☠️ 루기아 준보스 등장!', 22: '☠️ 루기아 재등장!', 30: '🔮 최종보스 뮤츠!' };
-    const nextWave = waveIdx + 1;
-    if (bossWaves[nextWave]) {
-      const el = document.createElement('div');
-      el.className = 'wave-announce boss';
-      el.textContent = bossWaves[nextWave];
-      document.getElementById('game-screen').appendChild(el);
-      setTimeout(() => el.remove(), 2500);
+    if (nextWave % 30 === 0) {
+      this.showWaveAnnounce(`🔮 존 보스 등장! (Wave ${nextWave})`, '#ff6b6b');
+    } else if (nextWave % 10 === 0) {
+      this.showWaveAnnounce(`☠️ 중간보스 등장! (Wave ${nextWave})`, '#ffab40');
     }
 
     const timeLimit = waveTimeLimit(wave, this.difficulty, this.engine);
@@ -1467,7 +1583,7 @@ class App {
     setTimeout(() => el.remove(), 2200);
   }
 
-  showEndScreen(victory, stars) {
+  showEndScreen(victory, stars, best) {
     this.engine.stop();
     const gameScreen = document.getElementById('game-screen');
 
@@ -1478,6 +1594,18 @@ class App {
     title.className = 'end-title ' + (victory ? 'victory' : 'gameover');
     title.textContent = victory ? '🏆 VICTORY!' : '💀 GAME OVER';
     overlay.appendChild(title);
+
+    if (!victory) {
+      const reached = this.engine ? this.engine.currentWave : 0;
+      const info = document.createElement('div');
+      info.style.cssText = 'color:#fff;font-size:16px;margin:6px 0 2px;';
+      info.textContent = `도달 웨이브: ${reached}`;
+      overlay.appendChild(info);
+      const bestEl = document.createElement('div');
+      bestEl.style.cssText = 'color:#ffd60a;font-size:15px;margin-bottom:8px;';
+      bestEl.textContent = `🏆 최고 기록: ${best != null ? best : reached}`;
+      overlay.appendChild(bestEl);
+    }
 
     if (victory && stars > 0) {
       const starEl = document.createElement('div');
@@ -1511,11 +1639,16 @@ class App {
     document.querySelectorAll('.gacha-btn').forEach(b => b.classList.remove('slot-ready'));
     this.els.gameScreen.classList.remove('active');
     this.els.mapSelect.classList.add('active');
+    this._refreshBestWaveLabel();
 
     const ctx = this.els.canvas.getContext('2d');
     ctx.clearRect(0, 0, this.els.canvas.width, this.els.canvas.height);
 
-    document.querySelectorAll('.end-overlay,.wave-announce,.shop-overlay,.skin-picker,.skilltree-overlay').forEach(el => el.remove());
+    document.querySelectorAll('.end-overlay,.wave-announce,.shop-overlay,.skin-picker,.skilltree-overlay,#field-warning-banner').forEach(el => el.remove());
+    const shopBar = document.getElementById('shop-bar');
+    if (shopBar) shopBar.innerHTML = '';
+    const bossBtn = document.getElementById('boss-summon-btn');
+    if (bossBtn) bossBtn.remove();
     const tp = document.getElementById('tower-panel');
     if (tp) tp.remove();
 

@@ -1,4 +1,11 @@
-// ===== SHOP.JS - 상점 아이템 + 글로벌 스펠 =====
+// ===== SHOP.JS - 상점 아이템 + 글로벌 스펠 (v27: 상시노출, 상한 대신 누적가격) =====
+
+// v27: 영구 강화류는 상한(maxBuys) 대신 살수록 가격이 올라가는 방식으로 변경
+function shopItemCost(item, engine) {
+  if (!item.scaling) return item.cost;
+  const n = (engine._shopBuyCount && engine._shopBuyCount[item.key]) || 0;
+  return Math.round(item.cost * Math.pow(1.4, n));
+}
 
 const ShopItems = [
   {
@@ -18,6 +25,21 @@ const ShopItems = [
     }
   },
   {
+    key: 'blizzard', name: '블리자드', emoji: '❄️', cost: 110,
+    desc: '필드의 모든 적 3초간 50% 슬로우 (엔드리스 필드누적 대응용)',
+    buy(engine) {
+      let n = 0;
+      for (const e of engine.enemies) {
+        if (e.dead || e.reachedEnd) continue;
+        if (e.applyStatus) e.applyStatus('slow', 3, 0.5);
+        else { e.slowed = 3; e.slowFactor = 0.5; }
+        n++;
+      }
+      if (window.AoeBurst) engine.particles.push(new AoeBurst(engine.width/2, engine.height/2, Math.max(engine.width, engine.height), '#80deea'));
+      engine.spawnFloatingText(`❄️ 블리자드! 적 ${n}마리 슬로우`, engine.width/2, 80, '#80deea');
+    }
+  },
+  {
     key: 'potion', name: '골드 두루마리', emoji: '📜', cost: 90,
     desc: '다음 웨이브 클리어 보상 골드 2배',
     buy(engine) {
@@ -26,17 +48,17 @@ const ShopItems = [
     }
   },
   {
-    key: 'superpotion', name: '고급상처약', emoji: '💊', cost: 140, maxBuys: 3,
-    desc: '모든 타워 데미지 영구 +12% (최대 3회, 상한 있음)',
+    key: 'superpotion', name: '고급상처약', emoji: '💊', cost: 140, scaling: true,
+    desc: '모든 타워 데미지 영구 +15% (살수록 비싸짐)',
     buy(engine) {
-      for (const t of engine.towers) t.buffDmgMul = (t.buffDmgMul || 1) * 1.12;
-      engine._shopDmgMul = (engine._shopDmgMul || 1) * 1.12;
-      engine.spawnFloatingText('💊 전체 데미지 +12%!', engine.width/2, 80, '#ce93d8');
+      for (const t of engine.towers) t.buffDmgMul = (t.buffDmgMul || 1) * 1.15;
+      engine._shopDmgMul = (engine._shopDmgMul || 1) * 1.15;
+      engine.spawnFloatingText('💊 전체 데미지 +15%!', engine.width/2, 80, '#ce93d8');
     }
   },
   {
-    key: 'revive', name: '확장 부지', emoji: '🏗️', cost: 180, maxBuys: 2,
-    desc: '트랙 안쪽에 빈 배치슬롯 1개 즉시 추가 (최대 2회)',
+    key: 'revive', name: '확장 부지', emoji: '🏗️', cost: 180, scaling: true,
+    desc: '트랙 안쪽에 빈 배치슬롯 1개 즉시 추가 (살수록 비싸짐)',
     buy(engine) {
       const w = engine.width, h = engine.height;
       const HUD=52, BAR=82, PAD=20;
@@ -58,23 +80,21 @@ const ShopItems = [
     }
   },
   {
-    key: 'rangeorb', name: '사거리 구슬', emoji: '🔵', cost: 120, maxBuys: 2,
-    desc: '모든 타워 사거리 영구 +8% (최대 2회, 상한 있음 - 전범위 방지)',
+    key: 'rangeorb', name: '사거리 구슬', emoji: '🔵', cost: 120, scaling: true,
+    desc: '모든 타워 사거리 영구 +10% (살수록 비싸짐)',
     buy(engine) {
-      for (const t of engine.towers) t.buffRangeMul = (t.buffRangeMul || 1) * 1.08;
-      engine._shopRangeMul = (engine._shopRangeMul || 1) * 1.08;
-      engine.spawnFloatingText('🔵 전체 사거리 +8%!', engine.width/2, 80, '#4fc3f7');
+      for (const t of engine.towers) t.buffRangeMul = (t.buffRangeMul || 1) * 1.10;
+      engine._shopRangeMul = (engine._shopRangeMul || 1) * 1.10;
+      engine.spawnFloatingText('🔵 전체 사거리 +10%!', engine.width/2, 80, '#4fc3f7');
     }
   },
   {
-    key: 'speedorb', name: '속도 구슬', emoji: '🟢', cost: 130, maxBuys: 3,
-    desc: '모든 타워 공격속도 영구 +10% (최대 3회, 상한 있음)',
+    key: 'speedorb', name: '속도 구슬', emoji: '🟢', cost: 130, scaling: true,
+    desc: '모든 타워 공격속도 영구 +12% (살수록 비싸짐)',
     buy(engine) {
-      for (const t of engine.towers) {
-        t._shopSpeedMul = (t._shopSpeedMul || 1) * 1.10;
-      }
-      engine._shopSpeedMul = (engine._shopSpeedMul || 1) * 1.10;
-      engine.spawnFloatingText('🟢 공격속도 +10%!', engine.width/2, 80, '#06d6a0');
+      for (const t of engine.towers) t._shopSpeedMul = (t._shopSpeedMul || 1) * 1.12;
+      engine._shopSpeedMul = (engine._shopSpeedMul || 1) * 1.12;
+      engine.spawnFloatingText('🟢 공격속도 +12%!', engine.width/2, 80, '#06d6a0');
     }
   },
   {
@@ -87,7 +107,7 @@ const ShopItems = [
     }
   },
   {
-    key: 'rarecandy', name: '이상한사탕', emoji: '🍬', cost: 350, maxBuys: 1,
+    key: 'rarecandy', name: '이상한사탕', emoji: '🍬', cost: 350,
     desc: '랜덤 타워 1개를 한 등급 상위로 진화',
     buy(engine) {
       const gachaSlots = engine.towerSlots.filter(s => s.occupied && s.tower?._gachaId);
@@ -100,7 +120,7 @@ const ShopItems = [
       const evoId = window.MERGE_EVOLUTION?.[t._gachaId];
       const evoDef = evoId ? window.GachaTowerDefs?.[evoId] : null;
       if (evoDef) {
-        const evoTower = window._createGachaTower(evoDef, slot.x, slot.y);
+        const evoTower = window._createGachaTower(evoDef, slot.x, slot.y, engine);
         engine.towers = engine.towers.filter(x => x !== t);
         engine.towers.push(evoTower);
         slot.tower = evoTower;
@@ -146,7 +166,7 @@ const GlobalSpells = {
   },
 };
 
-// 타워 업그레이드 시 상점 버프 재적용
+// 타워 생성/업그레이드 시 상점 버프 재적용
 function applyShopBuffs(tower, engine) {
   if (engine._shopDmgMul)   tower.buffDmgMul   = (tower.buffDmgMul||1)   * engine._shopDmgMul;
   if (engine._shopRangeMul) tower.buffRangeMul = (tower.buffRangeMul||1) * engine._shopRangeMul;
@@ -175,3 +195,4 @@ window.ShopItems = ShopItems;
 window.GlobalSpells = GlobalSpells;
 window.SpellManager = SpellManager;
 window.applyShopBuffs = applyShopBuffs;
+window.shopItemCost = shopItemCost;

@@ -67,6 +67,14 @@ class GameEngine {
     this.waveTimeLimit = 45;
     this.waveTimeRemaining = 0;
 
+    // ===== v27: 엔드리스 모드 =====
+    this.endless = true;
+    this.fieldGameOverAt = 100;
+    this.fieldWarnLevels = [70, 80, 90];
+    this._fieldWarnFired = {};
+    this.onFieldWarning = null; // (count, level)
+    this.onZoneChange = null;   // (zoneIdx, mapId)
+
     // 난이도 (이지/노말/하드) - startGame에서 설정
     this.difficulty = 'normal';
 
@@ -212,6 +220,19 @@ class GameEngine {
       this.waveCleared();
     }
 
+    // ===== v27: 엔드리스 - 필드 누적 몬스터 수로 게임오버 판정 =====
+    if (this.endless && (this.state === 'wave' || this.state === 'idle')) {
+      const count = this.enemies.length;
+      for (const lvl of this.fieldWarnLevels) {
+        if (count >= lvl && !this._fieldWarnFired[lvl]) {
+          this._fieldWarnFired[lvl] = true;
+          this.onFieldWarning && this.onFieldWarning(count, lvl);
+        }
+        if (count < lvl - 5) this._fieldWarnFired[lvl] = false;
+      }
+      if (count >= this.fieldGameOverAt) this.triggerGameOver();
+    }
+
     if (this.shakeTimer > 0) this.shakeTimer -= this.dt;
   }
 
@@ -253,23 +274,15 @@ class GameEngine {
     return true;
   }
 
-  // 시간 초과: 살아남은 적 수(보스=3, 엘리트=2, 일반=1)만큼 라이프 손실 후 웨이브 강제 종료
+  // v27: 시간 초과 - 페널티 없이 자동으로 다음 웨이브 진행. 살아남은 적은 필드에 그대로 남아 누적됨(필드 누적 게임오버 판정용)
   timeoutWave() {
     if (this.state !== 'wave') return;
-    const survivors = this.enemies.filter(e => !e.dead);
-    let penalty = 0;
-    for (const e of survivors) penalty += e.isBoss ? 3 : (e._elite ? 2 : 1);
-    for (const e of survivors) this.spawnHitParticle(e.x, e.y, '#9e9e9e');
     this.spawnQueue = []; this.activeSpawns = 0;
-    this.enemies = [];
-    this.activeBoss = null;
     this.state = 'idle';
     this.onWaveTimerChange && this.onWaveTimerChange(0, this.waveTimeLimit);
-    this.onWaveTimeout && this.onWaveTimeout(penalty, survivors.length);
-    if (penalty > 0) this.loseLife(penalty);
-    if (this.state === 'gameover') return;
+    this.onWaveTimeout && this.onWaveTimeout(0, this.enemies.length);
     this.onWaveComplete && this.onWaveComplete(this.currentWave, 0, true);
-    if (this.currentWave >= this.totalWaves) this.triggerVictory();
+    if (!this.endless && this.currentWave >= this.totalWaves) this.triggerVictory();
     else this.onStateChange && this.onStateChange('idle');
   }
 
@@ -313,7 +326,7 @@ class GameEngine {
     if (this._nextWaveGoldMul) { bonus = Math.round(bonus * this._nextWaveGoldMul); this._nextWaveGoldMul = null; }
     this.addGold(bonus);
     this.onWaveComplete && this.onWaveComplete(this.currentWave, bonus, false);
-    if (this.currentWave >= this.totalWaves) this.triggerVictory();
+    if (!this.endless && this.currentWave >= this.totalWaves) this.triggerVictory();
     else this.onStateChange && this.onStateChange('idle');
   }
 
@@ -330,6 +343,15 @@ class GameEngine {
   triggerGameOver() {
     this.state = 'gameover';
     this.onGameOver && this.onGameOver();
+  }
+
+  // v27: 존(맵) 전환 - 기존 타워는 절대좌표 유지로 그대로 남음
+  switchZone(mapId, zoneIdx) {
+    this.currentMap = MapDefs[mapId];
+    this.buildPaths();
+    this.buildTowerSlots();
+    this._bgDirty = true;
+    this.onZoneChange && this.onZoneChange(zoneIdx, mapId);
   }
   triggerVictory() {
     this.state = 'victory';
