@@ -48,6 +48,11 @@
       <div class="title-pokemon">맵 선택</div>
       <div class="title-main">어디서 싸울까?</div>
     </div>
+    <div class="difficulty-select">
+      <button class="diff-btn" data-diff="easy">🟢 이지</button>
+      <button class="diff-btn active" data-diff="normal">🟡 노말</button>
+      <button class="diff-btn" data-diff="hard">🔴 하드</button>
+    </div>
     <div class="map-cards">
       <div class="map-card" data-map="forest">
         <div class="map-preview forest-preview">
@@ -56,8 +61,8 @@
         </div>
         <div class="map-info">
           <div class="map-name">태초마을 숲</div>
-          <div class="map-desc">구불구불한 경로 · 18개 배치슬롯</div>
-          <div class="map-tags"><span class="map-tag">입문</span><span class="map-tag info">18슬롯</span></div>
+          <div class="map-desc">순환 트랙 · 20개 배치슬롯</div>
+          <div class="map-tags"><span class="map-tag">입문</span><span class="map-tag info">20슬롯</span></div>
         </div>
       </div>
       <div class="map-card" data-map="city">
@@ -67,8 +72,8 @@
         </div>
         <div class="map-info">
           <div class="map-name">홍련체육관 도시</div>
-          <div class="map-desc">짧고 빠른 경로 · 8개 배치슬롯</div>
-          <div class="map-tags"><span class="map-tag danger">고급</span><span class="map-tag info">8슬롯</span></div>
+          <div class="map-desc">좁은 순환 트랙 · 15개 배치슬롯</div>
+          <div class="map-tags"><span class="map-tag danger">고급</span><span class="map-tag info">15슬롯</span></div>
         </div>
       </div>
       <div class="map-card" data-map="cave">
@@ -78,8 +83,8 @@
         </div>
         <div class="map-info">
           <div class="map-name">라벤더 동굴</div>
-          <div class="map-desc">2갈래 경로 · 유령 HP+30%</div>
-          <div class="map-tags"><span class="map-tag ghost">유령</span><span class="map-tag info">9슬롯</span></div>
+          <div class="map-desc">가장 좁은 순환 트랙 · 유령 HP+30%</div>
+          <div class="map-tags"><span class="map-tag ghost">유령</span><span class="map-tag info">12슬롯</span></div>
         </div>
       </div>
     </div>
@@ -94,6 +99,7 @@
       <div class="hud-cell" id="hud-lives">❤️ <span id="lives-val">20</span></div>
       <div class="hud-cell" id="hud-gold">💰 <span id="gold-val">200</span></div>
       <div class="hud-cell" id="hud-wave">🌊 <span id="wave-val">0</span>/<span id="wave-total">20</span></div>
+      <div class="hud-cell" id="hud-timer" style="display:none">⏱ <span id="timer-val">--</span>s</div>
       <div class="hud-cell hud-combo" id="hud-combo" style="display:none">
         🔥 <span id="combo-val">0</span>콤보 <span id="combo-mul" class="combo-mul">×1.0</span>
       </div>
