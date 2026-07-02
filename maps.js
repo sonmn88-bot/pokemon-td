@@ -10,51 +10,31 @@ const MapDefs = {
     pathHighlight:'rgba(255,235,160,0.22)',
     pathArrow:'rgba(255,210,80,0.32)', pathWidth:34,
 
+    // 순환 트랙 (스타 랜덤디펜스 스타일): 적이 사각 트랙을 계속 돌며,
+    // 제한시간 내에 처치해야 한다. 슬롯은 트랙 안쪽에 격자로 배치.
+    loopMargin: {x:0.09, y:0.13},
+    slotGrid: {cols:5, rows:4},
+
     getPaths(w, h) {
+      const mx = w*0.09, my = h*0.13;
       return [[
-        {x:-40,     y:h*0.75},
-        {x:w*0.08,  y:h*0.75},
-        {x:w*0.08,  y:h*0.20},
-        {x:w*0.22,  y:h*0.20},
-        {x:w*0.22,  y:h*0.75},
-        {x:w*0.36,  y:h*0.75},
-        {x:w*0.36,  y:h*0.20},
-        {x:w*0.50,  y:h*0.20},
-        {x:w*0.50,  y:h*0.75},
-        {x:w*0.64,  y:h*0.75},
-        {x:w*0.64,  y:h*0.20},
-        {x:w*0.78,  y:h*0.20},
-        {x:w*0.78,  y:h*0.75},
-        {x:w*0.92,  y:h*0.75},
-        {x:w*0.92,  y:h*0.20},
-        {x:w+40,    y:h*0.20},
+        {x:mx, y:my}, {x:w-mx, y:my}, {x:w-mx, y:h-my}, {x:mx, y:h-my}, {x:mx, y:my}
       ]];
     },
 
     getSlots(w, h) {
-      // 각 구간마다 좌우에 균등 배치
-      return [
-        // 구간1 옆
-        {x:w*0.03, y:h*0.48},{x:w*0.03, y:h*0.88},
-        // 구간2 옆
-        {x:w*0.15, y:h*0.10},{x:w*0.15, y:h*0.50},
-        // 구간3 옆
-        {x:w*0.29, y:h*0.10},{x:w*0.29, y:h*0.88},
-        // 구간4 옆
-        {x:w*0.43, y:h*0.10},{x:w*0.43, y:h*0.50},
-        // 구간5 옆
-        {x:w*0.57, y:h*0.88},{x:w*0.57, y:h*0.10},
-        // 구간6 옆
-        {x:w*0.71, y:h*0.10},{x:w*0.71, y:h*0.50},
-        // 구간7 옆
-        {x:w*0.85, y:h*0.10},{x:w*0.85, y:h*0.88},
-        // 구간8 옆
-        {x:w*0.96, y:h*0.50},{x:w*0.96, y:h*0.10},
-        // 코너 보조
-        {x:w*0.08, y:h*0.50},{x:w*0.22, y:h*0.50},
-        {x:w*0.36, y:h*0.50},{x:w*0.50, y:h*0.50},
-        {x:w*0.64, y:h*0.50},{x:w*0.78, y:h*0.50},
-      ];
+      const slots = [];
+      const cols=5, rows=4;
+      const x0=w*0.20, x1=w*0.80, y0=h*0.26, y1=h*0.82;
+      for (let r=0; r<rows; r++) {
+        for (let c=0; c<cols; c++) {
+          slots.push({
+            x: x0 + (x1-x0) * (c/(cols-1)),
+            y: y0 + (y1-y0) * (r/(rows-1)),
+          });
+        }
+      }
+      return slots;
     },
 
     drawBg(ctx, w, h) {
@@ -98,36 +78,27 @@ const MapDefs = {
     pathHighlight:'rgba(255,120,40,0.18)',
     pathArrow:'rgba(255,140,60,0.32)', pathWidth:34,
 
+    // 순환 트랙: 숲보다 살짝 좁아 몹 밀도가 높게 느껴짐 (난이도 상승 체감)
     getPaths(w, h) {
+      const mx = w*0.12, my = h*0.16;
       return [[
-        {x:-40,     y:h*0.80},
-        {x:w*0.10,  y:h*0.80},
-        {x:w*0.10,  y:h*0.20},
-        {x:w*0.28,  y:h*0.20},
-        {x:w*0.28,  y:h*0.60},
-        {x:w*0.46,  y:h*0.60},
-        {x:w*0.46,  y:h*0.20},
-        {x:w*0.64,  y:h*0.20},
-        {x:w*0.64,  y:h*0.80},
-        {x:w*0.82,  y:h*0.80},
-        {x:w*0.82,  y:h*0.40},
-        {x:w+40,    y:h*0.40},
+        {x:mx, y:my}, {x:w-mx, y:my}, {x:w-mx, y:h-my}, {x:mx, y:h-my}, {x:mx, y:my}
       ]];
     },
 
     getSlots(w, h) {
-      return [
-        {x:w*0.03, y:h*0.55},{x:w*0.03, y:h*0.88},
-        {x:w*0.19, y:h*0.10},{x:w*0.19, y:h*0.45},
-        {x:w*0.19, y:h*0.88},
-        {x:w*0.37, y:h*0.10},{x:w*0.37, y:h*0.40},
-        {x:w*0.37, y:h*0.78},
-        {x:w*0.55, y:h*0.10},{x:w*0.55, y:h*0.40},
-        {x:w*0.55, y:h*0.88},
-        {x:w*0.73, y:h*0.10},{x:w*0.73, y:h*0.55},
-        {x:w*0.73, y:h*0.88},
-        {x:w*0.93, y:h*0.22},{x:w*0.93, y:h*0.62},
-      ];
+      const slots = [];
+      const cols=5, rows=3;
+      const x0=w*0.22, x1=w*0.78, y0=h*0.30, y1=h*0.78;
+      for (let r=0; r<rows; r++) {
+        for (let c=0; c<cols; c++) {
+          slots.push({
+            x: x0 + (x1-x0) * (c/(cols-1)),
+            y: y0 + (y1-y0) * (r/(rows-1)),
+          });
+        }
+      }
+      return slots;
     },
 
     drawBg(ctx, w, h) {
@@ -163,22 +134,27 @@ const MapDefs = {
     pathArrow:'rgba(160,120,255,0.28)', pathWidth:32,
     ghostBonus:0.30,
 
+    // 순환 트랙: 동굴은 가장 좁고 빠른 템포 (고스트 체력 보너스 + 좁은 트랙)
     getPaths(w, h) {
-      return [
-        [{x:-40,y:h*0.26},{x:w*0.22,y:h*0.26},{x:w*0.22,y:h*0.12},{x:w*0.58,y:h*0.12},{x:w*0.58,y:h*0.50},{x:w+40,y:h*0.50}],
-        [{x:-40,y:h*0.74},{x:w*0.22,y:h*0.74},{x:w*0.22,y:h*0.88},{x:w*0.58,y:h*0.88},{x:w*0.58,y:h*0.50},{x:w+40,y:h*0.50}],
-      ];
+      const mx = w*0.14, my = h*0.11;
+      return [[
+        {x:mx, y:my}, {x:w-mx, y:my}, {x:w-mx, y:h-my}, {x:mx, y:h-my}, {x:mx, y:my}
+      ]];
     },
 
     getSlots(w, h) {
-      return [
-        {x:w*0.10,y:h*0.14},{x:w*0.42,y:h*0.07},
-        {x:w*0.42,y:h*0.22},{x:w*0.66,y:h*0.16},
-        {x:w*0.10,y:h*0.86},{x:w*0.42,y:h*0.93},
-        {x:w*0.42,y:h*0.78},{x:w*0.66,y:h*0.84},
-        {x:w*0.75,y:h*0.62},{x:w*0.85,y:h*0.35},
-        {x:w*0.85,y:h*0.65},{x:w*0.95,y:h*0.50},
-      ];
+      const slots = [];
+      const cols=4, rows=3;
+      const x0=w*0.26, x1=w*0.74, y0=h*0.28, y1=h*0.76;
+      for (let r=0; r<rows; r++) {
+        for (let c=0; c<cols; c++) {
+          slots.push({
+            x: x0 + (x1-x0) * (c/(cols-1)),
+            y: y0 + (y1-y0) * (r/(rows-1)),
+          });
+        }
+      }
+      return slots;
     },
 
     drawBg(ctx, w, h) {
