@@ -1,5 +1,13 @@
 // ===== ENGINE.JS - 완전 재설계 v3 =====
 
+// 난이도별 적 스탯/보상/제한시간 배율
+const DifficultyMods = {
+  easy:   { name:'이지',  hpMul:0.72, speedMul:0.88, rewardMul:1.20, livesStart:26, goldStart:300, timeBonus:12 },
+  normal: { name:'노말',  hpMul:1.00, speedMul:1.00, rewardMul:1.00, livesStart:20, goldStart:250, timeBonus:0  },
+  hard:   { name:'하드',  hpMul:1.40, speedMul:1.15, rewardMul:0.88, livesStart:15, goldStart:220, timeBonus:-8 },
+};
+window.DifficultyMods = DifficultyMods;
+
 class GameEngine {
   constructor(canvas) {
     this.canvas = canvas;
@@ -55,6 +63,13 @@ class GameEngine {
     this.maxDeployPoints = 12;
     this.deployRegenRate = 0.5; // 초당 회복
 
+    // 웨이브 제한시간 (순환 트랙 - 시간 내 처치 못하면 페널티)
+    this.waveTimeLimit = 45;
+    this.waveTimeRemaining = 0;
+
+    // 난이도 (이지/노말/하드) - startGame에서 설정
+    this.difficulty = 'normal';
+
     // 골드 보너스
     this._globalGoldMul = 1;
 
@@ -68,6 +83,9 @@ class GameEngine {
     this.onVictory = null;
     this.onComboChange = null;
     this.onBossAppear = null;
+    this.onWaveTimerChange = null;
+    this.onWaveTimeout = null;
+    this.onEliteKill = null;
 
     // 캐시
     this._bgCanvas = null;
@@ -140,6 +158,10 @@ class GameEngine {
       this.updateSpawn();
       // DP 재생
       this.deployPoints = Math.min(this.maxDeployPoints, this.deployPoints + this.deployRegenRate * this.dt);
+      // 웨이브 제한시간 (시간 내 전멸 못 시키면 남은 적 수만큼 라이프 손실)
+      this.waveTimeRemaining -= this.dt;
+      this.onWaveTimerChange && this.onWaveTimerChange(Math.max(0, this.waveTimeRemaining), this.waveTimeLimit);
+      if (this.waveTimeRemaining <= 0) this.timeoutWave();
     }
 
     // 콤보 타이머
@@ -152,12 +174,11 @@ class GameEngine {
       }
     }
 
-    // 적 이동
+    // 적 이동 (순환 트랙 - 더 이상 '도착'으로 라이프를 잃지 않음, 시간 내 처치해야 함)
     for (let i = this.enemies.length - 1; i >= 0; i--) {
       const e = this.enemies[i];
       e.update(this.dt);
-      if (e.reachedEnd) { this.enemies.splice(i,1); this.loseLife(1); }
-      else if (e.dead) { this._onEnemyDie(e); this.enemies.splice(i,1); }
+      if (e.dead) { this._onEnemyDie(e); this.enemies.splice(i,1); }
     }
 
     // 보스 트래킹
@@ -188,6 +209,7 @@ class GameEngine {
   }
 
   _onEnemyDie(enemy) {
+    if (enemy._elite === 'gold') this.onEliteKill && this.onEliteKill(enemy);
     const baseReward = enemy.reward;
     const bonus = Math.floor(baseReward * (this._globalGoldMul - 1));
     this.addGold(baseReward + bonus);
@@ -210,16 +232,38 @@ class GameEngine {
   }
 
   // ===== SPAWN =====
-  startWave(waveData) {
+  startWave(waveData, timeLimit) {
     if (this.state !== 'idle') return false;
     this.currentWave++;
     this.state = 'wave';
     this.spawnQueue = [...waveData];
     this.spawnTimer = 0;
     this.activeSpawns = waveData.length;
+    this.waveTimeRemaining = timeLimit || this.waveTimeLimit;
     this.onWaveChange && this.onWaveChange(this.currentWave, this.totalWaves);
+    this.onWaveTimerChange && this.onWaveTimerChange(this.waveTimeRemaining, this.waveTimeRemaining);
     this.onStateChange && this.onStateChange('wave');
     return true;
+  }
+
+  // 시간 초과: 살아남은 적 수(보스=3, 엘리트=2, 일반=1)만큼 라이프 손실 후 웨이브 강제 종료
+  timeoutWave() {
+    if (this.state !== 'wave') return;
+    const survivors = this.enemies.filter(e => !e.dead);
+    let penalty = 0;
+    for (const e of survivors) penalty += e.isBoss ? 3 : (e._elite ? 2 : 1);
+    for (const e of survivors) this.spawnHitParticle(e.x, e.y, '#9e9e9e');
+    this.spawnQueue = []; this.activeSpawns = 0;
+    this.enemies = [];
+    this.activeBoss = null;
+    this.state = 'idle';
+    this.onWaveTimerChange && this.onWaveTimerChange(0, this.waveTimeLimit);
+    this.onWaveTimeout && this.onWaveTimeout(penalty, survivors.length);
+    if (penalty > 0) this.loseLife(penalty);
+    if (this.state === 'gameover') return;
+    this.onWaveComplete && this.onWaveComplete(this.currentWave, 0, true);
+    if (this.currentWave >= this.totalWaves) this.triggerVictory();
+    else this.onStateChange && this.onStateChange('idle');
   }
 
   updateSpawn() {
@@ -234,6 +278,12 @@ class GameEngine {
     const pathIdx = item.pathIdx !== undefined ? item.pathIdx : 0;
     const path = this.paths[pathIdx] || this.paths[0];
     const enemy = new Enemy(item.type, path, this);
+
+    // 난이도 배율
+    const dm = DifficultyMods[this.difficulty] || DifficultyMods.normal;
+    if (dm.hpMul !== 1) { enemy.maxHp = Math.max(1, Math.round(enemy.maxHp * dm.hpMul)); enemy.hp = enemy.maxHp; }
+    if (dm.speedMul !== 1) enemy.speed *= dm.speedMul;
+    if (dm.rewardMul !== 1) enemy.reward = Math.max(1, Math.round(enemy.reward * dm.rewardMul));
 
     // 엘리트 변형 (10% 확률)
     if (!enemy.isBoss && Math.random() < 0.10) {
@@ -254,7 +304,7 @@ class GameEngine {
     this.state = 'idle';
     const bonus = 20 + this.currentWave * 7;
     this.addGold(bonus);
-    this.onWaveComplete && this.onWaveComplete(this.currentWave, bonus);
+    this.onWaveComplete && this.onWaveComplete(this.currentWave, bonus, false);
     if (this.currentWave >= this.totalWaves) this.triggerVictory();
     else this.onStateChange && this.onStateChange('idle');
   }
