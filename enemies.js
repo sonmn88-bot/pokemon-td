@@ -1,4 +1,4 @@
-// ===== ENEMIES.JS - 적 12종 + 이동 시스템 =====
+// ===== ENEMIES.JS - 적 12종 + 이동  시스템 =====
 
 // 적 캐릭터 이미지 (실사 포켓몬 스프라이트)
 const EnemySpriteImages = {
