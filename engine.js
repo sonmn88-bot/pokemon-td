@@ -1,4 +1,4 @@
-// ===== ENGINE.JS - 완전 재설계 v3 =====
+// ===== ENGINE.JS - 완전 재설계 v3  =====
 
 // 난이도별 적 스탯/보상/제한시간 배율
 const DifficultyMods = {
