@@ -69,8 +69,8 @@ class GameEngine {
 
     // ===== v27: 엔드리스 모드 =====
     this.endless = true;
-    this.fieldGameOverAt = 100;
-    this.fieldWarnLevels = [70, 80, 90];
+    this.fieldGameOverAt = 200;
+    this.fieldWarnLevels = [140, 160, 180];
     this._fieldWarnFired = {};
     this.onFieldWarning = null; // (count, level)
     this.onZoneChange = null;   // (zoneIdx, mapId)
@@ -91,6 +91,7 @@ class GameEngine {
     this.onVictory = null;
     this.onComboChange = null;
     this.onBossAppear = null;
+    this.onKingDefeated = null;
     this.onWaveTimerChange = null;
     this.onWaveTimeout = null;
     this.onEliteKill = null;
@@ -238,6 +239,7 @@ class GameEngine {
 
   _onEnemyDie(enemy) {
     if (enemy._elite === 'gold') this.onEliteKill && this.onEliteKill(enemy);
+    if (enemy._isKing) this.onKingDefeated && this.onKingDefeated();
     const baseReward = enemy.reward;
     const bonus = Math.floor(baseReward * (this._globalGoldMul - 1));
     this.addGold(baseReward + bonus);
@@ -305,6 +307,15 @@ class GameEngine {
     if (dm.speedMul !== 1) enemy.speed *= dm.speedMul;
     if (dm.rewardMul !== 1) enemy.reward = Math.max(1, Math.round(enemy.reward * dm.rewardMul));
 
+    // v27-4: 90웨이브 왕(King) - 일반 보스보다 훨씬 강력, 고유 표식
+    if (item.isKing) {
+      enemy.maxHp = Math.round(enemy.maxHp * 60);
+      enemy.hp = enemy.maxHp;
+      enemy.reward = Math.round(enemy.reward * 40);
+      enemy.isBoss = true;
+      enemy._isKing = true;
+    }
+
     // v27: 수동 보스소환 등급 배율 (1~5단계, 너무 약해서 순삭당하던 문제 수정)
     if (item.bossTier) {
       enemy.maxHp = Math.round(enemy.maxHp * item.hpMul);
@@ -322,6 +333,24 @@ class GameEngine {
       enemy.hp = enemy.maxHp;
       enemy.speed *= (enemy._elite === 'gold' ? 1.3 : 1.15);
       enemy.reward = Math.floor(enemy.reward * (enemy._elite === 'gold' ? 2.5 : 1.8));
+    }
+
+    // v27-4: 왕(90웨이브) 처치 후 무한강화 구간 - 20웨이브마다 새로운 능력 순차 추가 (item 10)
+    if (!enemy.isBoss && this.currentWave > 90) {
+      const postKing = this.currentWave - 90;
+      if (postKing >= 20 && Math.random() < 0.18) {
+        // 1단계(110웨이브+): 방어막 (기존 뮤츠 방어막 시스템 재사용)
+        enemy.shieldActive = true;
+        enemy.shieldHp = Math.round(enemy.maxHp * 0.25);
+      }
+      if (postKing >= 40 && Math.random() < 0.15) {
+        // 2단계(130웨이브+): 재생 (기존 라프라스 regen 시스템 재사용, 공유 def 오염 방지 위해 클론)
+        enemy.def = { ...enemy.def, special: 'regen', regenRate: enemy.maxHp * 0.01 };
+      }
+      if (postKing >= 60) {
+        // 3단계(150웨이브+): 전체 이동속도 +20%
+        enemy.speed *= 1.2;
+      }
     }
 
     this.enemies.push(enemy);

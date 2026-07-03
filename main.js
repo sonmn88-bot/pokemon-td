@@ -1,10 +1,12 @@
 // ===== MAIN.JS - 화면 관리 + HUD + 절차적 웨이브 생성(엔드리스) + 타워/영웅/상점 통합 =====
 
-const WAVES_PER_ZONE = 30; // v27: 30웨이브씩 3존 순환, 90 이후로도 계속 강해지며 무한 진행
+const WAVES_PER_ZONE = 30; // v27: 30웨이브씩 3존 순환(1~90), 90에서 왕 조우 후엔 존 전환 없이 그 자리에서 무한 강화
 const ZONE_MAPS = ['forest', 'cave', 'city']; // 1~30 태초마을 숲 / 31~60 라벤더 동굴(우주 성운 테마) / 61~90 홍련체육관 도시(화산)
 const ZONE_LABELS = ['🌲 초원 지대', '🌌 우주 동굴', '🌋 화산 도시'];
-function zoneIndexForWave(n) { return Math.floor((n - 1) / WAVES_PER_ZONE) % ZONE_MAPS.length; }
-function zoneCycleForWave(n) { return Math.floor((n - 1) / WAVES_PER_ZONE); } // 0=1회차, 1=2회차(반복 강화)...
+const KING_WAVE = 90;
+// v27-4: 90웨이브부터는 존 전환 없이 마지막 존(화산 도시)에 고정 - "왕 조우 후 무한강화" 구조 (item 9)
+function zoneIndexForWave(n) { return n >= KING_WAVE ? ZONE_MAPS.length - 1 : Math.floor((n - 1) / WAVES_PER_ZONE) % ZONE_MAPS.length; }
+function zoneCycleForWave(n) { return Math.floor((n - 1) / WAVES_PER_ZONE); } // 난이도 스케일링용으로는 계속 증가 (30웨이브마다 한단계씩)
 
 // 웨이브 진행도에 따라 열리는 적 티어 (기존 20웨이브 손수 작성 대신 공식으로 생성 - 튜닝 비용 최소화)
 const ENEMY_TIERS = {
@@ -55,8 +57,10 @@ function generateWave(n) {
   arr.sort((a, b) => a.delay - b.delay);
 
   const lastDelay = arr.length ? arr[arr.length - 1].delay : 0;
-  // 미니보스: 10웨이브마다 / 존보스: 30웨이브마다(존 경계) - 90 이후로도 계속 반복+강화
-  if (n % 30 === 0) {
+  // v27-4: 90웨이브 = 왕(King) 조우, 이후엔 존전환 없이 무한강화만 계속 (item 9)
+  if (n === KING_WAVE) {
+    arr.push({ type: 'mewtwo', delay: lastDelay + 5, isKing: true });
+  } else if (n % 30 === 0) {
     arr.push({ type: BOSS_POOL[Math.floor(Math.random() * BOSS_POOL.length)], delay: lastDelay + 4 });
   } else if (n % 10 === 0) {
     arr.push({ type: MINIBOSS_POOL[Math.floor(Math.random() * MINIBOSS_POOL.length)], delay: lastDelay + 4 });
@@ -271,24 +275,23 @@ class App {
     if (skinBtn) skinBtn.addEventListener('click', () => this.openSkinPicker(this.starterHero || 'pikachu'));
   }
 
-  // v27: 타이틀 진입/게임오버 후 복귀할 때마다 최고 기록 갱신
-  async _refreshBestWaveLabel() {
+  // v27-4: 타이틀 진입/게임오버 후 복귀할 때마다 최고 기록 갱신
+  // (기존 window.storage는 Claude 아티팩트 전용 API라 실제 배포본에서 동작 안 했음 - localStorage로 교체)
+  _refreshBestWaveLabel() {
     const label = document.getElementById('best-wave-label');
     if (!label) return;
     try {
-      const res = await window.storage.get('best_wave');
-      const val = res ? JSON.parse(res.value) : 0;
+      const val = parseInt(localStorage.getItem('pokemontd_best_wave') || '0', 10);
       label.textContent = `🏆 최고 도달 웨이브: ${val || 0}`;
     } catch (e) { label.textContent = '🏆 최고 도달 웨이브: -'; }
   }
 
-  async _recordBestWave() {
+  _recordBestWave() {
     const reached = this.engine ? this.engine.currentWave : 0;
     try {
-      const res = await window.storage.get('best_wave').catch(() => null);
-      const prevBest = res ? JSON.parse(res.value) : 0;
+      const prevBest = parseInt(localStorage.getItem('pokemontd_best_wave') || '0', 10);
       const best = Math.max(prevBest, reached);
-      if (best !== prevBest) await window.storage.set('best_wave', JSON.stringify(best));
+      if (best !== prevBest) localStorage.setItem('pokemontd_best_wave', String(best));
       return best;
     } catch (e) { return reached; }
   }
@@ -302,10 +305,10 @@ class App {
       el.style.cssText = 'position:absolute;top:60px;left:50%;transform:translateX(-50%);z-index:50;padding:8px 18px;border-radius:10px;font-weight:bold;font-size:14px;pointer-events:none;transition:opacity 0.3s;';
       document.getElementById('game-screen').appendChild(el);
     }
-    const colors = { 70: ['#3a2f00','#ffd60a'], 80: ['#3a1f00','#ff9800'], 90: ['#3a0000','#ff3b3b'] };
-    const [bg, fg] = colors[level] || colors[70];
+    const colors = { 140: ['#3a2f00','#ffd60a'], 160: ['#3a1f00','#ff9800'], 180: ['#3a0000','#ff3b3b'] };
+    const [bg, fg] = colors[level] || colors[140];
     el.style.background = bg; el.style.color = fg; el.style.border = `1px solid ${fg}`;
-    el.textContent = `⚠️ 필드에 몬스터 ${count}마리 (100마리에서 게임오버!)`;
+    el.textContent = `⚠️ 필드에 몬스터 ${count}마리 (200마리에서 게임오버!)`;
     el.style.opacity = '1';
     clearTimeout(this._fieldWarnHideTimer);
     this._fieldWarnHideTimer = setTimeout(() => { if (el) el.style.opacity = '0'; }, 4000);
@@ -399,6 +402,8 @@ class App {
     this.els.btnMenu.addEventListener('click', () => this.togglePause());
     const btnMission = document.getElementById('btn-mission');
     if (btnMission) btnMission.addEventListener('click', () => this.openMissionBoard());
+    const btnSynergy = document.getElementById('btn-synergy');
+    if (btnSynergy) btnSynergy.addEventListener('click', () => this.openSynergyChart());
   }
 
   bindSpeedButtons() {
@@ -436,15 +441,16 @@ class App {
     const scroll = document.createElement('div');
     scroll.className = 'tower-bar-scroll gacha-bar';
 
-    // 뽑기 버튼 3종
+    // 뽑기 버튼 3종 (v27 fix: cost를 여기 하드코딩하지 말고 실제 과금 기준인 PULL_COSTS에서 읽어오도록 - 안 그러면 가격 바꿀 때마다 표시랑 실제가 어긋남)
     const pulls = [
-      { key:'normal',  label:'일반 뽑기',  cost:50,  color:'#9e9e9e', emoji:'🎰', hotkey:'1' },
-      { key:'premium', label:'프리미엄',   cost:120, color:'#4fc3f7', emoji:'💎', hotkey:'2' },
-      { key:'gamble',  label:'도박 뽑기',  cost:200, color:'#ffd60a', emoji:'🎲', hotkey:'3' },
-      { key:'ten',     label:'10연 뽑기',  cost:450, color:'#ce93d8', emoji:'🌟', ten:true, hotkey:'4' },
+      { key:'normal',  label:'일반 뽑기',  color:'#9e9e9e', emoji:'🎰', hotkey:'1' },
+      { key:'premium', label:'프리미엄',   color:'#4fc3f7', emoji:'💎', hotkey:'2' },
+      { key:'gamble',  label:'도박 뽑기',  color:'#ffd60a', emoji:'🎲', hotkey:'3' },
+      { key:'ten',     label:'10연 뽑기',  color:'#ce93d8', emoji:'🌟', ten:true, hotkey:'4' },
     ];
 
     for (const p of pulls) {
+      const cost = window.PULL_COSTS?.[p.key] ?? 0;
       const btn = document.createElement('button');
       btn.className = 'tower-btn gacha-btn';
       btn.dataset.pullKey = p.key;
@@ -453,7 +459,7 @@ class App {
         <span class="hotkey-badge">${p.hotkey}</span>
         <span class="tower-btn-emoji">${p.emoji}</span>
         <span class="tower-btn-name" style="color:${p.color}">${p.label}</span>
-        <span class="tower-btn-cost">💰${p.cost}</span>
+        <span class="tower-btn-cost">💰${cost}</span>
       `;
       btn.title = p.key === 'gamble' ? '에픽~레전드 확률 높음! (단축키: ' + p.hotkey + ')' :
                   p.key === 'ten'    ? '10개! 에픽 1개 보장 (단축키: ' + p.hotkey + ')' :
@@ -872,13 +878,18 @@ class App {
       this.SFX.play('boss');
       const el = document.createElement('div');
       el.className = 'wave-announce boss';
-      el.innerHTML = `${boss.def.emoji} ${boss.name} 등장!<br><span style="font-size:0.7em">⚠️ 보스</span>`;
+      el.innerHTML = boss._isKing
+        ? `👑 ${boss.def.emoji} 궁극의 뮤츠 (왕) 등장!<br><span style="font-size:0.7em">⚠️ 이후로는 존 이동 없이 이 자리에서 무한 강화 모드로 진입합니다</span>`
+        : `${boss.def.emoji} ${boss.name} 등장!<br><span style="font-size:0.7em">⚠️ 보스</span>`;
       document.getElementById('game-screen').appendChild(el);
-      setTimeout(() => el.remove(), 2800);
-      this.engine.triggerScreenShake(10, 0.4);
+      setTimeout(() => el.remove(), boss._isKing ? 4500 : 2800);
+      this.engine.triggerScreenShake(boss._isKing ? 16 : 10, boss._isKing ? 0.6 : 0.4);
     };
     const origLoseLife = this.engine.loseLife.bind(this.engine);
     this.engine.loseLife = (n) => { this.SFX.play('life_lost'); origLoseLife(n); };
+    this.engine.onKingDefeated = () => {
+      this.showWaveAnnounce('👑 왕을 처치했습니다! 무한 강화 모드 진입 - 20웨이브마다 적이 새로운 능력을 얻습니다', '#ffd60a');
+    };
     this.engine.onWaveComplete = (wave, bonus, timedOut) => {
       if (hudTimer) hudTimer.style.display = 'none';
       this.els.btnWave.disabled = false;
@@ -895,7 +906,7 @@ class App {
         this.missionTracker.check();
       }
     };
-    this.engine.onGameOver = () => this._recordBestWave().then(best => this.showEndScreen(false, 0, best));
+    this.engine.onGameOver = () => { const best = this._recordBestWave(); this.showEndScreen(false, 0, best); };
     this.engine.onVictory  = (stars) => {
       this.checkSkinUnlocks(stars);
       this.showEndScreen(true, stars);
@@ -1222,11 +1233,14 @@ class App {
 
     for (const typeKey in window.TypeUpgrades) {
       const typeInfo = window.TYPES[typeKey];
-      const upgrades = window.TypeUpgrades[typeKey];
+      const maxBaseTiers = window.TypeUpgrades[typeKey].length;
       const level = window.TypeUpgradeLevels?.[typeKey] || 0;
-      if (level >= upgrades.length) continue; // 다 올렸으면 숨김
+      // v27-4: 5단계 이후에도 숨기지 않고 무한 반복 강화로 계속 표시
 
-      const nextUpg = upgrades[level];
+      const nextUpg = window.getTypeUpgradeAt(typeKey, level);
+      const dotsStr = level < maxBaseTiers
+        ? '●'.repeat(level) + '○'.repeat(maxBaseTiers-level)
+        : '★'.repeat(Math.min(5, level - maxBaseTiers + 1)); // 5단계 이후는 별로 계속 누적 표시
       const btn = document.createElement('button');
       btn.className = 'type-upg-btn';
       btn.dataset.typeKey = typeKey;
@@ -1235,7 +1249,7 @@ class App {
         <span>${typeInfo.emoji}</span>
         <span style="font-size:9px;color:${typeInfo.color}">${typeInfo.name}</span>
         <span style="font-size:8px;color:#ffd60a">💰${nextUpg.cost}</span>
-        <span style="font-size:7px;color:#888">${'●'.repeat(level)}${'○'.repeat(upgrades.length-level)}</span>
+        <span style="font-size:7px;color:#888">${dotsStr}</span>
       `;
       btn.title = `${nextUpg.label}: ${nextUpg.cost}g`;
       btn.addEventListener('click', () => {
@@ -1373,6 +1387,53 @@ class App {
     `;
     document.getElementById('game-screen').appendChild(el);
     setTimeout(() => el.remove(), 3000);
+  }
+
+  // v27-4: 시너지 조합표 (요청6) - 미션판처럼 게임 진행 중에도 열람 가능 (engine.stop() 호출 안 함)
+  openSynergyChart() {
+    const existing = document.querySelector('.synergy-overlay');
+    if (existing) { existing.remove(); return; }
+
+    const overlay = document.createElement('div');
+    overlay.className = 'synergy-overlay mission-overlay'; // 미션판과 동일한 위치/스타일 재사용
+
+    const title = document.createElement('div');
+    title.className = 'skilltree-title';
+    title.textContent = '🔗 시너지 조합표 (150px 이내 배치시 발동)';
+    overlay.appendChild(title);
+
+    const list = document.createElement('div');
+    list.className = 'mission-list';
+
+    // 동일 타입
+    const sameRow = document.createElement('div');
+    sameRow.className = 'mission-item';
+    sameRow.innerHTML = `<div>⚡⚡ 같은 타입끼리</div><div style="color:#ffd60a">+8 데미지</div>`;
+    list.appendChild(sameRow);
+
+    if (window.SYNERGY_PAIRS && window.TYPES) {
+      for (const key in window.SYNERGY_PAIRS) {
+        const [ta, tb] = key.split('|');
+        const pair = window.SYNERGY_PAIRS[key];
+        const infoA = window.TYPES[ta], infoB = window.TYPES[tb];
+        const row = document.createElement('div');
+        row.className = 'mission-item';
+        row.innerHTML = `
+          <div>${infoA.emoji}${infoB.emoji} ${infoA.name}+${infoB.name} <span style="color:#888;font-size:10px">(${pair.label})</span></div>
+          <div style="color:#ffd60a">+${pair.bonus} 데미지</div>
+        `;
+        list.appendChild(row);
+      }
+    }
+    overlay.appendChild(list);
+
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'shop-close-btn';
+    closeBtn.textContent = '닫기';
+    closeBtn.addEventListener('click', () => overlay.remove());
+    overlay.appendChild(closeBtn);
+
+    document.getElementById('game-screen').appendChild(overlay);
   }
 
   openMissionBoard() {
@@ -1666,7 +1727,9 @@ class App {
     const wave = generateWave(nextWave);
 
     // 보스 웨이브 경고
-    if (nextWave % 30 === 0) {
+    if (nextWave === KING_WAVE) {
+      this.showWaveAnnounce(`👑 왕이 기다리고 있습니다... (Wave ${nextWave})`, '#ffd60a');
+    } else if (nextWave % 30 === 0) {
       this.showWaveAnnounce(`🔮 존 보스 등장! (Wave ${nextWave})`, '#ff6b6b');
     } else if (nextWave % 10 === 0) {
       this.showWaveAnnounce(`☠️ 중간보스 등장! (Wave ${nextWave})`, '#ffab40');
@@ -1750,7 +1813,7 @@ class App {
     const ctx = this.els.canvas.getContext('2d');
     ctx.clearRect(0, 0, this.els.canvas.width, this.els.canvas.height);
 
-    document.querySelectorAll('.end-overlay,.wave-announce,.shop-overlay,.skin-picker,.skilltree-overlay,#field-warning-banner').forEach(el => el.remove());
+    document.querySelectorAll('.end-overlay,.wave-announce,.shop-overlay,.skin-picker,.skilltree-overlay,.mission-overlay,.synergy-overlay,#field-warning-banner').forEach(el => el.remove());
     const shopBar = document.getElementById('shop-bar');
     if (shopBar) shopBar.innerHTML = '';
     const bossBtn = document.getElementById('boss-summon-bar');
