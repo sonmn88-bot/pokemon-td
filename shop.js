@@ -138,15 +138,14 @@ const ShopItems = [
 const GlobalSpells = {
   pokecenter: {
     name: '포켓몬센터', emoji: '🏥', cooldown: 90,
-    desc: '라이프 +5 회복 + 모든 타워 8초간 데미지 +30%',
+    desc: '모든 타워 8초간 데미지 +30%',
     cast(engine) {
-      engine.lives = Math.min(engine.lives + 5, 99);
-      engine.onLivesChange && engine.onLivesChange(engine.lives);
+      // v27: 라이프 회복 제거 (필드누적 게임오버로 바뀌어 라이프가 의미없어짐)
       for (const t of engine.towers) {
         t.buffDmgMul = (t.buffDmgMul || 1) * 1.3;
         t._pokecenterTimer = 8;
       }
-      engine.spawnFloatingText('🏥 포켓몬센터! 라이프+5 / 데미지+30%', engine.width/2, 80, '#06d6a0');
+      engine.spawnFloatingText('🏥 포켓몬센터! 전체 데미지+30%', engine.width/2, 80, '#06d6a0');
     }
   },
   masterball: {

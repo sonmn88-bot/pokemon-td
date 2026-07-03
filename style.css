@@ -251,7 +251,7 @@ html, body {
 }
 
 /* ===== TOWER PANEL ===== */
-#tower-panel {
+#tower-panel, #hero-panel {
   position:absolute; left:50%; bottom:calc(var(--bar-h) + 8px);
   transform:translateX(-50%);
   background:rgba(8,12,24,0.97);
@@ -323,18 +323,18 @@ html, body {
   align-items:flex-start;
 }
 .spell-btn {
-  position:relative; display:flex; align-items:center; gap:4px;
+  position:relative; display:flex; align-items:center; gap:3px;
   background:rgba(10,10,30,0.88);
   border:1.5px solid rgba(124,77,255,0.5);
-  border-radius:var(--radius-sm); padding:5px 8px;
-  color:#fff; cursor:pointer; font-size:10px; font-weight:600;
+  border-radius:var(--radius-sm); padding:3px 6px;
+  color:#fff; cursor:pointer; font-size:9px; font-weight:600;
   box-shadow:0 2px 8px rgba(0,0,0,0.4);
   transition:transform 0.1s;
   white-space:nowrap;
 }
 .spell-btn:active { transform:scale(0.94); }
 .spell-btn.on-cooldown { border-color:var(--text-lo); opacity:0.55; }
-.spell-emoji { font-size:18px; }
+.spell-emoji { font-size:13px; }
 .spell-cd { font-size:10px; color:var(--accent-yel); margin-left:2px; }
 
 /* ===== BACK BUTTON ===== */

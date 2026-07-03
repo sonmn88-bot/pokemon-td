@@ -1,4 +1,4 @@
-// ===== ENGINE.JS - 완전 재설계 v3  =====
+// ===== ENGINE.JS - 완전 재설계 v3 =====
 
 // 난이도별 적 스탯/보상/제한시간 배율
 const DifficultyMods = {
@@ -305,7 +305,16 @@ class GameEngine {
     if (dm.speedMul !== 1) enemy.speed *= dm.speedMul;
     if (dm.rewardMul !== 1) enemy.reward = Math.max(1, Math.round(enemy.reward * dm.rewardMul));
 
-    // 엘리트 변형 (10% 확률)
+    // v27: 수동 보스소환 등급 배율 (1~5단계, 너무 약해서 순삭당하던 문제 수정)
+    if (item.bossTier) {
+      enemy.maxHp = Math.round(enemy.maxHp * item.hpMul);
+      enemy.hp = enemy.maxHp;
+      enemy.reward = Math.round(enemy.reward * item.rewardMul);
+      enemy._bossTier = item.bossTier;
+      enemy.isBoss = true;
+    }
+
+    // 엘리트 변형 (10% 확률, 수동소환 보스는 제외)
     if (!enemy.isBoss && Math.random() < 0.10) {
       enemy._elite = Math.random() < 0.15 ? 'gold' : 'silver';
       const mul = enemy._elite === 'gold' ? 2.2 : 1.5;
