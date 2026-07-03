@@ -857,3 +857,29 @@ html, body {
 }
 .shop-bar-btn:active { transform:scale(0.93); }
 .shop-bar-btn:disabled { opacity:0.4; cursor:not-allowed; }
+
+/* ===== v27-4: 모바일 가로모드(짧은 세로높이) 전용 컴팩트 모드 ===== */
+/* 하단에 타워바+타입강화/상점바+영웅스킬바+보스소환바가 쌓이면서 겹치던 문제 완화 */
+@media (max-height: 430px) {
+  :root { --bar-h: 66px; }
+  .tower-btn { padding:3px 5px; min-width:52px; }
+  .tower-btn-emoji { font-size:15px; }
+  .tower-btn-name { font-size:8px; }
+  .tower-btn-cost { font-size:8px; }
+  #type-upgrade-bar { height:36px; bottom:calc(var(--bar-h) + 2px); }
+  .type-upg-btn { padding:2px 5px; min-width:36px; }
+  .shop-bar-btn { padding:2px 5px; min-width:36px; }
+  #hero-skill-bar { bottom:calc(var(--bar-h) + 40px); gap:4px; }
+  .hero-skills-group { padding:3px 6px; gap:4px; }
+  .skill-btn { width:30px; height:30px; }
+  #boss-summon-bar { bottom:calc(var(--bar-h) + 40px) !important; transform:scale(0.85); transform-origin:left bottom; }
+  #spell-bar { top:calc(var(--hud-h) + 3px); }
+  .spell-btn { padding:2px 5px; }
+  #hud-top { height:var(--hud-h,44px); }
+}
+
+/* 아주 좁은 화면(구형 스마트폰 등)은 한 단계 더 축소 */
+@media (max-height: 360px) {
+  #hero-skill-bar { transform:scale(0.85); transform-origin:right bottom; }
+  #boss-summon-bar { transform:scale(0.72); }
+}

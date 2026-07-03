@@ -353,10 +353,9 @@ function rollTower(tableKey) {
 // v27: 이미 구매한 타입강화를 새 타워 생성시점에 소급 적용 (이게 없어서 업그레이드가 안 먹는 것처럼 보였음)
 function _computeTypeBuffMuls(type) {
   const level = TypeUpgradeLevels[type] || 0;
-  const upgrades = (typeof TypeUpgrades !== 'undefined' ? TypeUpgrades[type] : null) || [];
   let dmg = 1, range = 1, speed = 1;
-  for (let i = 0; i < level && i < upgrades.length; i++) {
-    const u = upgrades[i];
+  for (let i = 0; i < level; i++) {
+    const u = getTypeUpgradeAt(type, i); // v27-4: 무한티어 대응 (5단계 이후도 소급적용)
     if (u.buff === 'dmg' || u.buff === 'all')   dmg   *= (1 + u.val);
     if (u.buff === 'range' || u.buff === 'all') range *= (1 + u.val);
     if (u.buff === 'speed' || u.buff === 'all') speed *= (1 + u.val);
@@ -487,6 +486,25 @@ function _createGachaTower(def, x, y, engine) {
 }
 
 // ===== 시너지 (타입별) =====
+// v27-4: 시너지 페어 확장 (기존엔 ice/ghost 타입 참조가 있었는데 실제 TYPES엔 그 타입 자체가 없어서 죽은 코드였음)
+// 6타입 전체 조합(15쌍) 커버 - 조합 다양성을 위해 전부 정의
+const SYNERGY_PAIRS = {
+  'fire|water':    { bonus: 5, label:'수증기' },
+  'fire|grass':    { bonus: 4, label:'그을림' },
+  'fire|electric': { bonus: 6, label:'점화폭발' },
+  'fire|psychic':  { bonus: 5, label:'화염투시' },
+  'fire|normal':   { bonus: 5, label:'열기지원' },
+  'water|grass':   { bonus: 6, label:'생명의비' },
+  'water|electric':{ bonus: 5, label:'감전수류' },
+  'water|psychic': { bonus: 5, label:'심해투시' },
+  'water|normal':  { bonus: 5, label:'급류지원' },
+  'grass|electric':{ bonus: 5, label:'자연전류' },
+  'grass|psychic': { bonus: 6, label:'포자투시' },
+  'grass|normal':  { bonus: 5, label:'광합성지원' },
+  'electric|psychic':{ bonus: 6, label:'뇌파공명' },
+  'electric|normal':{ bonus: 5, label:'전류지원' },
+  'psychic|normal':{ bonus: 5, label:'염력지원' },
+};
 function applyTowerSynergies(towers) {
   for(const t of towers) t.synergyBonus=0;
   for(let i=0;i<towers.length;i++){
@@ -494,14 +512,10 @@ function applyTowerSynergies(towers) {
       const a=towers[i],b=towers[j];
       if(!a.def||!b.def) continue;
       if(Math.hypot(a.x-b.x,a.y-b.y)>150) continue;
-      // 같은 타입 인접: 시너지
-      if(a.def.type===b.def.type){ a.synergyBonus+=8; b.synergyBonus+=8; }
-      // 물+얼음
-      else if((a.def.type==='water'&&b.def.type==='ice')||(a.def.type==='ice'&&b.def.type==='water')){ a.synergyBonus+=5; b.synergyBonus+=5; }
-      // 불꽃+전기
-      else if((a.def.type==='fire'&&b.def.type==='electric')||(a.def.type==='electric'&&b.def.type==='fire')){ a.synergyBonus+=6; b.synergyBonus+=6; }
-      // 풀+독(고스트)
-      else if((a.def.type==='grass'&&b.def.type==='ghost')||(a.def.type==='ghost'&&b.def.type==='grass')){ a.synergyBonus+=5; b.synergyBonus+=7; }
+      if(a.def.type===b.def.type){ a.synergyBonus+=8; b.synergyBonus+=8; continue; }
+      const key = [a.def.type,b.def.type].sort().join('|');
+      const pair = SYNERGY_PAIRS[key];
+      if(pair){ a.synergyBonus+=pair.bonus; b.synergyBonus+=pair.bonus; }
     }
   }
 }
@@ -519,11 +533,24 @@ const TypeUpgrades = {
 const TypeUpgradeLevels = {};
 for(const t in TypeUpgrades) TypeUpgradeLevels[t]=0;
 
+// v27-4: 5단계 이후에도 계속 강화 가능하도록 무한 반복 티어 생성 (엔드리스라 후반에 쓸 곳이 없어지는 문제 방지)
+// 마지막 티어의 버프 종류를 유지하되, 가격은 계속 오르고 효과는 완만하게 체감(그래도 0은 안 됨)
+function getTypeUpgradeAt(type, level) {
+  const upgrades = TypeUpgrades[type];
+  if (level < upgrades.length) return upgrades[level];
+  const last = upgrades[upgrades.length - 1];
+  const extra = level - upgrades.length + 1; // 1,2,3...
+  return {
+    cost: Math.round(last.cost * Math.pow(1.55, extra)),
+    label: `${TYPES[type].name} 초월강화 ${extra}`,
+    buff: last.buff,
+    val: last.val * Math.pow(0.86, extra - 1),
+  };
+}
+
 function applyTypeUpgrade(type, engine) {
   const level = TypeUpgradeLevels[type]||0;
-  const upgrades = TypeUpgrades[type];
-  if(level >= upgrades.length) return false;
-  const upg = upgrades[level];
+  const upg = getTypeUpgradeAt(type, level);
   if(!engine.spendGold(upg.cost)) return false;
   TypeUpgradeLevels[type]++;
   const color = TYPES[type].color;
@@ -619,7 +646,9 @@ window.MERGE_EVOLUTION=MERGE_EVOLUTION;
 window.TypeUpgrades=TypeUpgrades;
 window.TypeUpgradeLevels=TypeUpgradeLevels;
 window.applyTypeUpgrade=applyTypeUpgrade;
+window.getTypeUpgradeAt=getTypeUpgradeAt;
 window.applyTowerSynergies=applyTowerSynergies;
+window.SYNERGY_PAIRS=SYNERGY_PAIRS;
 
 function checkMerge(towers, towerSlots, engine) {
   const counts={};
