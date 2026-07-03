@@ -92,6 +92,9 @@ class GameEngine {
     this.onComboChange = null;
     this.onBossAppear = null;
     this.onKingDefeated = null;
+    this.score = 0;
+    this.killScore = 0;
+    this.onScoreChange = null;
     this.onWaveTimerChange = null;
     this.onWaveTimeout = null;
     this.onEliteKill = null;
@@ -245,6 +248,17 @@ class GameEngine {
     this.addGold(baseReward + bonus);
     this.spawnFloatingText(`+${baseReward + bonus}g`, enemy.x, enemy.y - 10, '#ffd60a');
 
+    // v27-4: 점수 공식 (item 13,19) - 생존이 지배적, 킬은 보너스 수준
+    // 일반킬 1-3(엘리트는 조금 더), 미니보스 25, 일반보스 80, 왕 120
+    let killScore = 1;
+    if (enemy._isKing) killScore = 120;
+    else if (enemy.isBoss) killScore = 80;
+    else if (enemy._elite) killScore = enemy._elite === 'gold' ? 5 : 3;
+    else killScore = enemy.def?.special ? 2 : 1; // 기믹 있는 몹은 조금 더
+    this.killScore = (this.killScore || 0) + killScore;
+    this.score = Math.round(this.currentWave * 12 + this.killScore);
+    this.onScoreChange && this.onScoreChange(this.score);
+
     // 콤보 시스템
     this.comboCount++;
     this.comboTimer = this.comboMaxTime;
@@ -363,6 +377,8 @@ class GameEngine {
     let bonus = 14 + this.currentWave * 5;
     if (this._nextWaveGoldMul) { bonus = Math.round(bonus * this._nextWaveGoldMul); this._nextWaveGoldMul = null; }
     this.addGold(bonus);
+    this.score = Math.round(this.currentWave * 12 + (this.killScore || 0));
+    this.onScoreChange && this.onScoreChange(this.score);
     this.onWaveComplete && this.onWaveComplete(this.currentWave, bonus, false);
     if (!this.endless && this.currentWave >= this.totalWaves) this.triggerVictory();
     else this.onStateChange && this.onStateChange('idle');

@@ -30,6 +30,9 @@ const BOSS_TIERS = [
 const BOSS_SUMMON_COOLDOWN = 60;
 function bossWaveScaleMul(wave) { return 1 + Math.max(0, wave) * 0.07; } // 웨이브 진행할수록 소환보스도 계속 강해짐
 
+// v27-4: 존별 적 타입 편향 (item17) - 존마다 특정 타입이 더 자주 나와서 전략적 예측/대응 여지를 줌
+const ZONE_TYPE_BIAS = ['grass', 'psychic', 'fire']; // 숲=풀 위주 / 동굴=에스퍼 위주 / 도시=불 위주
+
 function generateWave(n) {
   const posInZone = ((n - 1) % WAVES_PER_ZONE) + 1; // 1~30, 존이 바뀌어도 난이도 곡선은 동일 패턴 반복
   const cycle = zoneCycleForWave(n); // 90웨이브 넘어가서 같은 존이 다시 나올 때마다 +1씩 계속 강해짐
@@ -38,6 +41,14 @@ function generateWave(n) {
   if (progress > 0.15) pool = pool.concat(ENEMY_TIERS.t2);
   if (progress > 0.42) pool = pool.concat(ENEMY_TIERS.t3);
   if (progress > 0.68) pool = pool.concat(ENEMY_TIERS.t4);
+
+  // 존별 편향: 해당 존 선호 타입 몬스터를 풀에 추가로 더 넣어서(가중치 효과) 등장 빈도를 높임
+  const zoneIdx = zoneIndexForWave(n);
+  const favType = ZONE_TYPE_BIAS[zoneIdx];
+  if (typeof EnemyTypes !== 'undefined' && favType) {
+    const favored = pool.filter(id => EnemyTypes[id]?.type === favType);
+    for (let i = 0; i < 2; i++) pool = pool.concat(favored); // 3배 가중치
+  }
 
   // 웨이브가 진행될수록 더 많이, 더 빽빽하게 스폰 (계속 돌면서 잡는 느낌). cycle이 늘수록(90웨이브 이후 반복) 한번 더 강화
   const enemyCount = Math.round(16 + n * 2.6 + cycle * 10);
@@ -292,6 +303,10 @@ class App {
       const prevBest = parseInt(localStorage.getItem('pokemontd_best_wave') || '0', 10);
       const best = Math.max(prevBest, reached);
       if (best !== prevBest) localStorage.setItem('pokemontd_best_wave', String(best));
+      // v27-4: 최고 점수도 같이 기록 (item19)
+      const score = this.engine ? (this.engine.score || 0) : 0;
+      const prevBestScore = parseInt(localStorage.getItem('pokemontd_best_score') || '0', 10);
+      if (score > prevBestScore) localStorage.setItem('pokemontd_best_score', String(score));
       return best;
     } catch (e) { return reached; }
   }
@@ -845,6 +860,10 @@ class App {
       this.els.waveVal.textContent = w;
       this.els.waveTotal.textContent = '∞';
     };
+    this.engine.onScoreChange = (score) => {
+      const el = document.getElementById('score-val');
+      if (el) el.textContent = score.toLocaleString();
+    };
     const hudTimer = document.getElementById('hud-timer');
     const timerVal = document.getElementById('timer-val');
     this.engine.onWaveTimerChange = (remaining, total) => {
@@ -1231,6 +1250,15 @@ class App {
     bar.innerHTML = '';
     if (!window.TypeUpgrades || !window.TYPES) return;
 
+    // v27-4: 최다 투자 속성 뱃지 계산 (item11) - 레벨이 가장 높은 타입에 표시 (1 이상이고 유일할 때만)
+    let topType = null, topLevel = 0, tieCount = 0;
+    for (const tk in window.TypeUpgrades) {
+      const lv = window.TypeUpgradeLevels?.[tk] || 0;
+      if (lv > topLevel) { topLevel = lv; topType = tk; tieCount = 1; }
+      else if (lv === topLevel && lv > 0) { tieCount++; }
+    }
+    const showBadge = topType && topLevel > 0 && tieCount === 1;
+
     for (const typeKey in window.TypeUpgrades) {
       const typeInfo = window.TYPES[typeKey];
       const maxBaseTiers = window.TypeUpgrades[typeKey].length;
@@ -1245,13 +1273,18 @@ class App {
       btn.className = 'type-upg-btn';
       btn.dataset.typeKey = typeKey;
       btn.style.borderColor = typeInfo.color + '60';
+      btn.style.position = 'relative';
+      if (showBadge && typeKey === topType) {
+        btn.style.boxShadow = `0 0 10px ${typeInfo.color}`;
+      }
       btn.innerHTML = `
+        ${showBadge && typeKey === topType ? '<span style="position:absolute;top:-6px;right:-4px;font-size:11px;">👑</span>' : ''}
         <span>${typeInfo.emoji}</span>
         <span style="font-size:9px;color:${typeInfo.color}">${typeInfo.name}</span>
         <span style="font-size:8px;color:#ffd60a">💰${nextUpg.cost}</span>
         <span style="font-size:7px;color:#888">${dotsStr}</span>
       `;
-      btn.title = `${nextUpg.label}: ${nextUpg.cost}g`;
+      btn.title = (showBadge && typeKey === topType ? '👑 가장 많이 투자한 속성\n' : '') + `${nextUpg.label}: ${nextUpg.cost}g`;
       btn.addEventListener('click', () => {
         if (!this.engine) return;
         if (window.applyTypeUpgrade(typeKey, this.engine)) {

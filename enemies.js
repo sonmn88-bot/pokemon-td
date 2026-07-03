@@ -58,9 +58,9 @@ const EnemyTypes = {
     type: 'grass',
   abo: {
     name: '아보',     emoji: '🐍',
-    hp: 112,  speed: 88, reward: 4,  size: 18,
+    hp: 140,  speed: 88, reward: 4,  size: 18,
     color: '#8bc34a',
-    special: null,
+    special: 'split',   // 죽을 때 약한 개체 2마리로 분裂
   },
     type: 'psychic',
   golbat: {
@@ -121,7 +121,7 @@ const EnemyTypes = {
   },
 
   // ─── 11~15웨이브 ───
-    type: 'psychic',
+    type: 'fire',
   weezing: {
     name: '또가스',   emoji: '💨',
     hp: 210, speed: 64, reward: 16, size: 26,
@@ -438,6 +438,20 @@ class Enemy {
     // 폭발 (또가스)
     if (this.def.special === 'explode') {
       this.doExplode();
+    }
+    // v27-4: 분裂 (아보) - 죽을 때 약한 개체 2마리로 분裂
+    if (this.def.special === 'split' && !this._isSplitChild) {
+      for (let i = 0; i < 2; i++) {
+        const child = new Enemy(this.typeId, this.path, this.engine);
+        child._isSplitChild = true;
+        child.maxHp = Math.round(this.maxHp * 0.35);
+        child.hp = child.maxHp;
+        child.reward = Math.max(1, Math.round(this.reward * 0.4));
+        child.size = this.size * 0.7;
+        child.distTraveled = this.distTraveled;
+        child.speed = this.speed * 1.15;
+        this.engine.enemies.push(child);
+      }
     }
 
     // 파티클
