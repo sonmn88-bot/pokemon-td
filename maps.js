@@ -78,9 +78,9 @@ const MapDefs = {
     pathHighlight:'rgba(255,120,40,0.18)',
     pathArrow:'rgba(255,140,60,0.32)', pathWidth:34,
 
-    // 순환 트랙: 숲보다 살짝 좁아 몹 밀도가 높게 느껴짐 (난이도 상승 체감)
+    // v27-3: 존 전환해도 타워 위치가 깨지지 않도록 3맵 모두 동일한 트랙/슬롯 좌표 사용 (숲맵 기준 통일)
     getPaths(w, h) {
-      const mx = w*0.12, my = h*0.16;
+      const mx = w*0.09, my = h*0.13;
       return [[
         {x:mx, y:my}, {x:w-mx, y:my}, {x:w-mx, y:h-my}, {x:mx, y:h-my}, {x:mx, y:my}
       ]];
@@ -88,8 +88,8 @@ const MapDefs = {
 
     getSlots(w, h) {
       const slots = [];
-      const cols=5, rows=3;
-      const x0=w*0.22, x1=w*0.78, y0=h*0.30, y1=h*0.78;
+      const cols=5, rows=4;
+      const x0=w*0.20, x1=w*0.80, y0=h*0.26, y1=h*0.82;
       for (let r=0; r<rows; r++) {
         for (let c=0; c<cols; c++) {
           slots.push({
@@ -134,9 +134,9 @@ const MapDefs = {
     pathArrow:'rgba(160,120,255,0.28)', pathWidth:32,
     ghostBonus:0.30,
 
-    // 순환 트랙: 동굴은 가장 좁고 빠른 템포 (고스트 체력 보너스 + 좁은 트랙)
+    // v27-3: 존 전환해도 타워 위치가 깨지지 않도록 3맵 모두 동일한 트랙/슬롯 좌표 사용 (숲맵 기준 통일)
     getPaths(w, h) {
-      const mx = w*0.14, my = h*0.11;
+      const mx = w*0.09, my = h*0.13;
       return [[
         {x:mx, y:my}, {x:w-mx, y:my}, {x:w-mx, y:h-my}, {x:mx, y:h-my}, {x:mx, y:my}
       ]];
@@ -144,8 +144,8 @@ const MapDefs = {
 
     getSlots(w, h) {
       const slots = [];
-      const cols=4, rows=3;
-      const x0=w*0.26, x1=w*0.74, y0=h*0.28, y1=h*0.76;
+      const cols=5, rows=4;
+      const x0=w*0.20, x1=w*0.80, y0=h*0.26, y1=h*0.82;
       for (let r=0; r<rows; r++) {
         for (let c=0; c<cols; c++) {
           slots.push({

@@ -16,16 +16,17 @@ const ENEMY_TIERS = {
 const MINIBOSS_POOL = ['gyarados', 'dragonite'];
 const BOSS_POOL = ['lugia', 'mewtwo'];
 
-// v27-2: 수동 보스소환 1~5단계. 쿨다운은 고정 60초 하나만 공유(등급 골라서 소환, 여러개 동시소환 불가).
-// 체력/보상 대폭 상향 (기존엔 순식간에 잡혀서 보스 구경도 못했고, 보상도 낮았음)
+// v27-3: 보스 난이도 추가 상향 - 기본 배율을 더 키우고, 소환 시점 웨이브에 비례해서도 더 강해지게
+// (10라운드째에도 5단계까지 다 잡히던 문제 - 고정배율만으론 후반에 상대적으로 계속 약해지므로 웨이브연동 필수)
 const BOSS_TIERS = [
-  { tier: 1, type: 'gyarados', label: '갸라도스',   hpMul: 6,  rewardMul: 4  },
-  { tier: 2, type: 'dragonite', label: '망나뇽',    hpMul: 11, rewardMul: 7  },
-  { tier: 3, type: 'lugia',    label: '루기아',      hpMul: 18, rewardMul: 11 },
-  { tier: 4, type: 'mewtwo',   label: '뮤츠',        hpMul: 28, rewardMul: 16 },
-  { tier: 5, type: 'mewtwo',   label: '뮤츠(각성)',  hpMul: 45, rewardMul: 24 },
+  { tier: 1, type: 'gyarados', label: '갸라도스',   hpMul: 10, rewardMul: 5  },
+  { tier: 2, type: 'dragonite', label: '망나뇽',    hpMul: 18, rewardMul: 9  },
+  { tier: 3, type: 'lugia',    label: '루기아',      hpMul: 30, rewardMul: 14 },
+  { tier: 4, type: 'mewtwo',   label: '뮤츠',        hpMul: 48, rewardMul: 20 },
+  { tier: 5, type: 'mewtwo',   label: '뮤츠(각성)',  hpMul: 80, rewardMul: 30 },
 ];
 const BOSS_SUMMON_COOLDOWN = 60;
+function bossWaveScaleMul(wave) { return 1 + Math.max(0, wave) * 0.07; } // 웨이브 진행할수록 소환보스도 계속 강해짐
 
 function generateWave(n) {
   const posInZone = ((n - 1) % WAVES_PER_ZONE) + 1; // 1~30, 존이 바뀌어도 난이도 곡선은 동일 패턴 반복
@@ -119,7 +120,7 @@ class App {
             pull_rare:  { freq:[550,700,880],dur:0.32, vol:0.14, type:'sine' },
             pull_epic:  { freq:[440,660,880,1100],dur:0.5,vol:0.16,type:'sine' },
             merge:      { freq:[523,659,784,1047],dur:0.6,vol:0.17,type:'sine' },
-            boss:       { freq:[150,120,100],dur:0.85, vol:0.16, type:'triangle' },
+            boss:       { freq:[150,120,100],dur:0.85, vol:0.09, type:'triangle' },
             buy:        { freq:[440,550],   dur:0.16, vol:0.11, type:'sine' },
             life_lost:  { freq:[260,210,170],dur:0.45, vol:0.13, type:'sine' },
             skill:      { freq:[660,880],   dur:0.22, vol:0.13, type:'sine' },
@@ -829,7 +830,7 @@ class App {
     this.missionTracker.onComplete = (mission) => this._onMissionComplete(mission);
 
     this.engine.onGoldChange  = g => { this.els.goldVal.textContent = g; this.refreshPullButtons(); this.buildShopBar(); };
-    this.engine.onHitSound = () => { if (Math.random() < 0.3) this.SFX.play('hit'); };
+    this.engine.onHitSound = () => { if (Math.random() < 0.18) this.SFX.play('hit'); };
     this.engine.onLivesChange = l => {
       // v27: 라이프 HUD 숨김 (필드누적 게임오버로 대체됨, 화면 안 씀)
       if (this.els.livesVal) this.els.livesVal.textContent = l;
@@ -1450,18 +1451,31 @@ class App {
     bar.appendChild(divider);
     for (const item of window.ShopItems) {
       const cost = window.shopItemCost(item, this.engine);
+      const used = item.oneTime && this.engine._oneTimeUsed?.[item.key];
       const btn = document.createElement('button');
       btn.className = 'shop-bar-btn';
-      btn.disabled = this.engine.gold < cost;
-      btn.innerHTML = `<span>${item.emoji}</span><span style="font-size:8px;color:#ffd60a">💰${cost}</span>`;
-      btn.title = `${item.name}: ${item.desc}`;
+      btn.disabled = used || this.engine.gold < cost;
+      btn.innerHTML = used
+        ? `<span style="opacity:0.4">${item.emoji}</span><span style="font-size:8px;color:#888">사용완료</span>`
+        : `<span>${item.emoji}</span><span style="font-size:8px;color:#ffd60a">💰${cost}</span>`;
+      btn.title = used ? `${item.name}: 이미 사용함 (게임당 1회)` : `${item.name}: ${item.desc}`;
       btn.addEventListener('click', () => {
+        if (used) return;
         if (!this.engine.spendGold(cost)) {
           this.showWaveAnnounce('골드가 부족합니다', '#ff6b6b');
           return;
         }
-        item.buy(this.engine);
+        const result = item.buy(this.engine);
+        if (result === false) {
+          // 구매 취소 조건(예: 대상 없음) - 골드 환불
+          this.engine.addGold(cost);
+          return;
+        }
         if (item.scaling) this.engine._shopBuyCount[item.key] = (this.engine._shopBuyCount[item.key] || 0) + 1;
+        if (item.oneTime) {
+          if (!this.engine._oneTimeUsed) this.engine._oneTimeUsed = {};
+          this.engine._oneTimeUsed[item.key] = true;
+        }
         this.SFX.play('buy');
         this.showWaveAnnounce(`${item.emoji} ${item.name} 사용!`, '#06d6a0');
         this.buildShopBar();
@@ -1511,7 +1525,8 @@ class App {
     if (!e || !tierDef) return;
     if (e.state !== 'wave') { this.showWaveAnnounce('웨이브 진행 중에만 소환 가능', '#ff6b6b'); return; }
     if ((e._bossSummonCooldown || 0) > 0) return;
-    e._spawnEnemy({ type: tierDef.type, bossTier: tier, hpMul: tierDef.hpMul, rewardMul: tierDef.rewardMul });
+    const waveMul = bossWaveScaleMul(e.currentWave);
+    e._spawnEnemy({ type: tierDef.type, bossTier: tier, hpMul: tierDef.hpMul * waveMul, rewardMul: tierDef.rewardMul });
     e._bossSummonCooldown = BOSS_SUMMON_COOLDOWN;
     this.showWaveAnnounce(`🔮 ${tierDef.label}(${tier}성) 소환!`, '#ff6b6b');
     if (this.missionTracker) { this.missionTracker.stats.bossSummons = (this.missionTracker.stats.bossSummons||0) + 1; this.missionTracker.check(); }

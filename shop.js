@@ -98,22 +98,14 @@ const ShopItems = [
     }
   },
   {
-    key: 'oranberry', name: '오카열매', emoji: '🍊', cost: 160,
-    desc: '라이프 +3 즉시 회복',
+    key: 'rarecandy', name: '이상한사탕', emoji: '🍬', cost: 350, oneTime: true,
+    desc: '3성(에픽) 타워 1개를 레전드로 진화 (게임당 1회만 사용 가능)',
     buy(engine) {
-      engine.lives = Math.min(engine.lives + 3, 99);
-      engine.onLivesChange && engine.onLivesChange(engine.lives);
-      engine.spawnFloatingText('🍊 라이프 +3!', engine.width/2, 80, '#ff6b6b');
-    }
-  },
-  {
-    key: 'rarecandy', name: '이상한사탕', emoji: '🍬', cost: 350,
-    desc: '랜덤 타워 1개를 한 등급 상위로 진화',
-    buy(engine) {
-      const gachaSlots = engine.towerSlots.filter(s => s.occupied && s.tower?._gachaId);
+      // v27 fix: 아무 등급이나 무한정 되던 걸 3성(epic) 한정 + 1회용으로 변경 (안 그러면 도배해서 다 5성 만들어버림)
+      const gachaSlots = engine.towerSlots.filter(s => s.occupied && s.tower?._gachaId && s.tower.def?.grade === 'epic');
       if (!gachaSlots.length) {
-        engine.spawnFloatingText('진화할 타워 없음', engine.width/2, 80, '#aaa');
-        return;
+        engine.spawnFloatingText('3성(에픽) 타워가 없습니다', engine.width/2, 80, '#aaa');
+        return false; // 구매 취소 (골드 안 깎임, 1회 소모 안 함)
       }
       const slot = gachaSlots[Math.floor(Math.random() * gachaSlots.length)];
       const t = slot.tower;
@@ -129,6 +121,7 @@ const ShopItems = [
         engine.spawnFloatingText(`🍬 ${evoDef.name} 진화!`, slot.x, slot.y-36, grade?.color||'#ffd60a');
       } else {
         engine.spawnFloatingText('이미 최고 등급!', slot.x, slot.y-20, '#ffd60a');
+        return false;
       }
     }
   },

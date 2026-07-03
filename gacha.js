@@ -1,4 +1,4 @@
-// ===== GACHA.JS - 포켓몬 랜덤 뽑기 시스 템 v3 =====
+// ===== GACHA.JS - 포켓몬 랜덤 뽑기 시스템 v3 =====
 // 1세대 핵심 31종, 타입별 특성, 진화 체계
 
 // ===== 등급 정의 =====
@@ -278,11 +278,12 @@ const GachaTowerDefs = {
 };
 
 // ===== v27: 밸런스 재설계 - 기본 스탯 전체 하향 (초반엔 약하게, 업그레이드 투자가 중요해지도록) =====
+// v27-3: 사거리 추가 하향 (0.93 -> 0.72) - 위치별 배치가 의미 있어지고, 사거리 강화템 구매가 가치있어지도록
 for (const id in GachaTowerDefs) {
   const d = GachaTowerDefs[id];
   d.damage   = Math.round(d.damage * 0.80 * 10) / 10;
   d.fireRate = Math.round(d.fireRate * 0.88 * 100) / 100;
-  d.range    = Math.round(d.range * 0.93);
+  d.range    = Math.round(d.range * 0.72);
 }
 
 // ===== 헬퍼 =====
@@ -296,13 +297,14 @@ function _shot(tower, engine, color, emoji, status, speed, onHit, splash, knockb
 }
 
 // ===== 뽑기 확률 =====
+// v27-3: 도박뽑기 확률이 너무 후해서 초반부터 전설급을 금방 채웠던 문제 - 확률 낮추고 가격 상향
 const PULL_TABLES = {
   normal:   [{grade:'normal',weight:60},{grade:'rare',weight:32},{grade:'epic',weight:7},{grade:'legend',weight:0.9},{grade:'unique',weight:0.1}],
   premium:  [{grade:'normal',weight:20},{grade:'rare',weight:48},{grade:'epic',weight:26},{grade:'legend',weight:5.5},{grade:'unique',weight:0.5}],
-  gamble:   [{grade:'normal',weight:3},{grade:'rare',weight:17},{grade:'epic',weight:48},{grade:'legend',weight:28},{grade:'unique',weight:4}],
+  gamble:   [{grade:'normal',weight:10},{grade:'rare',weight:34},{grade:'epic',weight:42},{grade:'legend',weight:12},{grade:'unique',weight:2}],
   ten_base: [{grade:'normal',weight:15},{grade:'rare',weight:50},{grade:'epic',weight:28},{grade:'legend',weight:6.5},{grade:'unique',weight:0.5}],
 };
-const PULL_COSTS = { normal:50, premium:120, gamble:200, ten:450 };
+const PULL_COSTS = { normal:50, premium:120, gamble:320, ten:450 };
 
 const GRADE_POOLS = {
   normal:  ['bulbasaur','charmander','squirtle','pidgey','rattata','clefairy','oddish','diglett','psyduck','growlithe','abra','magnemite'],

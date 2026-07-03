@@ -489,7 +489,7 @@ class Hero {
 
   get skin() { return SkinDefs[this.id][this.skinId] || SkinDefs[this.id].default; }
   get skinFx() { return this.skin.fxColor; }
-  get name() { return this.def.name; }
+  get name() { return this.evolved ? (this._evoName || this.def.name) : this.def.name; }
 
   get attackRange() {
     const a = this.def.attack;
@@ -576,6 +576,7 @@ class Hero {
     this.evolutionPending = false;
     this._evoStatMul = option.statMul || 1.2;
     this._evoColor = option.color;
+    this._evoName = option.name; // v27 fix: 진화 후 이름이 안 바뀌던 버그
     engine && engine.spawnFloatingText(`✨ ${option.name}(으)로 진화!`, this.x, this.y-46, option.color);
     engine && engine.particles && engine.particles.push(new AoeBurst(this.x, this.y, 70, option.color));
     engine && engine.triggerScreenShake && engine.triggerScreenShake(6, 0.3);
