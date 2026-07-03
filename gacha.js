@@ -457,7 +457,9 @@ function _createGachaTower(def, x, y, engine) {
       if(def.grade!=='normal'){ ctx.shadowColor=grade.color; ctx.shadowBlur=8; }
       ctx.fill(); ctx.stroke();
       // 포켓몬 이미지: 진화단계 전용(id) 이미지 우선, 없으면 라인 공통(pokemonId) 이미지로 폴백
-      const imgPath=window.TowerSpriteImages?.[def.id] || window.TowerSpriteImages?.[def.pokemonId];
+      // v27 fix: towers 폴더에 이미지가 없으면 같은 이름의 enemies 폴더 이미지로 자동 폴백 (파일 중복 업로드 불필요)
+      const imgPath=window.TowerSpriteImages?.[def.id] || window.TowerSpriteImages?.[def.pokemonId]
+        || window.EnemySpriteImages?.[def.id] || window.EnemySpriteImages?.[def.pokemonId];
       const img=imgPath?window.loadSpriteImage?.(imgPath):null;
       const gradeBonus={normal:0,rare:2,epic:5,legend:7,unique:10};
       const sz=34+(gradeBonus[def.grade]||0);
