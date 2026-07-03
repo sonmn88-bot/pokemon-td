@@ -282,7 +282,7 @@ const GachaTowerDefs = {
 for (const id in GachaTowerDefs) {
   const d = GachaTowerDefs[id];
   d.damage   = Math.round(d.damage * 0.80 * 10) / 10;
-  d.fireRate = Math.round(d.fireRate * 0.88 * 100) / 100;
+  d.fireRate = Math.round(d.fireRate * 0.68 * 100) / 100;
   d.range    = Math.round(d.range * 0.72);
 }
 
@@ -299,10 +299,10 @@ function _shot(tower, engine, color, emoji, status, speed, onHit, splash, knockb
 // ===== 뽑기 확률 =====
 // v27-3: 도박뽑기 확률이 너무 후해서 초반부터 전설급을 금방 채웠던 문제 - 확률 낮추고 가격 상향
 const PULL_TABLES = {
-  normal:   [{grade:'normal',weight:60},{grade:'rare',weight:32},{grade:'epic',weight:7},{grade:'legend',weight:0.9},{grade:'unique',weight:0.1}],
-  premium:  [{grade:'normal',weight:20},{grade:'rare',weight:48},{grade:'epic',weight:26},{grade:'legend',weight:5.5},{grade:'unique',weight:0.5}],
-  gamble:   [{grade:'normal',weight:10},{grade:'rare',weight:34},{grade:'epic',weight:42},{grade:'legend',weight:12},{grade:'unique',weight:2}],
-  ten_base: [{grade:'normal',weight:15},{grade:'rare',weight:50},{grade:'epic',weight:28},{grade:'legend',weight:6.5},{grade:'unique',weight:0.5}],
+  normal:   [{grade:'normal',weight:62},{grade:'rare',weight:32},{grade:'epic',weight:5.5},{grade:'legend',weight:0.45},{grade:'unique',weight:0.05}],
+  premium:  [{grade:'normal',weight:22},{grade:'rare',weight:50},{grade:'epic',weight:25},{grade:'legend',weight:2.8},{grade:'unique',weight:0.2}],
+  gamble:   [{grade:'normal',weight:12},{grade:'rare',weight:38},{grade:'epic',weight:43},{grade:'legend',weight:6.5},{grade:'unique',weight:0.5}],
+  ten_base: [{grade:'normal',weight:17},{grade:'rare',weight:53},{grade:'epic',weight:27},{grade:'legend',weight:2.8},{grade:'unique',weight:0.2}],
 };
 const PULL_COSTS = { normal:50, premium:120, gamble:320, ten:450 };
 
@@ -311,7 +311,7 @@ const GRADE_POOLS = {
   rare:    ['charmeleon','wartortle','kadabra','geodude','gastly','lickitung','horsea','magneton','dratini'],
   epic:    ['charizard','blastoise','alakazam','gyarados','lapras','aerodactyl','dragonair'],
   legend:  ['articuno','zapdos','moltres','dragonite'],
-  unique:  ['mewtwo','mew'],
+  unique:  ['mewtwo'], // v27-4: mew는 가챠풀에서 제외 - 합치기(전설 3개→유니크)로만 획득 가능 (item3)
 };
 
 // ===== 합치기 진화 =====

@@ -543,8 +543,8 @@ class App {
     if (pullKey === 'ten') {
       const results = [];
       for (let i = 0; i < 10; i++) {
-        // index 4, 8번째는 에픽 보장
-        const key = (i === 4 || i === 8) ? 'gamble' : 'ten_base';
+        // index 4, 8번째는 프리미엄급 보장 (기존엔 gamble 테이블 써서 전설이 이중으로 자주 나왔음)
+        const key = (i === 4 || i === 8) ? 'premium' : 'ten_base';
         results.push(window.rollTower(key));
       }
       this._showTenPullResult(results, slotIdx);
@@ -1432,11 +1432,40 @@ class App {
 
     const title = document.createElement('div');
     title.className = 'skilltree-title';
-    title.textContent = '🔗 시너지 조합표 (150px 이내 배치시 발동)';
+    title.textContent = '🧬 합치기 레시피 & 시너지 조합표';
     overlay.appendChild(title);
 
     const list = document.createElement('div');
     list.className = 'mission-list';
+
+    // v27-4: 합치기 레시피 (item3 - 원래 요청하신 "조합표") - 같은 타워 3개 모으면 합쳐지는 표
+    const mergeHeader = document.createElement('div');
+    mergeHeader.style.cssText = 'font-size:12px;color:#ffd60a;font-weight:700;margin:4px 0 2px;';
+    mergeHeader.textContent = '🧬 합치기 (동일 타워 3개 → 상위 등급)';
+    list.appendChild(mergeHeader);
+
+    if (window.MERGE_EVOLUTION && window.GachaTowerDefs) {
+      for (const fromId in window.MERGE_EVOLUTION) {
+        const toId = window.MERGE_EVOLUTION[fromId];
+        const fromDef = window.GachaTowerDefs[fromId];
+        const toDef = window.GachaTowerDefs[toId];
+        if (!fromDef || !toDef) continue;
+        const gachaOnly = ['mew'].includes(toId) ? '' : ''; // 자리표시
+        const isMergeOnly = toId === 'mew';
+        const row = document.createElement('div');
+        row.className = 'mission-item';
+        row.innerHTML = `
+          <div>${fromDef.emoji}${fromDef.name} ×3 → ${toDef.emoji}${toDef.name}${isMergeOnly ? ' <span style=\"color:#ff6b6b;font-size:9px\">(합치기 전용! 뽑기로 안 나옴)</span>' : ''}</div>
+          <div style="color:${window.GRADES?.[toDef.grade]?.color || '#fff'};font-size:10px">${window.GRADES?.[toDef.grade]?.name || ''}</div>
+        `;
+        list.appendChild(row);
+      }
+    }
+
+    const synergyHeader = document.createElement('div');
+    synergyHeader.style.cssText = 'font-size:12px;color:#4fc3f7;font-weight:700;margin:14px 0 2px;';
+    synergyHeader.textContent = '🔗 배치 시너지 (150px 이내 인접 배치시 발동)';
+    list.appendChild(synergyHeader);
 
     // 동일 타입
     const sameRow = document.createElement('div');

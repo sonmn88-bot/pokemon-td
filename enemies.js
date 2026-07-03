@@ -469,8 +469,8 @@ class Enemy {
       }
     }
     // 타워 디버프는 2단계에서
+    // v27-4 fix: 파티클을 2번 호출하면 타격음 확률도 2번 굴러서 유독 시끄럽게 들리던 문제 - 1번만 호출
     this.engine.spawnHitParticle(this.x, this.y, '#ff9800');
-    this.engine.spawnHitParticle(this.x, this.y, '#ffeb3b');
     this.engine.spawnFloatingText('💥 폭발!', this.x, this.y - 20, '#ff9800');
   }
 
