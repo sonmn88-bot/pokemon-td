@@ -16,14 +16,16 @@ const ENEMY_TIERS = {
 const MINIBOSS_POOL = ['gyarados', 'dragonite'];
 const BOSS_POOL = ['lugia', 'mewtwo'];
 
-// v27: 수동 보스소환 1~5단계 (기존엔 너무 약해서 보스 구경도 못했던 문제 수정 - 체력을 확실히 탱키하게)
+// v27-2: 수동 보스소환 1~5단계. 쿨다운은 고정 60초 하나만 공유(등급 골라서 소환, 여러개 동시소환 불가).
+// 체력/보상 대폭 상향 (기존엔 순식간에 잡혀서 보스 구경도 못했고, 보상도 낮았음)
 const BOSS_TIERS = [
-  { tier: 1, type: 'gyarados', label: '갸라도스',   hpMul: 3,  rewardMul: 1.5, cooldown: 30 },
-  { tier: 2, type: 'dragonite', label: '망나뇽',    hpMul: 5,  rewardMul: 2,   cooldown: 45 },
-  { tier: 3, type: 'lugia',    label: '루기아',      hpMul: 8,  rewardMul: 3,   cooldown: 60 },
-  { tier: 4, type: 'mewtwo',   label: '뮤츠',        hpMul: 12, rewardMul: 4,   cooldown: 90 },
-  { tier: 5, type: 'mewtwo',   label: '뮤츠(각성)',  hpMul: 20, rewardMul: 6,   cooldown: 150 },
+  { tier: 1, type: 'gyarados', label: '갸라도스',   hpMul: 6,  rewardMul: 4  },
+  { tier: 2, type: 'dragonite', label: '망나뇽',    hpMul: 11, rewardMul: 7  },
+  { tier: 3, type: 'lugia',    label: '루기아',      hpMul: 18, rewardMul: 11 },
+  { tier: 4, type: 'mewtwo',   label: '뮤츠',        hpMul: 28, rewardMul: 16 },
+  { tier: 5, type: 'mewtwo',   label: '뮤츠(각성)',  hpMul: 45, rewardMul: 24 },
 ];
+const BOSS_SUMMON_COOLDOWN = 60;
 
 function generateWave(n) {
   const posInZone = ((n - 1) % WAVES_PER_ZONE) + 1; // 1~30, 존이 바뀌어도 난이도 곡선은 동일 패턴 반복
@@ -924,7 +926,7 @@ class App {
 
   startHeroLoop() {
     this._waveTimer = 0;
-    this.engine._bossSummonCooldowns = {};
+    this.engine._bossSummonCooldown = 0;
     const origUpdate = this.engine.update.bind(this.engine);
     this.engine.update = () => {
       origUpdate();
@@ -934,14 +936,10 @@ class App {
         this.updateSpellBarUI();
         this.updateHeroSkillBarUI();
       }
-      let bossCdActive = false;
-      for (const k in this.engine._bossSummonCooldowns) {
-        if (this.engine._bossSummonCooldowns[k] > 0) {
-          this.engine._bossSummonCooldowns[k] -= this.engine.dt;
-          bossCdActive = true;
-        }
+      if (this.engine._bossSummonCooldown > 0) {
+        this.engine._bossSummonCooldown -= this.engine.dt;
+        this._updateBossSummonUI();
       }
-      if (bossCdActive) this._updateBossSummonUI();
       // 웨이브 진행 중 타이머 + 남은 적 표시
       if (this.engine.state === 'wave') {
         this._waveTimer += this.engine.dt;
@@ -1131,21 +1129,25 @@ class App {
     for (const hero of this.engine.heroes) {
       const wrap = document.createElement('div');
       wrap.className = 'hero-skills-group';
+
+      // v27 fix: label+경험치바를 세로 컬럼으로 묶어야 가로 flex 그룹 안에서 제대로 보임
+      const infoCol = document.createElement('div');
+      infoCol.style.cssText = 'display:flex;flex-direction:column;align-items:flex-start;min-width:64px;';
       const label = document.createElement('div');
       label.className = 'hero-skills-label';
       label.textContent = `${hero.skin.emoji} ${hero.name} Lv${hero.level}`;
-      wrap.appendChild(label);
+      infoCol.appendChild(label);
 
-      // v27: 경험치 바 (요청7)
       const expOuter = document.createElement('div');
       expOuter.className = 'hero-exp-bar-outer';
-      expOuter.style.cssText = 'width:100%;height:4px;background:rgba(255,255,255,0.12);border-radius:2px;margin:2px 0 4px;overflow:hidden;';
+      expOuter.style.cssText = 'width:100%;height:4px;background:rgba(255,255,255,0.15);border-radius:2px;margin-top:3px;overflow:hidden;';
       const expInner = document.createElement('div');
       expInner.className = 'hero-exp-bar-inner';
       expInner.dataset.heroId = hero.id;
       expInner.style.cssText = `height:100%;background:#4fc3f7;width:${Math.min(100, (hero.exp/hero.expToNext)*100)}%;transition:width 0.2s;`;
       expOuter.appendChild(expInner);
-      wrap.appendChild(expOuter);
+      infoCol.appendChild(expOuter);
+      wrap.appendChild(infoCol);
 
       // 스킬 버튼
       const heroIdx = this.engine.heroes.indexOf(hero);
@@ -1469,23 +1471,37 @@ class App {
   }
 
   // v27: 보스 소환 (스타 UMS 게이트 방식) - 영웅스킬바 옆 상시노출, 레벨별 쿨다운
-  // v27: 보스소환 1~5단계, 등급별 개별 쿨다운 + 체력배율 (기존엔 너무 약해서 보스 구경도 못했음)
+  // v27-2: 단일 쿨다운(60초) + 등급 선택 방식 (한번에 여러 등급 동시소환 방지)
   buildBossSummonButton() {
     let bar = document.getElementById('boss-summon-bar');
-    if (!bar) {
-      bar = document.createElement('div');
-      bar.id = 'boss-summon-bar';
-      bar.style.cssText = 'position:absolute;left:8px;bottom:calc(var(--bar-h,82px) + 100px);z-index:19;display:flex;gap:4px;';
-      document.getElementById('game-screen').appendChild(bar);
-      for (const tierDef of BOSS_TIERS) {
-        const btn = document.createElement('button');
-        btn.className = 'boss-tier-btn';
-        btn.dataset.tier = tierDef.tier;
-        btn.style.cssText = 'padding:6px 8px;border-radius:8px;border:1.5px solid rgba(255,60,60,0.4);background:rgba(40,5,5,0.85);color:#fff;font-size:10px;cursor:pointer;';
-        btn.addEventListener('click', () => this._summonBoss(tierDef.tier));
-        bar.appendChild(btn);
-      }
+    if (bar) bar.remove();
+    bar = document.createElement('div');
+    bar.id = 'boss-summon-bar';
+    bar.style.cssText = 'position:absolute;left:8px;bottom:calc(var(--bar-h,82px) + 100px);z-index:19;display:flex;flex-direction:column;gap:3px;background:rgba(20,5,5,0.75);border-radius:10px;padding:5px;border:1px solid rgba(255,60,60,0.3);';
+    document.getElementById('game-screen').appendChild(bar);
+
+    if (this._bossSummonTier == null) this._bossSummonTier = 1;
+
+    const tierRow = document.createElement('div');
+    tierRow.style.cssText = 'display:flex;gap:3px;';
+    for (const t of BOSS_TIERS) {
+      const chip = document.createElement('button');
+      chip.className = 'boss-tier-chip';
+      chip.dataset.tier = t.tier;
+      chip.textContent = t.tier;
+      chip.title = `${t.label} (체력×${t.hpMul}, 보상×${t.rewardMul})`;
+      chip.style.cssText = 'width:22px;height:22px;border-radius:6px;border:1.5px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.4);color:#fff;font-size:11px;cursor:pointer;padding:0;';
+      chip.addEventListener('click', () => { this._bossSummonTier = t.tier; this._updateBossSummonUI(); });
+      tierRow.appendChild(chip);
     }
+    bar.appendChild(tierRow);
+
+    const summonBtn = document.createElement('button');
+    summonBtn.id = 'boss-summon-btn';
+    summonBtn.style.cssText = 'padding:5px 8px;border-radius:8px;border:1.5px solid rgba(255,60,60,0.5);background:rgba(60,5,5,0.9);color:#fff;font-size:10px;cursor:pointer;';
+    summonBtn.addEventListener('click', () => this._summonBoss(this._bossSummonTier));
+    bar.appendChild(summonBtn);
+
     this._updateBossSummonUI();
   }
 
@@ -1494,30 +1510,31 @@ class App {
     const tierDef = BOSS_TIERS.find(t => t.tier === tier);
     if (!e || !tierDef) return;
     if (e.state !== 'wave') { this.showWaveAnnounce('웨이브 진행 중에만 소환 가능', '#ff6b6b'); return; }
-    if (!e._bossSummonCooldowns) e._bossSummonCooldowns = {};
-    if ((e._bossSummonCooldowns[tier] || 0) > 0) return;
+    if ((e._bossSummonCooldown || 0) > 0) return;
     e._spawnEnemy({ type: tierDef.type, bossTier: tier, hpMul: tierDef.hpMul, rewardMul: tierDef.rewardMul });
-    e._bossSummonCooldowns[tier] = tierDef.cooldown;
-    this.showWaveAnnounce(`🔮 ${tierDef.label} 보스 소환!`, '#ff6b6b');
+    e._bossSummonCooldown = BOSS_SUMMON_COOLDOWN;
+    this.showWaveAnnounce(`🔮 ${tierDef.label}(${tier}성) 소환!`, '#ff6b6b');
     if (this.missionTracker) { this.missionTracker.stats.bossSummons = (this.missionTracker.stats.bossSummons||0) + 1; this.missionTracker.check(); }
+    this._updateBossSummonUI();
   }
 
   _updateBossSummonUI() {
     const bar = document.getElementById('boss-summon-bar');
     if (!bar || !this.engine) return;
-    if (!this.engine._bossSummonCooldowns) this.engine._bossSummonCooldowns = {};
-    for (const tierDef of BOSS_TIERS) {
-      const btn = bar.querySelector(`.boss-tier-btn[data-tier="${tierDef.tier}"]`);
-      if (!btn) continue;
-      const cd = this.engine._bossSummonCooldowns[tierDef.tier] || 0;
-      if (cd > 0) {
-        btn.disabled = true;
-        btn.textContent = `${tierDef.tier}성 (${Math.ceil(cd)}s)`;
-      } else {
-        btn.disabled = false;
-        btn.textContent = `🔮${tierDef.tier}성 소환`;
-      }
-      btn.title = `${tierDef.label} (체력×${tierDef.hpMul}, 보상×${tierDef.rewardMul}, 쿨다운 ${tierDef.cooldown}s)`;
+    bar.querySelectorAll('.boss-tier-chip').forEach(chip => {
+      chip.style.borderColor = Number(chip.dataset.tier) === this._bossSummonTier ? '#ffd60a' : 'rgba(255,255,255,0.2)';
+      chip.style.background = Number(chip.dataset.tier) === this._bossSummonTier ? 'rgba(255,214,10,0.25)' : 'rgba(0,0,0,0.4)';
+    });
+    const btn = document.getElementById('boss-summon-btn');
+    if (!btn) return;
+    const cd = this.engine._bossSummonCooldown || 0;
+    const tierDef = BOSS_TIERS.find(t => t.tier === this._bossSummonTier);
+    if (cd > 0) {
+      btn.disabled = true;
+      btn.textContent = `⏳ 재사용 대기 (${Math.ceil(cd)}s)`;
+    } else {
+      btn.disabled = false;
+      btn.textContent = `🔮 ${tierDef.label} 소환`;
     }
   }
 

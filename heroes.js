@@ -25,7 +25,9 @@ const SkinDefs = {
     default: { name:'기본', emoji:'🐢', color:'#0288d1', unlocked:true, fxColor:'#81d4fa' },
   },
   eevee: {
-    default: { name:'기본', emoji:'🦊', color:'#a1887f', unlocked:true, fxColor:'#d7ccc8' },
+    default:   { name:'기본',       emoji:'🦊', color:'#a1887f', unlocked:true,  fxColor:'#d7ccc8' },
+    christmas: { name:'크리스마스', emoji:'🎅', color:'#c62828', unlocked:false, fxColor:'#ffcdd2', badge:'🎄' },
+    sakura:    { name:'벚꽃',       emoji:'🌸', color:'#f8bbd0', unlocked:false, fxColor:'#fce4ec', badge:'🌸' },
   },
 };
 
