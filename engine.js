@@ -157,6 +157,14 @@ class GameEngine {
       if (slot.tower) { slot.tower.x = slot.x; slot.tower.y = slot.y; }
       return slot;
     });
+    // v27-8 버그수정: 상점 "확장 부지"로 기본 격자 밖에 추가한 슬롯이 존 전환시 통째로 사라져서
+    // 그 위에 배치된 타워가 선택/업그레이드 불가능(클릭 안 먹힘) 상태로 남던 치명적 버그.
+    // 기본 격자 범위를 벗어난 기존 슬롯 중 사용중인 것만 그대로 이어받음.
+    if (prevSlots && prevSlots.length > rawSlots.length) {
+      for (let i = rawSlots.length; i < prevSlots.length; i++) {
+        if (prevSlots[i] && prevSlots[i].occupied) this.towerSlots.push(prevSlots[i]);
+      }
+    }
   }
 
   start() { this.running = true; this.lastTime = performance.now(); requestAnimationFrame(t=>this.loop(t)); }

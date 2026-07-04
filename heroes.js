@@ -179,14 +179,14 @@ const HeroDefs = {
     },
     skills:[
       {
-        name:'100만볼트', emoji:'⚡', baseCooldown:14,
+        name:'100만볼트', emoji:'⚡', baseCooldown:19,
         desc:'범위 내 모든 적에게 전기 데미지 + 감전',
         cast(hero, engine) {
           const r = (140 + hero.level * 10) * (1 + hero._skillVal('skillRange', 0));
           for (const e of engine.enemies) {
             if (e.dead||e.reachedEnd) continue;
             if (Math.hypot(e.x-hero.x,e.y-hero.y) <= r) {
-              e.takeDamage(40 + hero.level * 15, 'special');
+              e.takeDamage(40 + hero.level * 9.0, 'special');
               e.applyStatus('stun', 0.9, 0);
             }
           }
@@ -195,7 +195,7 @@ const HeroDefs = {
         }
       },
       {
-        name:'전광석화', emoji:'💨', baseCooldown:10,
+        name:'전광석화', emoji:'💨', baseCooldown:14,
         desc:'가장 강한 적에게 즉시 막대한 피해',
         cast(hero, engine) {
           let target=null, maxHp=-1;
@@ -204,7 +204,7 @@ const HeroDefs = {
             if (e.hp > maxHp) { maxHp=e.hp; target=e; }
           }
           if (target) {
-            target.takeDamage(160 + hero.level * 55, 'special');
+            target.takeDamage(160 + hero.level * 33.0, 'special');
             engine.particles.push(new ChainBolt(hero.x, hero.y, target.x, target.y));
             engine.spawnFloatingText('💨전광석화!', target.x, target.y-22, '#ffd600');
           }
@@ -229,7 +229,7 @@ const HeroDefs = {
     },
     skills:[
       {
-        name:'사이킥', emoji:'🔮', baseCooldown:13,
+        name:'사이킥', emoji:'🔮', baseCooldown:18,
         desc:'범위 내 모든 적 슬로우 + 데미지',
         cast(hero, engine) {
           const r = (150 + hero.level * 10) * (1 + hero._skillVal('skillRange', 0));
@@ -237,7 +237,7 @@ const HeroDefs = {
             if (e.dead||e.reachedEnd) continue;
             if (Math.hypot(e.x-hero.x,e.y-hero.y) <= r) {
               e.applyStatus('slow', 3.5, 0.38);
-              e.takeDamage(22 + hero.level * 9, 'special');
+              e.takeDamage(22 + hero.level * 5.4, 'special');
             }
           }
           engine.particles.push(new AoeBurst(hero.x, hero.y, r, '#ce93d8'));
@@ -245,7 +245,7 @@ const HeroDefs = {
         }
       },
       {
-        name:'변신', emoji:'✨', baseCooldown:20,
+        name:'변신', emoji:'✨', baseCooldown:27,
         desc:'가장 약한 적 무력화 (4초)',
         cast(hero, engine) {
           let target=null, minHp=Infinity;
@@ -280,12 +280,12 @@ const HeroDefs = {
     },
     skills:[
       {
-        name:'메트로놈', emoji:'🎲', baseCooldown:16,
+        name:'메트로놈', emoji:'🎲', baseCooldown:22,
         desc:'랜덤 대형 효과 발동',
         cast(hero, engine) {
           const roll = Math.floor(Math.random() * 4);
           if (roll === 0) {
-            for (const e of engine.enemies) { if (!e.dead&&!e.reachedEnd) e.takeDamage(65+hero.level*22,'special'); }
+            for (const e of engine.enemies) { if (!e.dead&&!e.reachedEnd) e.takeDamage(65+hero.level*13,'special'); }
             engine.spawnFloatingText('🎲전체 피해!', hero.x, hero.y-32, '#ffd54f');
           } else if (roll === 1) {
             for (const e of engine.enemies) { if (!e.dead&&!e.reachedEnd) e.applyStatus('slow',3.5,0.38); }
@@ -301,7 +301,7 @@ const HeroDefs = {
         }
       },
       {
-        name:'행복의알', emoji:'🥚', baseCooldown:18,
+        name:'행복의알', emoji:'🥚', baseCooldown:24,
         desc:'모든 타워 데미지 +25% (8초)',
         cast(hero, engine) {
           for (const t of engine.towers) {
@@ -332,14 +332,14 @@ HeroDefs.charizard = {
   },
   skills:[
     {
-      name:'불꽃보라기', emoji:'🔥', baseCooldown:13,
+      name:'불꽃보라기', emoji:'🔥', baseCooldown:18,
       desc:'범위 내 모든 적에게 화염 데미지 + 화상',
       cast(hero, engine) {
         const r = (150 + hero.level * 10) * (1 + hero._skillVal('skillRange', 0));
         for (const e of engine.enemies) {
           if (e.dead||e.reachedEnd) continue;
           if (Math.hypot(e.x-hero.x,e.y-hero.y) <= r) {
-            e.takeDamage(36 + hero.level * 13, 'special');
+            e.takeDamage(36 + hero.level * 7.8, 'special');
             e.applyStatus('burn', 3, 12 + hero.level);
           }
         }
@@ -348,12 +348,12 @@ HeroDefs.charizard = {
       }
     },
     {
-      name:'용의날개', emoji:'🐉', baseCooldown:19,
+      name:'용의날개', emoji:'🐉', baseCooldown:26,
       desc:'모든 적에게 큰 피해 + 3초 슬로우',
       cast(hero, engine) {
         for (const e of engine.enemies) {
           if (e.dead||e.reachedEnd) continue;
-          e.takeDamage(70 + hero.level * 24, 'special');
+          e.takeDamage(70 + hero.level * 14.4, 'special');
           e.applyStatus('slow', 3, 0.45);
         }
         engine.particles.push(new AoeBurst(hero.x, hero.y, Math.max(engine.width,engine.height), '#ff3d00'));
@@ -380,7 +380,7 @@ HeroDefs.blastoise = {
   },
   skills:[
     {
-      name:'하이드로펌프', emoji:'🌊', baseCooldown:13,
+      name:'하이드로펌프', emoji:'🌊', baseCooldown:18,
       desc:'범위 내 모든 적 큰 슬로우 + 데미지',
       cast(hero, engine) {
         const r = (150 + hero.level * 10) * (1 + hero._skillVal('skillRange', 0));
@@ -388,7 +388,7 @@ HeroDefs.blastoise = {
           if (e.dead||e.reachedEnd) continue;
           if (Math.hypot(e.x-hero.x,e.y-hero.y) <= r) {
             e.applyStatus('slow', 3.5, 0.35);
-            e.takeDamage(24 + hero.level * 9, 'special');
+            e.takeDamage(24 + hero.level * 5.4, 'special');
           }
         }
         engine.particles.push(new AoeBurst(hero.x, hero.y, r, '#0288d1'));
@@ -396,7 +396,7 @@ HeroDefs.blastoise = {
       }
     },
     {
-      name:'쉘아머', emoji:'🛡️', baseCooldown:20,
+      name:'쉘아머', emoji:'🛡️', baseCooldown:27,
       desc:'라이프 +4 회복 + 주변 적 2.5초 스턴',
       cast(hero, engine) {
         engine.lives = Math.min(engine.lives + 4, 99);
@@ -433,14 +433,14 @@ HeroDefs.eevee = {
   },
   skills:[
     {
-      name:'적응', emoji:'🌀', baseCooldown:14,
+      name:'적응', emoji:'🌀', baseCooldown:19,
       desc:'범위 내 모든 적 슬로우 + 소량 피해',
       cast(hero, engine) {
         const r = (140 + hero.level * 8) * (1 + hero._skillVal('skillRange', 0));
         for (const e of engine.enemies) {
           if (e.dead||e.reachedEnd) continue;
           if (Math.hypot(e.x-hero.x,e.y-hero.y) <= r) {
-            e.takeDamage(18 + hero.level * 6, 'special');
+            e.takeDamage(18 + hero.level * 3.6, 'special');
             e.applyStatus('slow', 2.5, 0.5);
           }
         }
@@ -449,7 +449,7 @@ HeroDefs.eevee = {
       }
     },
     {
-      name:'재빠른몸놀림', emoji:'💨', baseCooldown:20,
+      name:'재빠른몸놀림', emoji:'💨', baseCooldown:27,
       desc:'모든 스킬 쿨다운 즉시 30% 감소',
       cast(hero, engine) {
         for (const h of engine.heroes) h.cooldowns = h.cooldowns.map(c => c * 0.7);
@@ -499,7 +499,28 @@ class Hero {
   get attackDamage() {
     const a = this.def.attack;
     if (!a) return 0;
-    return (a.baseDamage + (this.level-1)*a.damagePerLevel) * (1 + this._skillVal('atkDmg', 0)) * (this._evoStatMul || 1);
+    const base = (a.baseDamage + (this.level-1)*a.damagePerLevel) * (1 + this._skillVal('atkDmg', 0)) * (this._evoStatMul || 1);
+    return base * this._typeUpgradeDmgMul();
+  }
+
+  // v27-8: 영웅도 해당 속성의 타입강화 영향을 받도록 추가 (기존엔 전혀 반영 안 되고 있었음)
+  _typeUpgradeDmgMul() {
+    const HERO_TYPE_MAP = {
+      pikachu:'electric', raichu:'electric',
+      togepi:'normal', togetic:'normal',
+      eevee:'normal', vaporeon:'water', jolteon:'electric', flareon:'fire',
+    };
+    const type = HERO_TYPE_MAP[this.evolved || this.id];
+    if (!type || !window.getTypeUpgradeAt || !window.TypeUpgradeLevels) return 1;
+    const level = window.TypeUpgradeLevels[type] || 0;
+    const FLAVOR_ONLY = ['slow','chain','poison','target'];
+    let mul = 1;
+    for (let i = 0; i < level; i++) {
+      const u = window.getTypeUpgradeAt(type, i);
+      const isFlavor = FLAVOR_ONLY.includes(u.buff);
+      if (u.buff === 'dmg' || u.buff === 'all' || isFlavor) mul *= (1 + (isFlavor ? u.val * 0.6 : u.val));
+    }
+    return mul;
   }
   get attackFireRate() {
     const a = this.def.attack;

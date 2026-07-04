@@ -32,7 +32,7 @@ Object.assign(App.prototype, {
         <span class="tower-btn-cost">💰${cost}</span>
       `;
       btn.title = p.key === 'gamble' ? '에픽~레전드 확률 높음! (단축키: ' + p.hotkey + ')' :
-                  p.key === 'ten'    ? '10개! 에픽 1개 보장 (단축키: ' + p.hotkey + ')' :
+                  p.key === 'ten'    ? '10개 묶음 (개당 45g, 확률은 일반뽑기와 동일) (단축키: ' + p.hotkey + ')' :
                   p.key === 'premium'? '레어~에픽 위주 (단축키: ' + p.hotkey + ')' : '노말~레어 위주 (단축키: ' + p.hotkey + ')';
       btn.addEventListener('click', () => this.doPull(p.key, btn));
       scroll.appendChild(btn);

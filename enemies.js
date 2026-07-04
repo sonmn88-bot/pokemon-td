@@ -414,17 +414,32 @@ class Enemy {
         if (this.def.special === 'iceImmune') return;
         if (duration > this.slowed) {
           this.slowed = duration;
-          this.slowFactor = Math.min(this.slowFactor, factor || 0.5);
+          // v27-8: 슬로우 하한 완화 (요청3) - 최대 70%감속까지만 (거의 정지 방지)
+          this.slowFactor = Math.max(0.30, Math.min(this.slowFactor, factor || 0.5));
         }
         break;
       case 'stun':
         if (this.def.stunResist) duration *= (1 - this.def.stunResist);
-        if (duration > this.stunned) this.stunned = duration;
+        // v27-8: 스턴 지속시간 상한 + 이미 스턴 상태면 갱신량 감쇠 (여러 타워가 연속으로 걸어서 사실상 무한잠금되던 문제)
+        duration = Math.min(duration, 1.2);
+        if (this.stunned > 0) {
+          this.stunned = Math.min(1.2, this.stunned + duration * 0.35);
+        } else if (duration > this.stunned) {
+          this.stunned = duration;
+        }
         break;
       case 'burn':
         if (this.def.special === 'poisonImmune') return; // 독/화상 면역은 불에도 약한 건 아니나 단순화
-        this.burning = duration;
-        this.burnDamage = factor || 10;
+        // v27-9: 화상 상한 + 무한갱신 방지 (요청6 - 도트가 너무 세서 보스가 혼자 녹던 문제)
+        duration = Math.min(duration, 3.5);
+        if (this.burning > 0.3) {
+          // 이미 타고 있으면 데미지는 더 센 쪽으로, 지속시간은 살짝만 연장 (무한갱신 방지)
+          this.burnDamage = Math.max(this.burnDamage, factor || 10);
+          this.burning = Math.min(3.5, Math.max(this.burning, duration * 0.5));
+        } else {
+          this.burning = duration;
+          this.burnDamage = factor || 10;
+        }
         break;
       case 'poison':
         if (this.def.special === 'poisonImmune' || this.def.poisonImmune) return;
@@ -433,6 +448,8 @@ class Enemy {
         break;
       case 'freeze':
         if (this.def.special === 'iceImmune') return;
+        // v27-8: 빙결 지속시간 상한 (요청3)
+        duration = Math.min(duration, 1.8);
         this.frozen = duration;
         break;
     }

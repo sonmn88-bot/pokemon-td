@@ -520,7 +520,7 @@ class App {
       const results = [];
       for (let i = 0; i < 10; i++) {
         // index 4, 8번째는 프리미엄급 보장 (기존엔 gamble 테이블 써서 전설이 이중으로 자주 나왔음)
-        const key = (i === 4 || i === 8) ? 'premium' : 'ten_base';
+        const key = 'ten_base'; // v27-9: 보장슬롯(구 premium) 제거 - 그냥 10개 다 일반뽑기와 동일 확률 (요청5)
         results.push(window.rollTower(key));
       }
       this._showTenPullResult(results, slotIdx);
@@ -1118,13 +1118,27 @@ class App {
         // 슬롯이든 빈 곳이든 어디든 배치 가능
         const HUD = 52, BAR = 82;
         if (y > HUD && y < this.engine.height - BAR) {
+          // v27-9 버그수정: 영웅을 타워 슬롯 바로 위/근처에 놓으면 탭 판정이 겹쳐서
+          // 이후로 그 자리를 탭해도 아무 반응이 없어지던 문제 - 슬롯과 45px 이내면 밀어냄
+          let px = x, py = y;
+          for (const s of this.engine.towerSlots) {
+            const d = Math.hypot(s.x - px, s.y - py);
+            if (d < 45) {
+              const angle = Math.atan2(py - s.y, px - s.x) || Math.random() * Math.PI * 2;
+              px = s.x + Math.cos(angle) * 46;
+              py = s.y + Math.sin(angle) * 46;
+            }
+          }
+          px = Math.max(20, Math.min(this.engine.width - 20, px));
+          py = Math.max(HUD + 20, Math.min(this.engine.height - BAR - 20, py));
+
           const skinId = this.selectedHeroSkins[this.placingHero];
           // 이미 배치된 영웅이면 위치만 이동
           const existing = this.engine.heroes.find(h => h.id === this.placingHero);
           if (existing) {
-            existing.x = x; existing.y = y;
+            existing.x = px; existing.y = py;
           } else {
-            const hero = new Hero(this.placingHero, x, y, skinId);
+            const hero = new Hero(this.placingHero, px, py, skinId);
             this.engine.heroes.push(hero);
             this.buildHeroSkillBar();
           }
@@ -1362,7 +1376,9 @@ class App {
       this.showWaveAnnounce(`☠️ 중간보스 등장! (Wave ${nextWave})`, '#ffab40');
     }
 
-    const timeLimit = waveTimeLimit(wave, this.difficulty, this.engine);
+    // v27-9: 왕/보스 웨이브는 시간제한을 짧게 고정 - 못 잡아도 빠르게 다음 웨이브로 넘어가도록 (요청3)
+    const isBossOrKingWave = nextWave === KING_WAVE || nextWave % 10 === 0;
+    const timeLimit = isBossOrKingWave ? 22 : waveTimeLimit(wave, this.difficulty, this.engine);
     if (e.startWave(wave, timeLimit)) {
       this.els.btnWave.disabled = true;
       this.els.btnWave.textContent = '⏳ 진행 중...';

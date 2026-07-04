@@ -51,7 +51,7 @@ const GachaTowerDefs = {
   charmander: {
     id:'charmander', name:'파이리', emoji:'🦎', grade:'normal', type:'fire', pokemonId:'charmander',
     damage:14, range:175, fireRate:1.8, desc:'화상 DoT',
-    fire(t,e){ _shot(t,e,'#ff7043','🔥',{type:'burn',duration:2,factor:7},450); }
+    fire(t,e){ _shot(t,e,'#ff7043','🔥',{type:'burn',duration:2,factor:5.2},450); }
   },
   squirtle: {
     id:'squirtle', name:'꼬부기', emoji:'🐢', grade:'normal', type:'water', pokemonId:'squirtle',
@@ -111,7 +111,7 @@ const GachaTowerDefs = {
   growlithe: {
     id:'growlithe', name:'가디', emoji:'🐕', grade:'normal', type:'fire', pokemonId:'growlithe',
     damage:13, range:175, fireRate:2.0, desc:'화염 속사',
-    fire(t,e){ _shot(t,e,'#ff6d00','🔥',{type:'burn',duration:1.5,factor:6},480); }
+    fire(t,e){ _shot(t,e,'#ff6d00','🔥',{type:'burn',duration:1.5,factor:4.5},480); }
   },
   abra: {
     id:'abra', name:'케이시', emoji:'🔮', grade:'normal', type:'psychic', pokemonId:'abra',
@@ -131,7 +131,7 @@ const GachaTowerDefs = {
   charmeleon: {
     id:'charmeleon', name:'리자드', emoji:'🔥', grade:'rare', type:'fire', pokemonId:'charmander',
     damage:22, range:195, fireRate:2.5, desc:'관통 화염',
-    fire(t,e){ e.projectiles.push(new Projectile(t.x,t.y,t.target,{engine:e,speed:520,damage:t.damage,color:'#ff7043',size:6,dmgType:'special',emoji:'🔥',piercing:true,pierceWidth:28,status:{type:'burn',duration:2.5,factor:10}})); }
+    fire(t,e){ e.projectiles.push(new Projectile(t.x,t.y,t.target,{engine:e,speed:520,damage:t.damage,color:'#ff7043',size:6,dmgType:'special',emoji:'🔥',piercing:true,pierceWidth:28,status:{type:'burn',duration:2.5,factor:7.5}})); }
   },
   wartortle: {
     id:'wartortle', name:'어니부기', emoji:'💧', grade:'rare', type:'water', pokemonId:'squirtle',
@@ -182,7 +182,7 @@ const GachaTowerDefs = {
     id:'charizard', name:'리자몽', emoji:'🐉', grade:'epic', type:'fire', pokemonId:'charmander',
     damage:50, range:240, fireRate:3.5, desc:'관통+폭발 25%',
     fire(t,e){
-      e.projectiles.push(new Projectile(t.x,t.y,t.target,{engine:e,speed:520,damage:t.damage,color:'#ff7043',size:6,dmgType:'special',emoji:'🔥',piercing:true,pierceWidth:28,status:{type:'burn',duration:3,factor:14},
+      e.projectiles.push(new Projectile(t.x,t.y,t.target,{engine:e,speed:520,damage:t.damage,color:'#ff7043',size:6,dmgType:'special',emoji:'🔥',piercing:true,pierceWidth:28,status:{type:'burn',duration:3,factor:10.5},
         onHit:(en)=>{ if(Math.random()<0.25){ for(const e2 of e.enemies) if(Math.hypot(e2.x-en.x,e2.y-en.y)<70) e2.takeDamage(t.damage*1.2,'special'); e.particles.push(new AoeBurst(en.x,en.y,70,'#ff6f00')); }}}));
     }
   },
@@ -251,7 +251,7 @@ const GachaTowerDefs = {
     id:'moltres', name:'파이어', emoji:'🔥', grade:'legend', type:'fire', pokemonId:'moltres',
     damage:70, range:295, fireRate:3.0, desc:'불꽃폭풍 광역',
     fire(t,e){
-      e.projectiles.push(new Projectile(t.x,t.y,t.target,{engine:e,speed:540,damage:t.damage,color:'#ff7043',size:6,dmgType:'special',emoji:'🔥',piercing:true,pierceWidth:30,status:{type:'burn',duration:4,factor:18},
+      e.projectiles.push(new Projectile(t.x,t.y,t.target,{engine:e,speed:540,damage:t.damage,color:'#ff7043',size:6,dmgType:'special',emoji:'🔥',piercing:true,pierceWidth:30,status:{type:'burn',duration:4,factor:13.5},
         onHit:(en)=>{ if(Math.random()<0.4){ for(const e2 of e.enemies) if(Math.hypot(e2.x-en.x,e2.y-en.y)<90) e2.takeDamage(t.damage*1.3,'special'); e.particles.push(new AoeBurst(en.x,en.y,90,'#ff6f00')); }}}));
     }
   },
@@ -337,7 +337,7 @@ const PULL_TABLES = {
   normal:   [{grade:'normal',weight:62},{grade:'rare',weight:32},{grade:'epic',weight:5.5},{grade:'legend',weight:0.45},{grade:'unique',weight:0.05}],
   premium:  [{grade:'normal',weight:22},{grade:'rare',weight:50},{grade:'epic',weight:25},{grade:'legend',weight:2.8},{grade:'unique',weight:0.2}],
   gamble:   [{grade:'normal',weight:25},{grade:'rare',weight:42},{grade:'epic',weight:28},{grade:'legend',weight:4.5},{grade:'unique',weight:0.5}],
-  ten_base: [{grade:'normal',weight:17},{grade:'rare',weight:53},{grade:'epic',weight:27},{grade:'legend',weight:2.8},{grade:'unique',weight:0.2}],
+  ten_base: [{grade:'normal',weight:62},{grade:'rare',weight:32},{grade:'epic',weight:5.5},{grade:'legend',weight:0.45},{grade:'unique',weight:0.05}], // v27-9: 일반뽑기와 동일 확률로 수정 (요청5 - 그냥 10개 묶음할인 개념이어야 함, 확률우대 아님)
 };
 const PULL_COSTS = { normal:50, premium:120, gamble:320, ten:450 };
 
@@ -389,9 +389,14 @@ function rollTower(tableKey) {
 function _computeTypeBuffMuls(type) {
   const level = TypeUpgradeLevels[type] || 0;
   let dmg = 1, range = 1, speed = 1;
+  // v27-8 버그수정: buff가 'dmg'/'range'/'speed'/'all'이 아닌 티어(slow/chain/poison/target)는
+  // 지금까지 실제 특수효과 구현이 없어서 완전히 아무 효과 없이 돈만 나갔던 치명적 버그였음.
+  // 전용 효과 구현 전까지는 데미지로 환산해서 최소한 "업그레이드가 의미있게" 만듦.
+  const FLAVOR_ONLY_BUFFS = ['slow', 'chain', 'poison', 'target'];
   for (let i = 0; i < level; i++) {
     const u = getTypeUpgradeAt(type, i); // v27-4: 무한티어 대응 (5단계 이후도 소급적용)
-    if (u.buff === 'dmg' || u.buff === 'all')   dmg   *= (1 + u.val);
+    const isFlavor = FLAVOR_ONLY_BUFFS.includes(u.buff);
+    if (u.buff === 'dmg' || u.buff === 'all' || isFlavor) dmg *= (1 + (isFlavor ? u.val * 0.6 : u.val));
     if (u.buff === 'range' || u.buff === 'all') range *= (1 + u.val);
     if (u.buff === 'speed' || u.buff === 'all') speed *= (1 + u.val);
   }
@@ -612,10 +617,12 @@ function applyTypeUpgrade(type, engine) {
   if(!engine.spendGold(upg.cost)) return false;
   TypeUpgradeLevels[type]++;
   const color = TYPES[type].color;
+  const FLAVOR_ONLY_BUFFS = ['slow', 'chain', 'poison', 'target'];
+  const isFlavor = FLAVOR_ONLY_BUFFS.includes(upg.buff);
   // 해당 타입 타워 전체에 버프 적용 + 어떤 타워가 버프받는지 색깔 링으로 명확히 표시
   for(const t of engine.towers){
     if(!t.def||t.def.type!==type) continue;
-    if(upg.buff==='dmg'||upg.buff==='all') t.buffDmgMul=(t.buffDmgMul||1)*(1+upg.val);
+    if(upg.buff==='dmg'||upg.buff==='all'||isFlavor) t.buffDmgMul=(t.buffDmgMul||1)*(1+(isFlavor?upg.val*0.6:upg.val));
     if(upg.buff==='range'||upg.buff==='all') t.buffRangeMul=(t.buffRangeMul||1)*(1+upg.val);
     if(upg.buff==='speed'||upg.buff==='all') t._shopSpeedMul=(t._shopSpeedMul||1)*(1+upg.val);
     if(window.AoeBurst) engine.particles.push(new AoeBurst(t.x,t.y,44,color));

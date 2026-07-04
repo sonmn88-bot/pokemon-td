@@ -40,14 +40,6 @@ const ShopItems = [
     }
   },
   {
-    key: 'potion', name: '골드 두루마리', emoji: '📜', cost: 90,
-    desc: '다음 웨이브 클리어 보상 골드 2배',
-    buy(engine) {
-      engine._nextWaveGoldMul = 2;
-      engine.spawnFloatingText('📜 다음 웨이브 보상 2배!', engine.width/2, 80, '#ffd60a');
-    }
-  },
-  {
     key: 'revive', name: '확장 부지', emoji: '🏗️', cost: 180, scaling: true,
     desc: '트랙 안쪽에 빈 배치슬롯 1개 즉시 추가 (살수록 비싸짐)',
     buy(engine) {
@@ -62,11 +54,12 @@ const ShopItems = [
         for (const s of engine.towerSlots) minDist = Math.min(minDist, Math.hypot(s.x-x, s.y-y));
         if (minDist > bestMinDist) { bestMinDist = minDist; best = {x,y}; }
       }
-      if (best && bestMinDist > 55) {
+      if (best && bestMinDist > 46) {
         engine.towerSlots.push({ x: best.x, y: best.y, occupied: false, tower: null });
         engine.spawnFloatingText('🏗️ 새 슬롯 확보!', best.x, best.y, '#06d6a0');
       } else {
         engine.spawnFloatingText('공간이 부족합니다', engine.width/2, 80, '#ff6b6b');
+        return false; // v27-8 버그수정: 실패해도 return false가 없어서 골드가 환불 안 되고 그냥 나갔던 문제
       }
     }
   },
