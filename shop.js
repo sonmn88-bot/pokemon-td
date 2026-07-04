@@ -45,10 +45,11 @@ const ShopItems = [
     buy(engine) {
       const w = engine.width, h = engine.height;
       const HUD=52, BAR=82, PAD=20;
-      const top = HUD+PAD, bot = h-BAR-PAD;
+      // v27-11: 맵 트랙을 가운데로 좁힌 것에 맞춰 확장부지 탐색범위도 같이 좁힘 (요청7)
+      const top = Math.max(HUD+PAD, h*0.22), bot = Math.min(h-BAR-PAD, h*0.78);
       let best = null, bestMinDist = -1;
       for (let tries=0; tries<40; tries++) {
-        const x = w*0.18 + Math.random()*w*0.64;
+        const x = w*0.22 + Math.random()*w*0.56;
         const y = top + Math.random()*(bot-top);
         let minDist = Infinity;
         for (const s of engine.towerSlots) minDist = Math.min(minDist, Math.hypot(s.x-x, s.y-y));

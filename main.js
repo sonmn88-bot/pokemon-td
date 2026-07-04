@@ -64,7 +64,7 @@ function generateWave(n) {
   }
 
   // 웨이브가 진행될수록 더 많이, 더 빽빽하게 스폰 (계속 돌면서 잡는 느낌). cycle이 늘수록(90웨이브 이후 반복) 한번 더 강화
-  const enemyCount = Math.round(20 + n * 3.4 + cycle * 14);
+  const enemyCount = Math.round(26 + n * 4.6 + cycle * 20);
   const baseInterval = Math.max(0.26, 0.85 - n * 0.014);
   const streams = 1 + Math.min(4, Math.floor(n / 6));
 

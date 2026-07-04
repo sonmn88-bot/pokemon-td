@@ -747,8 +747,10 @@ class Hero {
       ctx.restore();
 
       const drawSize = 46;
+      const _b = window.SpriteBoundsCache?.[window.HeroSpriteImages?.[spriteKey]];
       ctx.save();
-      ctx.drawImage(spriteImg, this.x - drawSize/2, this.y - drawSize/2, drawSize, drawSize);
+      if (_b) ctx.drawImage(spriteImg, _b.x, _b.y, _b.w, _b.h, this.x - drawSize/2, this.y - drawSize/2, drawSize, drawSize);
+      else ctx.drawImage(spriteImg, this.x - drawSize/2, this.y - drawSize/2, drawSize, drawSize);
       ctx.restore();
 
       if (skin.badge) {

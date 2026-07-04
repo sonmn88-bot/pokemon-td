@@ -183,8 +183,10 @@ class GameEngine {
   update() {
     if (this.state !== 'wave' && this.state !== 'idle') return;
 
+    // v27-11: 스폰 처리를 'wave' 상태 여부와 무관하게 항상 진행 (요청5 - 스킵해도 남은 몬스터가 계속 나오게)
+    if (this.spawnQueue.length > 0) this.updateSpawn();
+
     if (this.state === 'wave') {
-      this.updateSpawn();
       // DP 재생
       this.deployPoints = Math.min(this.maxDeployPoints, this.deployPoints + this.deployRegenRate * this.dt);
       // 웨이브 제한시간 (시간 내 전멸 못 시키면 남은 적 수만큼 라이프 손실)
@@ -296,9 +298,16 @@ class GameEngine {
     if (this.state !== 'idle') return false;
     this.currentWave++;
     this.state = 'wave';
-    this.spawnQueue = [...waveData];
-    this.spawnTimer = 0;
-    this.activeSpawns = waveData.length;
+    // v27-11: 이전 웨이브에서 스킵되어 아직 안 나온 몬스터가 있으면 지우지 않고 이어서 스폰 (요청5)
+    const carryOver = this.spawnQueue.length;
+    if (carryOver > 0) {
+      const offset = this.spawnTimer;
+      this.spawnQueue = this.spawnQueue.concat(waveData.map(item => ({ ...item, delay: item.delay + offset + 2 })));
+    } else {
+      this.spawnQueue = [...waveData];
+      this.spawnTimer = 0;
+    }
+    this.activeSpawns = carryOver + waveData.length;
     this.waveTimeRemaining = timeLimit || this.waveTimeLimit;
     this.onWaveChange && this.onWaveChange(this.currentWave, this.totalWaves);
     this.onWaveTimerChange && this.onWaveTimerChange(this.waveTimeRemaining, this.waveTimeRemaining);
@@ -307,9 +316,10 @@ class GameEngine {
   }
 
   // v27: 시간 초과 - 페널티 없이 자동으로 다음 웨이브 진행. 살아남은 적은 필드에 그대로 남아 누적됨(필드 누적 게임오버 판정용)
+  // v27-11: 시간 초과/스킵 - 페널티는 없지만, 요청5에 따라 아직 안 나온 몬스터를 그냥 삭제하지 않고
+  // 백그라운드에서 계속 스폰되도록 큐를 유지함 (스킵이 "물량을 통째로 씹고 진행"하는 공짜 스킵이 되지 않게)
   timeoutWave() {
     if (this.state !== 'wave') return;
-    this.spawnQueue = []; this.activeSpawns = 0;
     this.state = 'idle';
     this.onWaveTimerChange && this.onWaveTimerChange(0, this.waveTimeLimit);
     this.onWaveTimeout && this.onWaveTimeout(0, this.enemies.length);
@@ -332,8 +342,14 @@ class GameEngine {
     const enemy = new Enemy(item.type, path, this);
 
     // v27-5: 웨이브 진행에 따른 연속 체력 스케일링 (기존엔 티어 전환/사이클 외엔 몹 자체 체력이 안 늘었음)
+    // v27-11: 90웨이브 이후(왕 처치 후 무한강화) 체력 스케일링을 훨씬 가파르게 - 기존엔 웨이브 220에서도
+    // 3.94배 수준이라 계속 도배해서 잡을 수 있었음. 이제 90 이후로는 복합 성장으로 훨씬 위협적이게.
     if (!item.isKing && !item.bossTier && this.currentWave > 10) {
-      const waveHpMul = 1 + (this.currentWave - 10) * 0.014;
+      let waveHpMul = 1 + (this.currentWave - 10) * 0.014;
+      if (this.currentWave > 90) {
+        const post = this.currentWave - 90;
+        waveHpMul *= Math.pow(1 + post * 0.035, 1.3);
+      }
       enemy.maxHp = Math.round(enemy.maxHp * waveHpMul);
       enemy.hp = enemy.maxHp;
     }

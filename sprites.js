@@ -218,11 +218,14 @@ function computeSpriteBounds(img, path) {
     const data = cctx.getImageData(0, 0, cw, ch).data;
     let minX = cw, minY = ch, maxX = 0, maxY = 0, found = false;
     const ALPHA_THRESHOLD = 10;
+    const WHITE_THRESHOLD = 245; // v27-11: 투명배경이 아니라 흰배경 그대로인 이미지도 있어서 흰색도 배경으로 취급
     // 성능을 위해 2px 간격으로 샘플링 (충분히 정확하면서 빠름)
     for (let y = 0; y < ch; y += 2) {
       for (let x = 0; x < cw; x += 2) {
-        const a = data[(y * cw + x) * 4 + 3];
-        if (a > ALPHA_THRESHOLD) {
+        const i = (y * cw + x) * 4;
+        const a = data[i+3];
+        const isWhiteBg = a > 200 && data[i] > WHITE_THRESHOLD && data[i+1] > WHITE_THRESHOLD && data[i+2] > WHITE_THRESHOLD;
+        if (a > ALPHA_THRESHOLD && !isWhiteBg) {
           found = true;
           if (x < minX) minX = x;
           if (x > maxX) maxX = x;
@@ -439,9 +442,9 @@ function drawTogepiBody(ctx, x, y, size, color, info, facing) {
 }
 
 const HeroDrawFns = {
-  pikachu: makeImageDrawFn('assets/heroes/pikachu.png', { scale: 1.5 }),
-  mew: makeImageDrawFn('assets/heroes/mew.png', { scale: 1.5 }),
-  togepi: makeImageDrawFn('assets/heroes/togepi.png', { scale: 1.5 }),
+  pikachu: makeImageDrawFn('assets/heroes/pikachu.png', { scale: 1.05 }),
+  mew: makeImageDrawFn('assets/heroes/mew.png', { scale: 1.05 }),
+  togepi: makeImageDrawFn('assets/heroes/togepi.png', { scale: 1.05 }),
 };
 
 window.AnimState = AnimState;

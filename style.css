@@ -369,8 +369,9 @@ html, body {
 .skin-picker {
   position:absolute; inset:0;
   background:rgba(0,0,0,0.85); z-index:300;
-  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  display:flex; flex-direction:column; align-items:center; justify-content:flex-start;
   gap:20px; padding:24px;
+  overflow-y:auto; /* v27-12: 내용이 화면보다 길면 스크롤해서 닫기버튼까지 도달 가능하게 (요청) */
 }
 .skin-picker-title {
   font-family:var(--font-px); font-size:13px;
@@ -487,21 +488,8 @@ html, body {
 .end-unlock-msg { font-size:12px; color:var(--accent-pur); text-align:center; }
 
 /* ===== RESPONSIVE ===== */
-/* v27-9: 가로모드 강제가 안 먹히는 환경(카톡 인앱브라우저, 모바일 사파리 등) 대응.
-   기존엔 화면을 가리고 "돌려주세요"만 안내했는데, 그러면 애초에 가로고정이 안 되는 환경에선
-   영원히 플레이가 불가능했음. 대신 웹게임에서 흔히 쓰는 방식으로 화면 자체를 CSS로 90도 돌려서
-   세로로 들고 있어도 실제로 플레이 가능하게 함. */
-#rotate-overlay { display:none; }
-@media (orientation:portrait) and (max-width:900px) {
-  html, body { overflow:hidden; }
-  #app {
-    position:fixed;
-    width:100vh; height:100vw;
-    top:50%; left:50%;
-    transform:translate(-50%,-50%) rotate(90deg);
-    transform-origin:center center;
-  }
-}
+/* v27-12: 가로 강제 회전트릭 제거 (요청 - 계속 가로/세로 왔다갔다 하며 꼬이던 문제).
+   이제 세로모드를 기본으로 그대로 사용. 캔버스/트랙은 w,h 비율 기반이라 세로에서도 정상 렌더링됨. */
 
 /* ===== 경로 선택 버튼 ===== */
 .tp-path-a {
@@ -522,8 +510,9 @@ html, body {
   position:absolute; inset:0;
   background:rgba(0,0,0,0.88); z-index:300;
   display:flex; flex-direction:column;
-  align-items:center; justify-content:center;
+  align-items:center; justify-content:flex-start;
   gap:18px; padding:24px;
+  overflow-y:auto; /* v27-12: 내용이 화면보다 길면 스크롤해서 닫기버튼까지 도달 가능하게 (요청) */
 }
 .skilltree-title {
   font-family:var(--font-px); font-size:12px;
