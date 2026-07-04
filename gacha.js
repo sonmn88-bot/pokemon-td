@@ -389,16 +389,13 @@ function rollTower(tableKey) {
 function _computeTypeBuffMuls(type) {
   const level = TypeUpgradeLevels[type] || 0;
   let dmg = 1, range = 1, speed = 1;
-  // v27-8 버그수정: buff가 'dmg'/'range'/'speed'/'all'이 아닌 티어(slow/chain/poison/target)는
-  // 지금까지 실제 특수효과 구현이 없어서 완전히 아무 효과 없이 돈만 나갔던 치명적 버그였음.
-  // 전용 효과 구현 전까지는 데미지로 환산해서 최소한 "업그레이드가 의미있게" 만듦.
-  const FLAVOR_ONLY_BUFFS = ['slow', 'chain', 'poison', 'target'];
+  // v27-10: 요청 반영 - 어떤 타입/단계를 올리든 항상 데미지가 오르도록 통일 (기존엔 물=사거리만, 전기=공속만 식으로
+  // 타입에 따라 데미지가 전혀 안 오르는 경우가 있어서 "속성 업글했는데 공격력이 안 오른다"는 혼란이 있었음)
   for (let i = 0; i < level; i++) {
     const u = getTypeUpgradeAt(type, i); // v27-4: 무한티어 대응 (5단계 이후도 소급적용)
-    const isFlavor = FLAVOR_ONLY_BUFFS.includes(u.buff);
-    if (u.buff === 'dmg' || u.buff === 'all' || isFlavor) dmg *= (1 + (isFlavor ? u.val * 0.6 : u.val));
-    if (u.buff === 'range' || u.buff === 'all') range *= (1 + u.val);
-    if (u.buff === 'speed' || u.buff === 'all') speed *= (1 + u.val);
+    dmg *= (1 + u.val);                                  // 항상 데미지 적용
+    if (u.buff === 'range' || u.buff === 'all') range *= (1 + u.val); // 추가로 사거리도
+    if (u.buff === 'speed' || u.buff === 'all') speed *= (1 + u.val); // 추가로 공속도
   }
   return { dmg, range, speed };
 }
@@ -526,9 +523,13 @@ function _createGachaTower(def, x, y, engine) {
       const gradeBonus={normal:0,rare:2,epic:5,legend:7,unique:10};
       const sz=34+(gradeBonus[def.grade]||0);
       if(img&&img.complete&&img.naturalWidth>0){
-        const asp=img.naturalWidth/img.naturalHeight;
+        // v27-10: 이미지 여백 자동크롭 적용 - 스프라이트마다 다른 여백 비율을 통일해서 원 안에 고르게 꽉 차 보이게
+        const b = window.SpriteBoundsCache?.[imgPath];
+        const nw = b ? b.w : img.naturalWidth, nh = b ? b.h : img.naturalHeight;
+        const asp=nw/nh;
         const dw=asp>=1?sz:sz*asp, dh=asp>=1?sz/asp:sz;
-        ctx.drawImage(img,this.x-dw/2,this.y-dh/2,dw,dh);
+        if (b) ctx.drawImage(img, b.x, b.y, b.w, b.h, this.x-dw/2, this.y-dh/2, dw, dh);
+        else ctx.drawImage(img,this.x-dw/2,this.y-dh/2,dw,dh);
       } else {
         ctx.font=`${sz*0.8}px serif`; ctx.textAlign='center'; ctx.textBaseline='middle';
         ctx.fillText(def.emoji,this.x,this.y);
@@ -617,12 +618,10 @@ function applyTypeUpgrade(type, engine) {
   if(!engine.spendGold(upg.cost)) return false;
   TypeUpgradeLevels[type]++;
   const color = TYPES[type].color;
-  const FLAVOR_ONLY_BUFFS = ['slow', 'chain', 'poison', 'target'];
-  const isFlavor = FLAVOR_ONLY_BUFFS.includes(upg.buff);
-  // 해당 타입 타워 전체에 버프 적용 + 어떤 타워가 버프받는지 색깔 링으로 명확히 표시
+  // v27-10: 어떤 타입/단계든 항상 데미지가 오르도록 통일
   for(const t of engine.towers){
     if(!t.def||t.def.type!==type) continue;
-    if(upg.buff==='dmg'||upg.buff==='all'||isFlavor) t.buffDmgMul=(t.buffDmgMul||1)*(1+(isFlavor?upg.val*0.6:upg.val));
+    t.buffDmgMul=(t.buffDmgMul||1)*(1+upg.val);
     if(upg.buff==='range'||upg.buff==='all') t.buffRangeMul=(t.buffRangeMul||1)*(1+upg.val);
     if(upg.buff==='speed'||upg.buff==='all') t._shopSpeedMul=(t._shopSpeedMul||1)*(1+upg.val);
     if(window.AoeBurst) engine.particles.push(new AoeBurst(t.x,t.y,44,color));

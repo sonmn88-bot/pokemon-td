@@ -199,8 +199,49 @@ function loadSpriteImage(path) {
   const img = new Image();
   img.src = path;
   SpriteImageCache[path] = img;
+  img.addEventListener('load', () => computeSpriteBounds(img, path));
   return img;
 }
+
+// v27-10: 이미지마다 투명여백 양이 달라서 같은 박스 크기로 그려도 어떤 캐릭터는 작게, 어떤 건 꽉 차게 보이던 문제.
+// 로드되면 한 번 픽셀을 스캔해서 실제 캐릭터가 차지하는 영역(여백 제외)만 찾아두고, 그리기할 땐 그 영역만
+// 잘라서 그리도록 해서 모든 스프라이트가 원 안에 비슷한 비율로 꽉 차 보이게 함.
+const SpriteBoundsCache = {};
+function computeSpriteBounds(img, path) {
+  try {
+    const cw = img.naturalWidth, ch = img.naturalHeight;
+    if (!cw || !ch) return;
+    const c = document.createElement('canvas');
+    c.width = cw; c.height = ch;
+    const cctx = c.getContext('2d');
+    cctx.drawImage(img, 0, 0);
+    const data = cctx.getImageData(0, 0, cw, ch).data;
+    let minX = cw, minY = ch, maxX = 0, maxY = 0, found = false;
+    const ALPHA_THRESHOLD = 10;
+    // 성능을 위해 2px 간격으로 샘플링 (충분히 정확하면서 빠름)
+    for (let y = 0; y < ch; y += 2) {
+      for (let x = 0; x < cw; x += 2) {
+        const a = data[(y * cw + x) * 4 + 3];
+        if (a > ALPHA_THRESHOLD) {
+          found = true;
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+        }
+      }
+    }
+    if (found) {
+      // 살짝 여유(4%) 남겨서 너무 빡빡하게 잘리지 않게
+      const padX = (maxX - minX) * 0.04, padY = (maxY - minY) * 0.04;
+      SpriteBoundsCache[path] = {
+        x: Math.max(0, minX - padX), y: Math.max(0, minY - padY),
+        w: Math.min(cw, maxX - minX + padX * 2), h: Math.min(ch, maxY - minY + padY * 2),
+      };
+    }
+  } catch (e) { /* 캔버스 보안오류 등은 무시하고 원본 그대로 사용 */ }
+}
+window.SpriteBoundsCache = SpriteBoundsCache;
 
 // 이미지 기반 그리기 함수 팩토리
 // SpriteRig의 drawFn 시그니처(ctx, x, y, size, color, info, facing)를 그대로 따른다.

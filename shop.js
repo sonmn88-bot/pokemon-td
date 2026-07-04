@@ -54,7 +54,7 @@ const ShopItems = [
         for (const s of engine.towerSlots) minDist = Math.min(minDist, Math.hypot(s.x-x, s.y-y));
         if (minDist > bestMinDist) { bestMinDist = minDist; best = {x,y}; }
       }
-      if (best && bestMinDist > 46) {
+      if (best && bestMinDist > 62) {
         engine.towerSlots.push({ x: best.x, y: best.y, occupied: false, tower: null });
         engine.spawnFloatingText('🏗️ 새 슬롯 확보!', best.x, best.y, '#06d6a0');
       } else {

@@ -1,5 +1,13 @@
 // ===== HEROES.JS - 영웅 3종 + 스킬트리 + 스킨 시스템 =====
 
+// v27-10: 영웅별 속성 매핑 (요청5 - 어떤 타입강화가 이 영웅에게 적용되는지 UI에 표시하기 위해)
+const HERO_TYPE_MAP = {
+  pikachu:'electric', raichu:'electric',
+  togepi:'normal', togetic:'normal',
+  eevee:'normal', vaporeon:'water', jolteon:'electric', flareon:'fire',
+};
+window.HERO_TYPE_MAP = HERO_TYPE_MAP;
+
 // ===== 스킨 정의 =====
 const SkinDefs = {
   pikachu: {
@@ -505,20 +513,12 @@ class Hero {
 
   // v27-8: 영웅도 해당 속성의 타입강화 영향을 받도록 추가 (기존엔 전혀 반영 안 되고 있었음)
   _typeUpgradeDmgMul() {
-    const HERO_TYPE_MAP = {
-      pikachu:'electric', raichu:'electric',
-      togepi:'normal', togetic:'normal',
-      eevee:'normal', vaporeon:'water', jolteon:'electric', flareon:'fire',
-    };
     const type = HERO_TYPE_MAP[this.evolved || this.id];
     if (!type || !window.getTypeUpgradeAt || !window.TypeUpgradeLevels) return 1;
     const level = window.TypeUpgradeLevels[type] || 0;
-    const FLAVOR_ONLY = ['slow','chain','poison','target'];
     let mul = 1;
     for (let i = 0; i < level; i++) {
-      const u = window.getTypeUpgradeAt(type, i);
-      const isFlavor = FLAVOR_ONLY.includes(u.buff);
-      if (u.buff === 'dmg' || u.buff === 'all' || isFlavor) mul *= (1 + (isFlavor ? u.val * 0.6 : u.val));
+      mul *= (1 + window.getTypeUpgradeAt(type, i).val); // v27-10: 항상 데미지 반영으로 통일
     }
     return mul;
   }

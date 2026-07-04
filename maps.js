@@ -16,7 +16,7 @@ const MapDefs = {
     slotGrid: {cols:5, rows:4},
 
     getPaths(w, h) {
-      const mx = w*0.09, my = h*0.13;
+      const mx = w*0.15, my = h*0.20; // v27-10: 트랙을 가운데로 모음 (요청1 - 가장자리 여유 확보)
       return [[
         {x:mx, y:my}, {x:w-mx, y:my}, {x:w-mx, y:h-my}, {x:mx, y:h-my}, {x:mx, y:my}
       ]];
@@ -25,7 +25,7 @@ const MapDefs = {
     getSlots(w, h) {
       const slots = [];
       const cols=5, rows=4;
-      const x0=w*0.20, x1=w*0.80, y0=h*0.26, y1=h*0.82;
+      const x0=w*0.26, x1=w*0.74, y0=h*0.32, y1=h*0.76; // v27-10: 슬롯 간격 좁힘 (요청1)
       for (let r=0; r<rows; r++) {
         for (let c=0; c<cols; c++) {
           slots.push({
@@ -80,7 +80,7 @@ const MapDefs = {
 
     // v27-3: 존 전환해도 타워 위치가 깨지지 않도록 3맵 모두 동일한 트랙/슬롯 좌표 사용 (숲맵 기준 통일)
     getPaths(w, h) {
-      const mx = w*0.09, my = h*0.13;
+      const mx = w*0.15, my = h*0.20; // v27-10: 트랙을 가운데로 모음 (요청1 - 가장자리 여유 확보)
       return [[
         {x:mx, y:my}, {x:w-mx, y:my}, {x:w-mx, y:h-my}, {x:mx, y:h-my}, {x:mx, y:my}
       ]];
@@ -89,7 +89,7 @@ const MapDefs = {
     getSlots(w, h) {
       const slots = [];
       const cols=5, rows=4;
-      const x0=w*0.20, x1=w*0.80, y0=h*0.26, y1=h*0.82;
+      const x0=w*0.26, x1=w*0.74, y0=h*0.32, y1=h*0.76; // v27-10: 슬롯 간격 좁힘 (요청1)
       for (let r=0; r<rows; r++) {
         for (let c=0; c<cols; c++) {
           slots.push({
@@ -136,7 +136,7 @@ const MapDefs = {
 
     // v27-3: 존 전환해도 타워 위치가 깨지지 않도록 3맵 모두 동일한 트랙/슬롯 좌표 사용 (숲맵 기준 통일)
     getPaths(w, h) {
-      const mx = w*0.09, my = h*0.13;
+      const mx = w*0.15, my = h*0.20; // v27-10: 트랙을 가운데로 모음 (요청1 - 가장자리 여유 확보)
       return [[
         {x:mx, y:my}, {x:w-mx, y:my}, {x:w-mx, y:h-my}, {x:mx, y:h-my}, {x:mx, y:my}
       ]];
@@ -145,7 +145,7 @@ const MapDefs = {
     getSlots(w, h) {
       const slots = [];
       const cols=5, rows=4;
-      const x0=w*0.20, x1=w*0.80, y0=h*0.26, y1=h*0.82;
+      const x0=w*0.26, x1=w*0.74, y0=h*0.32, y1=h*0.76; // v27-10: 슬롯 간격 좁힘 (요청1)
       for (let r=0; r<rows; r++) {
         for (let c=0; c<cols; c++) {
           slots.push({

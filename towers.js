@@ -90,14 +90,19 @@ class Projectile {
   hit(enemy) {
     if (!enemy || enemy.dead) return;
     enemy.takeDamage(this.damage, this.dmgType);
-    if (this.status) enemy.applyStatus(this.status.type, this.status.duration, this.status.factor);
-    if (this.knockback > 0) enemy.distTraveled = Math.max(0, enemy.distTraveled - this.knockback);
+    // v27-10: 스턴은 지금까지 맞을 때마다 100% 발동이었음 - 확률제(35%)로 변경해서
+    // 전기타워 연사에 계속 멈춰있던 문제를 근본적으로 완화 (다른 상태이상은 그대로 100% 유지)
+    if (this.status && (this.status.type !== 'stun' || Math.random() < 0.35)) {
+      enemy.applyStatus(this.status.type, this.status.duration, this.status.factor);
+    }
+    // v27-10: 넉백도 매타격 100%였던 것을 확률제(40%)로 변경 (요청6 - 거북왕 등 넉백이 너무 세서 진행 자체가 막히던 문제)
+    if (this.knockback > 0 && Math.random() < 0.40) enemy.distTraveled = Math.max(0, enemy.distTraveled - this.knockback);
     if (this.splash > 0 && this.engine) {
       for (const e of this.engine.enemies) {
         if (e === enemy || e.dead || e.reachedEnd) continue;
         if (Math.hypot(e.x - enemy.x, e.y - enemy.y) < this.splash) {
           e.takeDamage(this.damage * 0.6, this.dmgType);
-          if (this.status) e.applyStatus(this.status.type, this.status.duration * 0.6, this.status.factor);
+          if (this.status && (this.status.type !== 'stun' || Math.random() < 0.35)) e.applyStatus(this.status.type, this.status.duration * 0.6, this.status.factor);
         }
       }
       this.engine && this.engine.particles.push(new BurstRing(enemy.x, enemy.y, this.splash, this.color));
@@ -119,7 +124,7 @@ class Projectile {
     nearest._chainedBy = this;
     this.engine.particles.push(new ChainBolt(from.x, from.y, nearest.x, nearest.y));
     nearest.takeDamage(this.damage * 0.7, this.dmgType);
-    if (this.status) nearest.applyStatus(this.status.type, this.status.duration, this.status.factor);
+    if (this.status && (this.status.type !== 'stun' || Math.random() < 0.35)) nearest.applyStatus(this.status.type, this.status.duration, this.status.factor);
     this._doChain(nearest, rem - 1);
   }
 

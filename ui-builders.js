@@ -215,7 +215,9 @@ Object.assign(App.prototype, {
       infoCol.style.cssText = 'display:flex;flex-direction:column;align-items:flex-start;min-width:64px;';
       const label = document.createElement('div');
       label.className = 'hero-skills-label';
-      label.textContent = `${hero.skin.emoji} ${hero.name} Lv${hero.level}`;
+      const _ht = window.HERO_TYPE_MAP?.[hero.evolved || hero.id];
+      const _ti = _ht ? window.TYPES?.[_ht] : null;
+      label.textContent = `${hero.skin.emoji} ${hero.name} Lv${hero.level} ${_ti ? _ti.emoji : ''}`;
       infoCol.appendChild(label);
 
       const expOuter = document.createElement('div');
@@ -271,7 +273,11 @@ Object.assign(App.prototype, {
         expInner.style.width = `${Math.min(100, (hero.exp/hero.expToNext)*100)}%`;
         const grp = expInner.closest('.hero-skills-group');
         const lbl = grp?.querySelector('.hero-skills-label');
-        if (lbl) lbl.textContent = `${hero.skin.emoji} ${hero.name} Lv${hero.level}`;
+        if (lbl) {
+          const _ht2 = window.HERO_TYPE_MAP?.[hero.evolved || hero.id];
+          const _ti2 = _ht2 ? window.TYPES?.[_ht2] : null;
+          lbl.textContent = `${hero.skin.emoji} ${hero.name} Lv${hero.level} ${_ti2 ? _ti2.emoji : ''}`;
+        }
       }
       hero.def.skills.forEach((skill, idx) => {
         const btn = bar.querySelector(`.skill-btn[data-hero-id="${hero.id}"][data-skill-idx="${idx}"]`);
@@ -366,10 +372,7 @@ Object.assign(App.prototype, {
       btn.dataset.spellKey = key;
       btn.innerHTML = `
         <span class="spell-emoji">${spell.emoji}</span>
-        <div style="display:flex;flex-direction:column;align-items:flex-start;gap:1px">
-          <span class="spell-name" style="font-size:11px;font-weight:700">${spell.name}</span>
-          <span style="font-size:9px;color:#888;line-height:1.2">${spell.desc}</span>
-        </div>
+        <span class="spell-name" style="font-size:10px;font-weight:700">${spell.name}</span>
         <span class="spell-cd"></span>
       `;
       btn.title = `${spell.name}: ${spell.desc} (쿨타임 ${spell.cooldown}초)`;

@@ -270,6 +270,7 @@ class Enemy {
     this.slowed = 0;        // 슬로우 잔여 시간
     this.slowFactor = 1;    // 0~1
     this.stunned = 0;       // 스턴 잔여 시간
+    this._stunImmune = 0;   // v27-10: 스턴 면역 잔여시간 (연속스턴락 방지)
     this.burning = 0;       // 화상 잔여 시간
     this.burnDamage = 0;
     this.poisoned = 0;      // 독 잔여 시간
@@ -296,9 +297,11 @@ class Enemy {
     // 스턴 중이면 이동 안 함
     if (this.stunned > 0) {
       this.stunned -= dt;
+      if (this.stunned <= 0) this._stunImmune = 1.8; // v27-10: 스턴 풀리면 잠깐 면역시간 부여 (연속스턴락 방지)
     } else if (this.frozen > 0) {
       this.frozen -= dt;
     } else {
+      if (this._stunImmune > 0) this._stunImmune -= dt;
       // 이동 속도
       let spd = this.speed;
       if (this.slowed > 0) {
@@ -420,10 +423,12 @@ class Enemy {
         break;
       case 'stun':
         if (this.def.stunResist) duration *= (1 - this.def.stunResist);
-        // v27-8: 스턴 지속시간 상한 + 이미 스턴 상태면 갱신량 감쇠 (여러 타워가 연속으로 걸어서 사실상 무한잠금되던 문제)
-        duration = Math.min(duration, 1.2);
+        // v27-10: 스턴 면역시간 도입 - 스턴 풀린 직후 1.8초간은 새 스턴이 15%만 반영됨
+        if (this._stunImmune > 0) duration *= 0.15;
+        // v27-10: 발동 자체가 35% 확률로 줄었으니, 발동했을 때는 조금 더 확실히 멈추도록 상한 상향(1.2→1.6초)
+        duration = Math.min(duration, 1.6);
         if (this.stunned > 0) {
-          this.stunned = Math.min(1.2, this.stunned + duration * 0.35);
+          this.stunned = Math.min(1.6, this.stunned + duration * 0.35);
         } else if (duration > this.stunned) {
           this.stunned = duration;
         }
@@ -560,16 +565,20 @@ class Enemy {
 
     if (img && img.complete && img.naturalWidth > 0) {
       const drawSize = s * 1.7;
+      // v27-10: 이미지 여백 자동크롭 적용
+      const b = window.SpriteBoundsCache?.[imgPath];
       if (this.flashTimer > 0) {
         // 피격 시 흰색 실루엣 오버레이
         ctx.save();
-        ctx.drawImage(img, this.x - drawSize / 2, drawY - drawSize / 2, drawSize, drawSize);
+        if (b) ctx.drawImage(img, b.x, b.y, b.w, b.h, this.x - drawSize / 2, drawY - drawSize / 2, drawSize, drawSize);
+        else ctx.drawImage(img, this.x - drawSize / 2, drawY - drawSize / 2, drawSize, drawSize);
         ctx.globalCompositeOperation = 'source-atop';
         ctx.fillStyle = 'rgba(255,255,255,0.75)';
         ctx.fillRect(this.x - drawSize / 2, drawY - drawSize / 2, drawSize, drawSize);
         ctx.restore();
       } else {
-        ctx.drawImage(img, this.x - drawSize / 2, drawY - drawSize / 2, drawSize, drawSize);
+        if (b) ctx.drawImage(img, b.x, b.y, b.w, b.h, this.x - drawSize / 2, drawY - drawSize / 2, drawSize, drawSize);
+        else ctx.drawImage(img, this.x - drawSize / 2, drawY - drawSize / 2, drawSize, drawSize);
       }
     } else {
       // 폴백: 도형 + 이모지

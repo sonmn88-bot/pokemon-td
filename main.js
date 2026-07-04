@@ -102,18 +102,8 @@ function seq(type, count, interval, pathIdx = 0, startDelay = 0) {
 // 순환 트랙 제한시간: 마지막 스폰 시각 + 처치 여유시간(난이도별 가감)
 // 여유시간은 실제 트랙 한 바퀴 길이(화면 크기에 비례)를 기준으로 계산 — 큰 화면일수록 트랙이 길어지므로 시간도 늘어나야 함
 function waveTimeLimit(wave, difficulty, engine) {
-  const lastDelay = wave.reduce((m, item) => Math.max(m, item.delay), 0);
-  const dm = (window.DifficultyMods && window.DifficultyMods[difficulty]) || { timeBonus: 0 };
-
-  let lapBuffer = 40; // 폴백값 (engine/paths 없을 때)
-  if (engine && engine.paths && engine.paths[0] && typeof totalPathLength === 'function') {
-    const lapLen = totalPathLength(engine.paths[0]);
-    const baselineSpeed = 75; // 대략적인 평균 이동속도(px/s)
-    const lapTime = lapLen / baselineSpeed;
-    lapBuffer = lapTime * 2.6; // 최소 2.6바퀴는 돌 수 있는 여유
-  }
-  const killBuffer = lapBuffer + dm.timeBonus;
-  return Math.max(30, Math.round(lastDelay + killBuffer));
+  // v27-10: 복잡한 랩타임 기반 계산 대신 100초 고정으로 단순화 (요청: 웨이브 시간이 너무 길었음)
+  return 100;
 }
 
 // ===== APP CONTROLLER =====
@@ -454,7 +444,10 @@ class App {
   }
 
   bindButtons() {
-    this.els.btnWave.addEventListener('click', () => this.sendWave());
+    this.els.btnWave.addEventListener('click', () => {
+      if (this.engine && this.engine.state === 'wave') this._skipWave();
+      else this.sendWave();
+    });
     this.els.btnBack.addEventListener('click', () => this.backToMapSelect());
     this.els.btnMenu.addEventListener('click', () => this.togglePause());
     const btnMission = document.getElementById('btn-mission');
@@ -1123,10 +1116,10 @@ class App {
           let px = x, py = y;
           for (const s of this.engine.towerSlots) {
             const d = Math.hypot(s.x - px, s.y - py);
-            if (d < 45) {
+            if (d < 60) {
               const angle = Math.atan2(py - s.y, px - s.x) || Math.random() * Math.PI * 2;
-              px = s.x + Math.cos(angle) * 46;
-              py = s.y + Math.sin(angle) * 46;
+              px = s.x + Math.cos(angle) * 61;
+              py = s.y + Math.sin(angle) * 61;
             }
           }
           px = Math.max(20, Math.min(this.engine.width - 20, px));
@@ -1272,8 +1265,11 @@ class App {
       document.getElementById('game-screen').appendChild(panel);
     }
     const expPct = Math.min(100, Math.round((hero.exp / hero.expToNext) * 100));
+    const heroType = window.HERO_TYPE_MAP?.[hero.evolved || hero.id];
+    const typeInfo = heroType ? window.TYPES?.[heroType] : null;
+    const typeTag = typeInfo ? `<span style="color:${typeInfo.color}">${typeInfo.emoji} ${typeInfo.name}속성</span>` : '';
     panel.innerHTML = `
-      <div class="tower-panel-name">${hero.skin.emoji} ${hero.name} Lv${hero.level}</div>
+      <div class="tower-panel-name">${hero.skin.emoji} ${hero.name} Lv${hero.level} ${typeTag}</div>
       <div class="tower-panel-stats">⚔️${Math.round(hero.attackDamage)} · 📏${Math.round(hero.attackRange)} · ✨EXP ${expPct}%</div>
       <div style="font-size:10px;color:#aaa;margin:2px 0">${hero.def.passive || ''}</div>
       <div class="tower-panel-btns">
@@ -1330,6 +1326,13 @@ class App {
     });
   }
 
+  // v27-10: 웨이브 강제 스킵 (요청8 - 잔여 몹 1마리 때문에 100초를 다 기다려야 하던 문제)
+  _skipWave() {
+    if (!this.engine || this.engine.state !== 'wave') return;
+    this.engine.timeoutWave();
+    this.showWaveAnnounce('⏭ 웨이브 스킵! (남은 적은 필드에 그대로 남음)', '#ffab40');
+  }
+
   sendWave() {
     const e = this.engine;
     if (!e || e.state !== 'idle') return;
@@ -1380,8 +1383,8 @@ class App {
     const isBossOrKingWave = nextWave === KING_WAVE || nextWave % 10 === 0;
     const timeLimit = isBossOrKingWave ? 22 : waveTimeLimit(wave, this.difficulty, this.engine);
     if (e.startWave(wave, timeLimit)) {
-      this.els.btnWave.disabled = true;
-      this.els.btnWave.textContent = '⏳ 진행 중...';
+      this.els.btnWave.disabled = false;
+      this.els.btnWave.textContent = '⏭ 스킵 (남은 적 놔두고 진행)';
       setTimeout(() => this.showWaveAnnounce(`Wave ${e.currentWave}`, '#ffd60a'), 100);
     }
   }
