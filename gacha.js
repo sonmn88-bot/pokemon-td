@@ -46,7 +46,7 @@ const GachaTowerDefs = {
   bulbasaur: {
     id:'bulbasaur', name:'이상해씨', emoji:'🌱', grade:'normal', type:'grass', pokemonId:'bulbasaur',
     damage:12, range:185, fireRate:1.2, desc:'독 DoT 부여',
-    fire(t,e){ _shot(t,e,'#8bc34a','🍃',{type:'poison',duration:3,factor:6},340); }
+    fire(t,e){ _shot(t,e,'#8bc34a','🍃',{type:'poison',duration:4,factor:11},340); }
   },
   charmander: {
     id:'charmander', name:'파이리', emoji:'🦎', grade:'normal', type:'fire', pokemonId:'charmander',
@@ -90,7 +90,7 @@ const GachaTowerDefs = {
     id:'oddish', name:'뚜벅초', emoji:'🌿', grade:'normal', type:'grass', pokemonId:'oddish',
     damage:10, range:180, fireRate:1.1, desc:'광역 독 포자',
     fire(t,e){
-      _shot(t,e,'#7cb342','🍃',{type:'poison',duration:3.5,factor:5},320);
+      _shot(t,e,'#7cb342','🍃',{type:'poison',duration:4.5,factor:10},320);
       t._sporeTimer=(t._sporeTimer||0)+1/t.fireRate;
       if(t._sporeTimer>=5){ t._sporeTimer=0;
         for(const en of e.enemies) if(!en.dead&&!en.reachedEnd&&Math.hypot(en.x-t.x,en.y-t.y)<=100) en.applyStatus('slow',2,0.7);
@@ -183,7 +183,7 @@ const GachaTowerDefs = {
     damage:50, range:240, fireRate:3.5, desc:'관통+폭발 25%',
     fire(t,e){
       e.projectiles.push(new Projectile(t.x,t.y,t.target,{engine:e,speed:520,damage:t.damage,color:'#ff7043',size:6,dmgType:'special',emoji:'🔥',piercing:true,pierceWidth:28,status:{type:'burn',duration:3,factor:10.5},
-        onHit:(en)=>{ if(Math.random()<0.25){ for(const e2 of e.enemies) if(Math.hypot(e2.x-en.x,e2.y-en.y)<70) e2.takeDamage(t.damage*1.2,'special'); e.particles.push(new AoeBurst(en.x,en.y,70,'#ff6f00')); }}}));
+        onHit:(en)=>{ if(Math.random()<0.25){ for(const e2 of e.enemies) if(e2!==en && !e2.dead && !e2.reachedEnd && Math.hypot(e2.x-en.x,e2.y-en.y)<70) e2.takeDamage(t.damage*0.6,'special'); e.particles.push(new AoeBurst(en.x,en.y,70,'#ff6f00')); }}}));
     }
   },
   blastoise: {
@@ -362,7 +362,7 @@ const MERGE_EVOLUTION = {
   horsea:'gyarados',     magneton:'zapdos',
   dratini:'dragonair',
   // 에픽 3개 → 레전드
-  charizard:'moltres',   blastoise:'articuno',    alakazam:'mewtwo',
+  charizard:'moltres',   blastoise:'articuno',    alakazam:'zapdos',
   gyarados:'articuno',   lapras:'articuno',       aerodactyl:'zapdos',
   dragonair:'dragonite',
   // 레전드 3개 → 유니크
@@ -633,15 +633,15 @@ function applyTypeUpgrade(type, engine) {
 
 // ===== 미션 =====
 const MissionDefs = [
-  {id:'first_rare',  name:'첫 레어!',    desc:'레어 타워 뽑기',       reward:30,  condition:(s)=>s.totalRareCount>=1},
-  {id:'first_epic',  name:'에픽 등장!',  desc:'에픽 타워 뽑기',       reward:60, condition:(s)=>s.totalEpicCount>=1},
+  {id:'first_rare',  name:'레어 수집가',    desc:'레어 타워 3개 뽑기',       reward:30,  condition:(s)=>s.totalRareCount>=3},
+  {id:'first_epic',  name:'에픽 수집가',  desc:'에픽 타워 3개 뽑기',       reward:60, condition:(s)=>s.totalEpicCount>=3},
   {id:'first_legend',name:'레전드!',     desc:'레전드 타워 뽑기',     reward:300, condition:(s)=>s.totalLegendCount>=1},
   {id:'first_unique',name:'유니크!',     desc:'유니크 타워 뽑기',     reward:500, condition:(s)=>s.totalUniqueCount>=1},
   {id:'first_merge', name:'첫 합치기!',  desc:'합치기로 진화',         reward:50, condition:(s)=>s.mergeCount>=1},
   {id:'merge5',      name:'합치기 장인', desc:'합치기 5회',            reward:200, condition:(s)=>s.mergeCount>=5},
-  {id:'combo10',     name:'콤보 10!',   desc:'콤보 10 달성',          reward:30,  condition:(s)=>s.maxCombo>=10},
+  {id:'combo10',     name:'콤보 20!',   desc:'콤보 20 달성',          reward:30,  condition:(s)=>s.maxCombo>=20},
   {id:'combo30',     name:'콤보 마스터',desc:'콤보 30 달성',           reward:200, condition:(s)=>s.maxCombo>=30},
-  {id:'wave5',       name:'웨이브 5',   desc:'웨이브 5 클리어',       reward:50, condition:(s)=>s.wavesCleared>=5},
+  {id:'wave5',       name:'웨이브 8',   desc:'웨이브 8 클리어',       reward:40, condition:(s)=>s.wavesCleared>=8},
   {id:'wave10',      name:'웨이브 10',  desc:'웨이브 10 클리어',      reward:100, condition:(s)=>s.wavesCleared>=10},
   {id:'boss1',       name:'보스 처치',  desc:'보스 처치',              reward:250, condition:(s)=>s.bossKills>=1},
   {id:'bosssummon1', name:'첫 소환!',   desc:'보스 소환 버튼으로 보스 1회 소환', reward:60, condition:(s)=>(s.bossSummons||0)>=1},
@@ -649,7 +649,7 @@ const MissionDefs = [
   {id:'wave90',      name:'3존 완주',   desc:'웨이브 90 도달 (엔드리스 3존 순환 완료)', reward:600, condition:(s)=>s.wavesCleared>=90},
   {id:'type_fire',   name:'불꽃 마스터',desc:'불꽃 타입 업그레이드 3단계',reward:300,condition:(s)=>(s.typeUpgrades?.fire||0)>=3},
   {id:'type_water',  name:'물 마스터',  desc:'물 타입 업그레이드 3단계',  reward:300,condition:(s)=>(s.typeUpgrades?.water||0)>=3},
-  {id:'towers8',     name:'군대 집결',  desc:'타워 8개 배치',          reward:60, condition:(s)=>s.maxTowersDeployed>=8},
+  {id:'towers8',     name:'군대 집결',  desc:'타워 14개 배치',          reward:60, condition:(s)=>s.maxTowersDeployed>=14},
   {id:'ten_pull',    name:'10연 도전',  desc:'10연 뽑기 1회',          reward:50, condition:(s)=>s.tenPullCount>=1},
   {id:'perfect5',    name:'완벽한 방어',desc:'시간초과 없이 웨이브 5 클리어',reward:70,condition:(s)=>s.wavesCleared>=5&&!s.timeouts},
   {id:'shadow_hunt', name:'흑화 사냥꾼',desc:'흑화(골드 엘리트) 5마리 처치',reward:200,condition:(s)=>(s.eliteGoldKills||0)>=5},
@@ -672,7 +672,7 @@ const MissionDefs = [
   {id:'gold2000',    name:'대부호', desc:'누적 골드 2000 획득', reward:80, condition:(s)=>(s.totalGoldEarned||0)>=2000},
   {id:'score1000',   name:'점수 1000 돌파', desc:'점수 1000 달성', reward:300, condition:(s)=>(s.maxScore||0)>=1000},
   // v27-5: 초반 유도미션 (요청C) - 초반에 할 일을 만들어줌
-  {id:'early_deploy', name:'초반 러시', desc:'웨이브 3 이내에 타워 4개 배치', reward:100, condition:(s)=>!!s.earlyDeploy4},
+  {id:'early_deploy', name:'초반 러시', desc:'웨이브 3 이내에 타워 6개 배치', reward:50, condition:(s)=>!!s.earlyDeploy4},
   {id:'first_synergy', name:'첫 궁합', desc:'타워 시너지 첫 발동 (같은/궁합 타입 150px 이내 배치)', reward:100, condition:(s)=>!!s.firstSynergy},
 ];
 

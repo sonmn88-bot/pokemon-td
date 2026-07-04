@@ -349,7 +349,7 @@ class App {
     if (!el) {
       el = document.createElement('div');
       el.id = 'field-warning-banner';
-      el.style.cssText = 'position:absolute;top:60px;left:50%;transform:translateX(-50%);z-index:50;padding:8px 18px;border-radius:10px;font-weight:bold;font-size:14px;pointer-events:none;transition:opacity 0.3s;';
+      el.style.cssText = 'position:absolute;top:8px;left:50%;transform:translateX(-50%);z-index:150;padding:6px 14px;border-radius:10px;font-weight:bold;font-size:12px;pointer-events:none;transition:opacity 0.3s;white-space:nowrap;';
       document.getElementById('game-screen').appendChild(el);
     }
     const colors = { 140: ['#3a2f00','#ffd60a'], 160: ['#3a1f00','#ff9800'], 180: ['#3a0000','#ff3b3b'] };
@@ -1068,6 +1068,14 @@ class App {
           document.getElementById('game-screen').appendChild(vig);
         }
         vig.classList.toggle('active', this.engine.enemies.length >= 180);
+        // v27-13: 필드 몬스터수 상시 HUD 갱신 (요청5 - 스킵 타이밍 판단용으로 항상 보여야 함)
+        const fcEl = document.getElementById('field-count-val');
+        if (fcEl) {
+          const cnt = this.engine.enemies.length;
+          fcEl.textContent = cnt;
+          const cell = document.getElementById('hud-field');
+          if (cell) cell.style.color = cnt >= 160 ? '#ff5252' : cnt >= 120 ? '#ffab40' : cnt >= 80 ? '#ffd60a' : '';
+        }
       }
       // v27-6: 최고 시너지 달성치 추적 (요청4 - 게임오버 요약화면 MVP용)
       if (this.engine.towers.length) {
@@ -1076,7 +1084,7 @@ class App {
       }
       // v27-5: 초반 유도미션용 트래킹 (요청C)
       if (this.missionTracker) {
-        if (this.engine.currentWave <= 3 && this.engine.towers.length >= 4) this.missionTracker.stats.earlyDeploy4 = true;
+        if (this.engine.currentWave <= 3 && this.engine.towers.length >= 6) this.missionTracker.stats.earlyDeploy4 = true;
         if (this.engine.towers.some(t => (t.synergyBonus||0) > 0)) this.missionTracker.stats.firstSynergy = true;
       }
       // 웨이브 진행 중 타이머 + 남은 적 표시

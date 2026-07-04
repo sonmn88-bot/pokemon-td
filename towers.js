@@ -96,7 +96,7 @@ class Projectile {
       enemy.applyStatus(this.status.type, this.status.duration, this.status.factor);
     }
     // v27-10: 넉백도 매타격 100%였던 것을 확률제(40%)로 변경 (요청6 - 거북왕 등 넉백이 너무 세서 진행 자체가 막히던 문제)
-    if (this.knockback > 0 && Math.random() < 0.40) enemy.distTraveled = Math.max(0, enemy.distTraveled - this.knockback);
+    if (this.knockback > 0 && Math.random() < 0.22) enemy.distTraveled = Math.max(0, enemy.distTraveled - this.knockback * 0.6);
     if (this.splash > 0 && this.engine) {
       for (const e of this.engine.enemies) {
         if (e === enemy || e.dead || e.reachedEnd) continue;

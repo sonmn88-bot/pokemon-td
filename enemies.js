@@ -418,7 +418,7 @@ class Enemy {
         if (duration > this.slowed) {
           this.slowed = duration;
           // v27-8: 슬로우 하한 완화 (요청3) - 최대 70%감속까지만 (거의 정지 방지)
-          this.slowFactor = Math.max(0.30, Math.min(this.slowFactor, factor || 0.5));
+          this.slowFactor = Math.max(0.42, Math.min(this.slowFactor, factor || 0.5));
         }
         break;
       case 'stun':
@@ -444,8 +444,10 @@ class Enemy {
         break;
       case 'poison':
         if (this.def.special === 'poisonImmune' || this.def.poisonImmune) return;
-        this.poisoned = duration;
-        this.poisonDamage = factor || 8;
+        if (this.poisoned <= 0.05) {
+          this.poisoned = duration;
+          this.poisonDamage = factor || 8;
+        }
         break;
       case 'freeze':
         if (this.def.special === 'iceImmune') return;

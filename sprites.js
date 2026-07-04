@@ -218,7 +218,7 @@ function computeSpriteBounds(img, path) {
     const data = cctx.getImageData(0, 0, cw, ch).data;
     let minX = cw, minY = ch, maxX = 0, maxY = 0, found = false;
     const ALPHA_THRESHOLD = 10;
-    const WHITE_THRESHOLD = 245; // v27-11: 투명배경이 아니라 흰배경 그대로인 이미지도 있어서 흰색도 배경으로 취급
+    const WHITE_THRESHOLD = 225; // v27-13: 완전 순백색이 아니라 약간 크림/오프화이트인 배경도 잡히도록 완화
     // 성능을 위해 2px 간격으로 샘플링 (충분히 정확하면서 빠름)
     for (let y = 0; y < ch; y += 2) {
       for (let x = 0; x < cw; x += 2) {
