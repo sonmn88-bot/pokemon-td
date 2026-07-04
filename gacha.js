@@ -60,13 +60,23 @@ const GachaTowerDefs = {
   },
   pidgey: {
     id:'pidgey', name:'구구', emoji:'🐦', grade:'normal', type:'normal', pokemonId:'pidgey',
-    damage:10, range:210, fireRate:2.2, desc:'빠른 연사, 비행 감지',
-    fire(t,e){ _shot(t,e,'#bcaaa4','🪶',null,520); }
+    damage:10, range:210, fireRate:2.2, desc:'비행형 적에게 데미지 +50%',
+    fire(t,e){
+      if(!t.target) return;
+      const dmg = t.target?.def?.special === 'flying' ? t.damage * 1.5 : t.damage;
+      e.projectiles.push(new Projectile(t.x,t.y,t.target,{engine:e,speed:520,damage:dmg,color:'#bcaaa4',size:5,dmgType:'special',emoji:'🪶'}));
+    }
   },
   rattata: {
     id:'rattata', name:'꼬렛', emoji:'🐭', grade:'normal', type:'normal', pokemonId:'rattata',
-    damage:9, range:160, fireRate:2.8, desc:'초고속 연사',
-    fire(t,e){ _shot(t,e,'#a1887f','🐭',null,420); }
+    damage:9, range:160, fireRate:2.8, desc:'같은 타겟 연속 공격시 데미지 누적(최대+50%)',
+    fire(t,e){
+      if(!t.target) return;
+      if(t._lastTarget===t.target){ t._biteStack=Math.min(5,(t._biteStack||0)+1); } else { t._biteStack=0; }
+      t._lastTarget=t.target;
+      const dmg=t.damage*(1+t._biteStack*0.1);
+      e.projectiles.push(new Projectile(t.x,t.y,t.target,{engine:e,speed:420,damage:dmg,color:'#a1887f',size:5,dmgType:'special',emoji:'🐭'}));
+    }
   },
   clefairy: {
     id:'clefairy', name:'피삐', emoji:'⭐', grade:'normal', type:'normal', pokemonId:'clefairy',
@@ -277,6 +287,28 @@ const GachaTowerDefs = {
   },
 };
 
+// v27-6: 도감 플레이버 텍스트 (요청3 - 짧은 원작 감성 문구, 타워패널에 표시)
+const FLAVOR_TEXT = {
+  bulbasaur:'등에 있는 씨앗에 영양분이 가득 차 있다.', charmander:'꼬리 불이 꺼지면 생명이 위험해진다.',
+  squirtle:'등껍질 속에서 몸을 웅크리면 방어력이 급상승.', pidgey:'겁이 많지만 날개짓만은 재빠르다.',
+  rattata:'무엇이든 갉아대는 습성 때문에 이빨이 계속 자란다.', clefairy:'보름달이 뜨면 춤을 춘다는 전설이 있다.',
+  oddish:'낮엔 땅에 몸을 묻고 밤에만 움직인다.', diglett:'지상에 보이는 건 몸의 일부일 뿐이다.',
+  psyduck:'늘 두통에 시달려서 머리를 감싸쥐고 있다.', growlithe:'충성심이 강해 주인을 끝까지 지킨다.',
+  abra:'하루의 대부분을 잠으로 보내며 힘을 모은다.', magnemite:'전자석의 힘으로 공중에 떠있다.',
+  charmeleon:'성격이 거칠어져 다루기 어려워진다.', wartortle:'복슬복슬한 꼬리는 나이의 상징.',
+  kadabra:'주위에 강한 염력파를 뿜어내 기계를 오작동시킨다.', geodude:'산길에 굴러다니는 바위로 착각하기 쉽다.',
+  gastly:'가스로 이루어진 몸이라 바람이 불면 흩어진다.', lickitung:'긴 혀로 뭐든 핥아서 맛을 확인한다.',
+  horsea:'꼬리를 감아 해초나 산호에 몸을 고정한다.', magneton:'마그네미트 세 마리가 강한 자력으로 뭉쳤다.',
+  dratini:'허물을 벗을 때마다 더 강해진다는 신비한 포켓몬.', charizard:'입에서 불꽃을 내뿜으면 근처 온도가 급상승.',
+  blastoise:'등의 대포는 물을 압축해서 쏘아낸다.', alakazam:'IQ 5000, 인류의 지혜를 초월했다는 두뇌.',
+  gyarados:'평소엔 얌전하지만 화나면 마을 하나를 가라앉힌다.', lapras:'사람을 태우고 바다를 건너주는 다정한 포켓몬.',
+  aerodactyl:'호박 속 화석에서 부활한 고대의 포켓몬.', dragonair:'몸의 구슬에 신비한 힘을 모은다는 전설.',
+  articuno:'날갯짓 한 번에 눈이 흩날린다는 전설의 새.', zapdos:'뇌운을 두르고 하늘을 가르는 전설의 새.',
+  moltres:'날개에서 떨어지는 불씨가 봄을 알린다는 전설.', dragonite:'바다에서 조난자를 육지까지 데려다준다는 이야기.',
+  mewtwo:'인류가 만들어낸 가장 강력하고 잔혹한 포켓몬.', mew:'모든 포켓몬의 유전자를 담고 있다는 환상의 포켓몬.',
+};
+window.FLAVOR_TEXT = FLAVOR_TEXT;
+
 // ===== v27: 밸런스 재설계 - 기본 스탯 전체 하향 (초반엔 약하게, 업그레이드 투자가 중요해지도록) =====
 // v27-3: 사거리 추가 하향 (0.93 -> 0.72) - 위치별 배치가 의미 있어지고, 사거리 강화템 구매가 가치있어지도록
 for (const id in GachaTowerDefs) {
@@ -289,6 +321,9 @@ for (const id in GachaTowerDefs) {
 // ===== 헬퍼 =====
 function _shot(tower, engine, color, emoji, status, speed, onHit, splash, knockback) {
   if (!tower.target) return;
+  // v27-6: MVP 집계용 데미지 출력량 트래킹 (요청4 - 게임오버 요약화면)
+  if (!engine._towerDamageStats) engine._towerDamageStats = {};
+  engine._towerDamageStats[tower._gachaId] = (engine._towerDamageStats[tower._gachaId] || 0) + tower.damage;
   engine.projectiles.push(new Projectile(tower.x, tower.y, tower.target, {
     engine, speed:speed||380, damage:tower.damage,
     color, size:5, dmgType:'special', emoji, status, onHit,
@@ -301,7 +336,7 @@ function _shot(tower, engine, color, emoji, status, speed, onHit, splash, knockb
 const PULL_TABLES = {
   normal:   [{grade:'normal',weight:62},{grade:'rare',weight:32},{grade:'epic',weight:5.5},{grade:'legend',weight:0.45},{grade:'unique',weight:0.05}],
   premium:  [{grade:'normal',weight:22},{grade:'rare',weight:50},{grade:'epic',weight:25},{grade:'legend',weight:2.8},{grade:'unique',weight:0.2}],
-  gamble:   [{grade:'normal',weight:12},{grade:'rare',weight:38},{grade:'epic',weight:43},{grade:'legend',weight:6.5},{grade:'unique',weight:0.5}],
+  gamble:   [{grade:'normal',weight:25},{grade:'rare',weight:42},{grade:'epic',weight:28},{grade:'legend',weight:4.5},{grade:'unique',weight:0.5}],
   ten_base: [{grade:'normal',weight:17},{grade:'rare',weight:53},{grade:'epic',weight:27},{grade:'legend',weight:2.8},{grade:'unique',weight:0.2}],
 };
 const PULL_COSTS = { normal:50, premium:120, gamble:320, ten:450 };
@@ -366,14 +401,17 @@ function _computeTypeBuffMuls(type) {
 // ===== 타워 생성 =====
 function _createGachaTower(def, x, y, engine) {
   const muls = _computeTypeBuffMuls(def.type);
+  // v27-5: 숙련도 (item2) - 같은 포켓몬을 중복으로 뽑을수록 그 포켓몬 전용 데미지 보너스 (합체 안 해도 저등급이 계속 쓸모 있어짐)
+  const masteryLv = (engine && engine._masteryLevel && engine._masteryLevel[def.id]) || 0;
+  const masteryMul = 1 + Math.min(20, masteryLv) * 0.02; // 중복 1개당 +2%, 최대 +40%(20중복)
   const t = {
     x, y, _gachaId:def.id, def,
     name:def.name, level:1, path:null, totalSpent:0,
     cooldown:0, fireFlash:0, _rotAngle:0,
-    synergyBonus:0, buffRangeMul:muls.range, buffDmgMul:muls.dmg, _shopSpeedMul:muls.speed, target:null,
+    synergyBonus:0, buffRangeMul:muls.range, buffDmgMul:muls.dmg, _shopSpeedMul:muls.speed, target:null, masteryMul,
     get range(){ return (def.range+(this.synergyBonus*2))*Math.min(this.buffRangeMul, BUFF_CAPS.range); },
     get damage(){
-      const base = (def.damage+this.synergyBonus)*Math.min(this.buffDmgMul, BUFF_CAPS.damage);
+      const base = (def.damage+this.synergyBonus)*Math.min(this.buffDmgMul, BUFF_CAPS.damage)*this.masteryMul;
       const mul = window.typeEffectiveness ? window.typeEffectiveness(def.type, this.target && this.target.typeTag) : 1;
       return base * mul;
     },
@@ -397,6 +435,7 @@ function _createGachaTower(def, x, y, engine) {
       this.cooldown-=dt;
       if(this.fireFlash>0) this.fireFlash-=dt;
       if(this._typeGlowTimer>0) this._typeGlowTimer-=dt;
+      if(this._evolveGlowTimer>0) this._evolveGlowTimer-=dt; // v27-5: 합체진화 연출 (item1)
       this._rotAngle+=dt*0.5;
       this.target=this.findTarget(enemies);
       if(this.target&&this.cooldown<=0){
@@ -409,13 +448,19 @@ function _createGachaTower(def, x, y, engine) {
       const grade=GRADES[def.grade];
       const typeInfo=TYPES[def.type]||TYPES.normal;
 
-      // 합치기 가능 링
+      // 합치기 가능 링 (3개 모임 - 초록)
       if(this.engine){
         const sameCount=this.engine.towerSlots.filter(s=>s.occupied&&s.tower?._gachaId===def.id).length;
         if(sameCount>=3){
           ctx.save(); ctx.beginPath(); ctx.arc(this.x,this.y,30,0,Math.PI*2);
           ctx.strokeStyle=`rgba(6,214,160,${0.5+Math.sin(Date.now()*0.006)*0.3})`;
           ctx.lineWidth=2.5; ctx.shadowColor='#06d6a0'; ctx.shadowBlur=10; ctx.stroke(); ctx.restore();
+        } else if(sameCount===2){
+          // v27-5: 1개만 더 모으면 합체 가능 - 노란색 링으로 미리 표시 (요청: 조합 힌트)
+          ctx.save(); ctx.beginPath(); ctx.arc(this.x,this.y,30,0,Math.PI*2);
+          ctx.strokeStyle=`rgba(255,214,10,${0.35+Math.sin(Date.now()*0.006)*0.2})`;
+          ctx.lineWidth=2; ctx.setLineDash([4,3]); ctx.shadowColor='#ffd60a'; ctx.shadowBlur=6; ctx.stroke();
+          ctx.setLineDash([]); ctx.restore();
         }
       }
       // 유니크 무지개 링
@@ -432,6 +477,19 @@ function _createGachaTower(def, x, y, engine) {
         const g=ctx.createRadialGradient(this.x,this.y,4,this.x,this.y,28);
         g.addColorStop(0,grade.color+'28'); g.addColorStop(1,'transparent');
         ctx.fillStyle=g; ctx.fill(); ctx.restore();
+      }
+      // v27-5: 합체진화 직후 확장 링 연출 (item1 - 영웅 진화처럼 임팩트 있게)
+      if(this._evolveGlowTimer>0){
+        const p = 1 - Math.max(0, this._evolveGlowTimer/1.2); // 0→1 진행도
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, 1 - p);
+        ctx.beginPath(); ctx.arc(this.x,this.y,20+p*40,0,Math.PI*2);
+        ctx.strokeStyle = grade.color; ctx.lineWidth = 3.5;
+        ctx.shadowColor = grade.color; ctx.shadowBlur = 18; ctx.stroke();
+        ctx.beginPath(); ctx.arc(this.x,this.y,12+p*24,0,Math.PI*2);
+        ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.globalAlpha = Math.max(0,(1-p)*0.7);
+        ctx.stroke();
+        ctx.restore();
       }
       // 타입 강화 직후 색깔 링 (어떤 타워가 방금 버프받았는지 명확히 표시)
       if(this._typeGlowTimer>0){
@@ -591,11 +649,30 @@ const MissionDefs = [
   {id:'shadow_hunt', name:'흑화 사냥꾼',desc:'흑화(골드 엘리트) 5마리 처치',reward:200,condition:(s)=>(s.eliteGoldKills||0)>=5},
   {id:'hero_evolve',name:'진화의 순간',desc:'영웅을 진화시키기',        reward:200, condition:(s)=>!!s.heroEvolved},
   {id:'hard_clear',  name:'하드 정복자',desc:'하드 난이도 웨이브 10 클리어',reward:400,condition:(s)=>(s.hardWavesCleared||0)>=10},
+  // v27-5: 전체모으기 미션 + 추가 다양화 (요청: 미션 더 다채롭게)
+  {id:'collect_normal', name:'노멀 도감 완성', desc:'노멀 등급 전체 모으기', reward:250,
+    condition:(s)=>window.GRADE_POOLS.normal.every(id=>s.collectedIds.has(id))},
+  {id:'collect_rare',   name:'레어 도감 완성', desc:'레어 등급 전체 모으기', reward:400,
+    condition:(s)=>window.GRADE_POOLS.rare.every(id=>s.collectedIds.has(id))},
+  {id:'collect_epic',   name:'에픽 도감 완성', desc:'에픽 등급 전체 모으기', reward:600,
+    condition:(s)=>window.GRADE_POOLS.epic.every(id=>s.collectedIds.has(id))},
+  {id:'collect_legend', name:'레전드 도감 완성', desc:'레전드 등급 전체 모으기', reward:900,
+    condition:(s)=>window.GRADE_POOLS.legend.every(id=>s.collectedIds.has(id))},
+  {id:'collect_mew',    name:'환상의 포켓몬', desc:'합치기 전용 뮤(mew) 획득', reward:500,
+    condition:(s)=>s.collectedIds.has('mew')},
+  {id:'type_all5',   name:'만능 조련사', desc:'6개 타입 모두 강화 1단계 이상', reward:350,
+    condition:(s)=>Object.keys(window.TypeUpgrades||{}).every(t=>(s.typeUpgrades?.[t]||0)>=1)},
+  {id:'wave150',     name:'무한의 도전자', desc:'왕 처치 후 웨이브 150 도달', reward:800, condition:(s)=>s.wavesCleared>=150},
+  {id:'gold2000',    name:'대부호', desc:'누적 골드 2000 획득', reward:200, condition:(s)=>(s.totalGoldEarned||0)>=2000},
+  {id:'score1000',   name:'점수 1000 돌파', desc:'점수 1000 달성', reward:300, condition:(s)=>(s.maxScore||0)>=1000},
+  // v27-5: 초반 유도미션 (요청C) - 초반에 할 일을 만들어줌
+  {id:'early_deploy', name:'초반 러시', desc:'웨이브 3 이내에 타워 4개 배치', reward:100, condition:(s)=>!!s.earlyDeploy4},
+  {id:'first_synergy', name:'첫 궁합', desc:'타워 시너지 첫 발동 (같은/궁합 타입 150px 이내 배치)', reward:100, condition:(s)=>!!s.firstSynergy},
 ];
 
 class MissionTracker {
   constructor(){
-    this.stats={totalRareCount:0,totalEpicCount:0,totalLegendCount:0,totalUniqueCount:0,mergeCount:0,maxCombo:0,wavesCleared:0,bossKills:0,livesLost:0,maxTowersDeployed:0,gambleCount:0,tenPullCount:0,typeUpgrades:{},timeouts:0,eliteGoldKills:0,heroEvolved:false,hardWavesCleared:0};
+    this.stats={totalRareCount:0,totalEpicCount:0,totalLegendCount:0,totalUniqueCount:0,mergeCount:0,maxCombo:0,wavesCleared:0,bossKills:0,livesLost:0,maxTowersDeployed:0,gambleCount:0,tenPullCount:0,typeUpgrades:{},timeouts:0,eliteGoldKills:0,heroEvolved:false,hardWavesCleared:0,collectedIds:new Set()};
     this.completed=new Set(); this.onComplete=null;
   }
   update(engine){
@@ -637,6 +714,7 @@ window.GRADES=GRADES; window.TYPES=TYPES;
 window.GachaTowerDefs=GachaTowerDefs;
 window.GRADE_POOLS=GRADE_POOLS;
 window.PULL_COSTS=PULL_COSTS;
+window.PULL_TABLES=PULL_TABLES;
 window.rollTower=rollTower;
 window.checkMerge=checkMerge;
 window._createGachaTower=_createGachaTower;

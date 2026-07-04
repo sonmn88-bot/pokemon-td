@@ -48,15 +48,6 @@ const ShopItems = [
     }
   },
   {
-    key: 'superpotion', name: '고급상처약', emoji: '💊', cost: 140, scaling: true,
-    desc: '모든 타워 데미지 영구 +15% (살수록 비싸짐)',
-    buy(engine) {
-      for (const t of engine.towers) t.buffDmgMul = (t.buffDmgMul || 1) * 1.15;
-      engine._shopDmgMul = (engine._shopDmgMul || 1) * 1.15;
-      engine.spawnFloatingText('💊 전체 데미지 +15%!', engine.width/2, 80, '#ce93d8');
-    }
-  },
-  {
     key: 'revive', name: '확장 부지', emoji: '🏗️', cost: 180, scaling: true,
     desc: '트랙 안쪽에 빈 배치슬롯 1개 즉시 추가 (살수록 비싸짐)',
     buy(engine) {
@@ -80,24 +71,6 @@ const ShopItems = [
     }
   },
   {
-    key: 'rangeorb', name: '사거리 구슬', emoji: '🔵', cost: 120, scaling: true,
-    desc: '모든 타워 사거리 영구 +10% (살수록 비싸짐)',
-    buy(engine) {
-      for (const t of engine.towers) t.buffRangeMul = (t.buffRangeMul || 1) * 1.10;
-      engine._shopRangeMul = (engine._shopRangeMul || 1) * 1.10;
-      engine.spawnFloatingText('🔵 전체 사거리 +10%!', engine.width/2, 80, '#4fc3f7');
-    }
-  },
-  {
-    key: 'speedorb', name: '속도 구슬', emoji: '🟢', cost: 130, scaling: true,
-    desc: '모든 타워 공격속도 영구 +12% (살수록 비싸짐)',
-    buy(engine) {
-      for (const t of engine.towers) t._shopSpeedMul = (t._shopSpeedMul || 1) * 1.12;
-      engine._shopSpeedMul = (engine._shopSpeedMul || 1) * 1.12;
-      engine.spawnFloatingText('🟢 공격속도 +12%!', engine.width/2, 80, '#06d6a0');
-    }
-  },
-  {
     key: 'rarecandy', name: '이상한사탕', emoji: '🍬', cost: 350, oneTime: true,
     desc: '3성(에픽) 타워 1개를 레전드로 진화 (게임당 1회만 사용 가능)',
     buy(engine) {
@@ -113,6 +86,7 @@ const ShopItems = [
       const evoDef = evoId ? window.GachaTowerDefs?.[evoId] : null;
       if (evoDef) {
         const evoTower = window._createGachaTower(evoDef, slot.x, slot.y, engine);
+        evoTower._evolveGlowTimer = 1.2;
         engine.towers = engine.towers.filter(x => x !== t);
         engine.towers.push(evoTower);
         slot.tower = evoTower;

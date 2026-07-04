@@ -80,6 +80,8 @@ class GameEngine {
 
     // 골드 보너스
     this._globalGoldMul = 1;
+    this._waveSpeedMul = 1;   // v27-5: 이벤트웨이브(스피드웨이브)용
+    this._waveHpMul = 1;      // v27-5: 이벤트웨이브(정예웨이브)용
 
     // 콜백
     this.onGoldChange = null;
@@ -227,6 +229,7 @@ class GameEngine {
     // ===== v27: 엔드리스 - 필드 누적 몬스터 수로 게임오버 판정 =====
     if (this.endless && (this.state === 'wave' || this.state === 'idle')) {
       const count = this.enemies.length;
+      this._peakFieldCount = Math.max(this._peakFieldCount || 0, count); // v27-5: 위험보너스용 (item D)
       for (const lvl of this.fieldWarnLevels) {
         if (count >= lvl && !this._fieldWarnFired[lvl]) {
           this._fieldWarnFired[lvl] = true;
@@ -267,6 +270,11 @@ class GameEngine {
 
     if (this.comboCount >= 5) {
       this.particles.push(new ComboFlash(enemy.x, enemy.y, this.comboCount));
+    }
+    // v27-6: 콤보 마일스톤 문구 (요청3, 딱 3번만 - 스팸 방지)
+    const comboQuips = { 20: '멋진데?!', 35: '완벽한 흐름!', 50: '전설적이야!' };
+    if (comboQuips[this.comboCount]) {
+      this.spawnFloatingText(comboQuips[this.comboCount], enemy.x, enemy.y - 40, '#ffd60a', { fontSize: 16, life: 1.3 });
     }
 
     // 영웅 경험치
@@ -314,6 +322,19 @@ class GameEngine {
     const pathIdx = item.pathIdx !== undefined ? item.pathIdx : 0;
     const path = this.paths[pathIdx] || this.paths[0];
     const enemy = new Enemy(item.type, path, this);
+
+    // v27-5: 웨이브 진행에 따른 연속 체력 스케일링 (기존엔 티어 전환/사이클 외엔 몹 자체 체력이 안 늘었음)
+    if (!item.isKing && !item.bossTier && this.currentWave > 10) {
+      const waveHpMul = 1 + (this.currentWave - 10) * 0.014;
+      enemy.maxHp = Math.round(enemy.maxHp * waveHpMul);
+      enemy.hp = enemy.maxHp;
+    }
+
+    // v27-5: 이벤트웨이브 배율 (요청: 초반 다채로움) - 왕/보스는 제외
+    if (!item.isKing && !item.bossTier) {
+      if (this._waveSpeedMul !== 1) enemy.speed *= this._waveSpeedMul;
+      if (this._waveHpMul !== 1) { enemy.maxHp = Math.round(enemy.maxHp * this._waveHpMul); enemy.hp = enemy.maxHp; }
+    }
 
     // 난이도 배율
     const dm = DifficultyMods[this.difficulty] || DifficultyMods.normal;
@@ -376,10 +397,17 @@ class GameEngine {
     this.state = 'idle';
     let bonus = 14 + this.currentWave * 5;
     if (this._nextWaveGoldMul) { bonus = Math.round(bonus * this._nextWaveGoldMul); this._nextWaveGoldMul = null; }
-    this.addGold(bonus);
+    // v27-5: 위험보너스 (item D) - 필드에 120마리 이상 쌓인 채로 웨이브를 넘기면 리스크 감수 보상
+    let riskBonus = 0;
+    if ((this._peakFieldCount || 0) >= 120) {
+      riskBonus = Math.round(bonus * 0.5);
+      this.spawnFloatingText(`🔥 위험 보너스! +${riskBonus}g`, this.width/2, 110, '#ff6b6b');
+    }
+    this._peakFieldCount = 0;
+    this.addGold(bonus + riskBonus);
     this.score = Math.round(this.currentWave * 12 + (this.killScore || 0));
     this.onScoreChange && this.onScoreChange(this.score);
-    this.onWaveComplete && this.onWaveComplete(this.currentWave, bonus, false);
+    this.onWaveComplete && this.onWaveComplete(this.currentWave, bonus + riskBonus, false);
     if (!this.endless && this.currentWave >= this.totalWaves) this.triggerVictory();
     else this.onStateChange && this.onStateChange('idle');
   }

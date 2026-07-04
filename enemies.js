@@ -393,6 +393,13 @@ class Enemy {
     this.hp -= dmg;
     this.flashTimer = 0.1;
 
+    // v27-7: 데미지 숫자 표시 (요청1 - 지금까지 전혀 없었음). DOT 미세틱(0.x 데미지)은 스팸 방지로 제외
+    if (dmg >= 1 && this.engine?.spawnFloatingText) {
+      const size = dmg >= 30 ? 15 : dmg >= 10 ? 12 : 10;
+      const color = dmg >= 30 ? '#ff5252' : dmg >= 10 ? '#ffd60a' : '#fff';
+      this.engine.spawnFloatingText(`-${Math.round(dmg)}`, this.x + (Math.random()*16-8), this.y - 14, color, { fontSize: size, life: 0.5 });
+    }
+
     // 분노 (갸라도스)
     if (this.def.special === 'rage' && this.rageStacks < this.def.maxRageStacks) {
       this.rageStacks++;

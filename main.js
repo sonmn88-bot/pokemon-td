@@ -33,6 +33,19 @@ function bossWaveScaleMul(wave) { return 1 + Math.max(0, wave) * 0.07; } // 웨�
 // v27-4: 존별 적 타입 편향 (item17) - 존마다 특정 타입이 더 자주 나와서 전략적 예측/대응 여지를 줌
 const ZONE_TYPE_BIAS = ['grass', 'psychic', 'fire']; // 숲=풀 위주 / 동굴=에스퍼 위주 / 도시=불 위주
 
+// v27-6: 다음 웨이브 등장 가능 타입 미리보기 (요청6 - 랜덤roll 없이 풀 구성만 계산, 실제 스폰과 분리된 순수함수)
+function previewWaveTypes(n) {
+  const posInZone = ((n - 1) % WAVES_PER_ZONE) + 1;
+  const progress = posInZone / WAVES_PER_ZONE;
+  let pool = [...ENEMY_TIERS.t1];
+  if (progress > 0.15) pool = pool.concat(ENEMY_TIERS.t2);
+  if (progress > 0.42) pool = pool.concat(ENEMY_TIERS.t3);
+  if (progress > 0.68) pool = pool.concat(ENEMY_TIERS.t4);
+  if (typeof EnemyTypes === 'undefined') return [];
+  const types = new Set(pool.map(id => EnemyTypes[id]?.type).filter(Boolean));
+  return [...types];
+}
+
 function generateWave(n) {
   const posInZone = ((n - 1) % WAVES_PER_ZONE) + 1; // 1~30, 존이 바뀌어도 난이도 곡선은 동일 패턴 반복
   const cycle = zoneCycleForWave(n); // 90웨이브 넘어가서 같은 존이 다시 나올 때마다 +1씩 계속 강해짐
@@ -51,8 +64,8 @@ function generateWave(n) {
   }
 
   // 웨이브가 진행될수록 더 많이, 더 빽빽하게 스폰 (계속 돌면서 잡는 느낌). cycle이 늘수록(90웨이브 이후 반복) 한번 더 강화
-  const enemyCount = Math.round(16 + n * 2.6 + cycle * 10);
-  const baseInterval = Math.max(0.26, 1.15 - n * 0.014);
+  const enemyCount = Math.round(20 + n * 3.4 + cycle * 14);
+  const baseInterval = Math.max(0.26, 0.85 - n * 0.014);
   const streams = 1 + Math.min(4, Math.floor(n / 6));
 
   const arr = [];
@@ -180,6 +193,8 @@ class App {
             forest: { notes:[261,294,330,349,392,440,494,523], tempo:0.4, vol:0.06, wave:'sine' },
             city:   { notes:[220,247,262,294,330,370,392,440], tempo:0.3, vol:0.06, wave:'triangle' },
             cave:   { notes:[196,220,233,261,294,311,349,392], tempo:0.5, vol:0.05, wave:'sine' },
+            // v27-7: 왕 조우 이후 무한강화 구간 전용 테마 - 더 빠르고 낮은 음역으로 긴장감 부여 (요청5)
+            infinite: { notes:[164,174,196,220,164,196,174,146], tempo:0.24, vol:0.07, wave:'sawtooth' },
           };
           const theme = themes[mapId] || themes.forest;
           const master = ctx.createGain();
@@ -284,6 +299,33 @@ class App {
     if (startBtn) startBtn.addEventListener('click', () => this.startGame());
     const skinBtn = document.getElementById('btn-title-skin');
     if (skinBtn) skinBtn.addEventListener('click', () => this.openSkinPicker(this.starterHero || 'pikachu'));
+    const howtoBtn = document.getElementById('btn-howto');
+    if (howtoBtn) howtoBtn.addEventListener('click', () => this._showHowToPlay());
+  }
+
+  // v27-7: 신규 유저 온보딩 - 간단한 게임방법 요약 (요청3)
+  _showHowToPlay() {
+    const overlay = document.createElement('div');
+    overlay.className = 'skin-picker';
+    overlay.innerHTML = `
+      <div class="skin-picker-title">❓ 게임 방법</div>
+      <div style="max-width:420px;text-align:left;color:#ddd;font-size:13px;line-height:1.9;padding:0 16px;max-height:60vh;overflow-y:auto;">
+        <b style="color:#ffd60a">🎯 목표</b> — 라이프가 아니라 <b>필드에 쌓이는 몬스터 수(200마리)</b>로 게임오버가 결정됩니다. 최대한 오래 버티세요.<br><br>
+        <b style="color:#ffd60a">🎰 뽑기</b> — 골드로 타워를 뽑아 빈 슬롯에 배치하세요. 등급이 높을수록 강합니다.<br><br>
+        <b style="color:#ffd60a">🧬 합체</b> — 같은 타워 3개를 모으면 상위 등급으로 합쳐집니다 (🔗 버튼에서 전체 레시피 확인 가능).<br><br>
+        <b style="color:#ffd60a">🔗 시너지</b> — 같은 타입이나 궁합 좋은 타입끼리 150px 이내에 배치하면 데미지가 오릅니다.<br><br>
+        <b style="color:#ffd60a">⭐ 숙련도</b> — 같은 포켓몬을 중복으로 뽑기만 해도 그 포켓몬 전용 데미지가 조금씩 오릅니다.<br><br>
+        <b style="color:#ffd60a">🔥 타입강화</b> — 화면 하단 바에서 타입별로 영구 강화를 살 수 있습니다.<br><br>
+        <b style="color:#ffd60a">👑 왕</b> — 90웨이브에 강력한 왕이 등장합니다. 처치하면 그 자리에서 무한히 강해지는 몹들과 계속 싸우게 됩니다.<br><br>
+        <b style="color:#ffd60a">🎯 미션 / 📖 도감</b> — 상단 버튼에서 확인 가능, 완료시 골드 보상.
+      </div>
+    `;
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'skin-picker-close';
+    closeBtn.textContent = '시작하기';
+    closeBtn.addEventListener('click', () => overlay.remove());
+    overlay.appendChild(closeBtn);
+    document.body.appendChild(overlay);
   }
 
   // v27-4: 타이틀 진입/게임오버 후 복귀할 때마다 최고 기록 갱신
@@ -449,72 +491,6 @@ class App {
     }
   }
 
-  buildTowerBar() {
-    this.els.towerBar.innerHTML = '';
-    this.els.towerBar.classList.add('tower-bar-real');
-
-    const scroll = document.createElement('div');
-    scroll.className = 'tower-bar-scroll gacha-bar';
-
-    // 뽑기 버튼 3종 (v27 fix: cost를 여기 하드코딩하지 말고 실제 과금 기준인 PULL_COSTS에서 읽어오도록 - 안 그러면 가격 바꿀 때마다 표시랑 실제가 어긋남)
-    const pulls = [
-      { key:'normal',  label:'일반 뽑기',  color:'#9e9e9e', emoji:'🎰', hotkey:'1' },
-      { key:'premium', label:'프리미엄',   color:'#4fc3f7', emoji:'💎', hotkey:'2' },
-      { key:'gamble',  label:'도박 뽑기',  color:'#ffd60a', emoji:'🎲', hotkey:'3' },
-      { key:'ten',     label:'10연 뽑기',  color:'#ce93d8', emoji:'🌟', ten:true, hotkey:'4' },
-    ];
-
-    for (const p of pulls) {
-      const cost = window.PULL_COSTS?.[p.key] ?? 0;
-      const btn = document.createElement('button');
-      btn.className = 'tower-btn gacha-btn';
-      btn.dataset.pullKey = p.key;
-      btn.style.borderColor = p.color + '60';
-      btn.innerHTML = `
-        <span class="hotkey-badge">${p.hotkey}</span>
-        <span class="tower-btn-emoji">${p.emoji}</span>
-        <span class="tower-btn-name" style="color:${p.color}">${p.label}</span>
-        <span class="tower-btn-cost">💰${cost}</span>
-      `;
-      btn.title = p.key === 'gamble' ? '에픽~레전드 확률 높음! (단축키: ' + p.hotkey + ')' :
-                  p.key === 'ten'    ? '10개! 에픽 1개 보장 (단축키: ' + p.hotkey + ')' :
-                  p.key === 'premium'? '레어~에픽 위주 (단축키: ' + p.hotkey + ')' : '노말~레어 위주 (단축키: ' + p.hotkey + ')';
-      btn.addEventListener('click', () => this.doPull(p.key, btn));
-      scroll.appendChild(btn);
-    }
-
-    // 구분선
-    const sep = document.createElement('div');
-    sep.style.cssText = 'width:1px;background:rgba(255,255,255,0.1);margin:4px 2px;flex-shrink:0';
-    scroll.appendChild(sep);
-
-    // 영웅 버튼 (게임 시작 시 고른 1명만 - 뮤/리자몽/거북왕은 더 이상 영웅으로 쓰지 않음)
-    {
-      const heroId = this.starterHero || 'pikachu';
-      const def = window.HeroDefs[heroId];
-      const btn = document.createElement('button');
-      btn.className = 'tower-btn hero-btn';
-      btn.dataset.heroKey = heroId;
-      const skinId = this.selectedHeroSkins[heroId];
-      const skin = window.SkinDefs[heroId][skinId];
-      btn.innerHTML = `
-        <span class="tower-btn-emoji">${skin.emoji}</span>
-        <span class="tower-btn-name">${def.name}</span>
-        <span class="tower-btn-cost">👆이동 🎨스킨</span>
-      `;
-      btn.title = def.passive;
-      btn.addEventListener('click', () => this.selectHeroToPlace(heroId, btn));
-      btn.addEventListener('contextmenu', (e) => { e.preventDefault(); this.openSkinPicker(heroId); });
-      let pressTimer;
-      btn.addEventListener('touchstart', () => { pressTimer = setTimeout(() => this.openSkinPicker(heroId), 500); });
-      btn.addEventListener('touchend', () => clearTimeout(pressTimer));
-      scroll.appendChild(btn);
-    }
-
-    this.els.towerBar.appendChild(scroll);
-    this._towerBarScroll = scroll;
-    this.refreshPullButtons();
-  }
 
   refreshPullButtons() {
     if (!this._towerBarScroll) return;
@@ -550,6 +526,24 @@ class App {
       this._showTenPullResult(results, slotIdx);
       if (this.missionTracker) {
         this.missionTracker.stats.tenPullCount++;
+        // v27-5 fix: 10연뽑 결과가 등급별 카운트/보유목록에 전혀 반영이 안 되고 있었음
+        for (const r of results) {
+          if (r.grade === 'rare' || r.grade === 'epic' || r.grade === 'legend' || r.grade === 'unique')
+            this.missionTracker.stats.totalRareCount++;
+          if (r.grade === 'epic' || r.grade === 'legend' || r.grade === 'unique')
+            this.missionTracker.stats.totalEpicCount++;
+          if (r.grade === 'legend' || r.grade === 'unique')
+            this.missionTracker.stats.totalLegendCount++;
+          if (r.grade === 'unique')
+            this.missionTracker.stats.totalUniqueCount++;
+          this.missionTracker.stats.collectedIds.add(r.id);
+          if (!this.engine._masteryLevel) this.engine._masteryLevel = {};
+          this.engine._masteryLevel[r.id] = (this.engine._masteryLevel[r.id] || 0) + 1; // v27-5: 숙련도 (item2)
+          const newMastery = 1 + Math.min(20, this.engine._masteryLevel[r.id]) * 0.02;
+          for (const s of this.engine.towerSlots) {
+            if (s.occupied && s.tower?._gachaId === r.id) s.tower.masteryMul = newMastery;
+          }
+        }
         this.missionTracker.check();
       }
       return;
@@ -561,9 +555,35 @@ class App {
 
     // 뽑기 등급 팝업 + 효과음
     const gradeSound = {normal:'pull_normal', rare:'pull_rare', epic:'pull_epic', legend:'pull_epic', unique:'merge'};
-    this.SFX.play(gradeSound[towerDef.grade] || 'pull_normal');
-    if (towerDef.grade !== 'normal') {
-      const g = window.GRADES?.[towerDef.grade]; this.showWaveAnnounce(`${towerDef.emoji} ${g?.name||""} ${towerDef.name}`, g?.color||"#ffd60a");
+    const isRareReveal = towerDef.grade === 'epic' || towerDef.grade === 'legend' || towerDef.grade === 'unique';
+    if (isRareReveal) {
+      // v27-5: 에픽 이상은 짧은 서스펜스 연출 후 공개 (요청B: 가챠의 재미)
+      let flick = 0;
+      const flickInterval = setInterval(() => {
+        this.showWaveAnnounce('❓❓❓', flick % 2 ? '#fff' : '#ffd60a');
+        flick++;
+        if (flick >= 3) {
+          clearInterval(flickInterval);
+          this.SFX.play(gradeSound[towerDef.grade] || 'pull_normal');
+          const g = window.GRADES?.[towerDef.grade];
+          this.showWaveAnnounce(`${towerDef.emoji} ${g?.name||""} ${towerDef.name}`, g?.color||"#ffd60a");
+        }
+      }, 220);
+    } else {
+      this.SFX.play(gradeSound[towerDef.grade] || 'pull_normal');
+      if (towerDef.grade === 'rare') {
+        const g = window.GRADES?.[towerDef.grade];
+        this.showWaveAnnounce(`${towerDef.emoji} ${g?.name||""} ${towerDef.name}`, g?.color||"#ffd60a");
+      }
+    }
+    // v27-5: 합체 힌트 (요청) - 뽑은 직후 동일 타워 보유수 체크해서 알려줌
+    if (this.engine) {
+      const sameCount = this.engine.towerSlots.filter(s => s.occupied && s.tower?._gachaId === towerDef.id).length;
+      if (sameCount === 3) {
+        setTimeout(() => this.showWaveAnnounce(`🧬 ${towerDef.emoji} ${towerDef.name} 3개 모임! 합체 가능해요`, '#06d6a0'), 900);
+      } else if (sameCount === 2) {
+        setTimeout(() => this.showWaveAnnounce(`🧬 ${towerDef.emoji} ${towerDef.name} 1개만 더 모으면 합체!`, '#ffd60a'), 900);
+      }
     }
 
     // 미션 트래킹
@@ -577,6 +597,13 @@ class App {
       if (towerDef.grade === 'unique')
         this.missionTracker.stats.totalUniqueCount++;
       if (pullKey === 'gamble') this.missionTracker.stats.gambleCount++;
+      this.missionTracker.stats.collectedIds.add(towerDef.id); // v27-5: 전체모으기 미션용
+      if (!this.engine._masteryLevel) this.engine._masteryLevel = {};
+      this.engine._masteryLevel[towerDef.id] = (this.engine._masteryLevel[towerDef.id] || 0) + 1; // v27-5: 숙련도 (item2)
+      const newMastery = 1 + Math.min(20, this.engine._masteryLevel[towerDef.id]) * 0.02;
+      for (const s of this.engine.towerSlots) {
+        if (s.occupied && s.tower?._gachaId === towerDef.id) s.tower.masteryMul = newMastery;
+      }
       this.missionTracker.check();
     }
 
@@ -622,7 +649,18 @@ class App {
       card.className = `tenpull-card grade-${def.grade}`;
       card.style.borderColor = grade.color;
       card.style.boxShadow = `0 0 12px ${grade.glow}`;
+      // v27-5: 합체 힌트 뱃지 (요청) - 보드에 배치된 것 + 보관함(이번 10연 포함) 합산
+      const boardCount = this.engine ? this.engine.towerSlots.filter(s => s.occupied && s.tower?._gachaId === def.id).length : 0;
+      const invCount = (this._inventory || []).filter(x => x.id === def.id).length;
+      const totalCount = boardCount + invCount;
+      const mergeBadge = totalCount >= 3
+        ? '<div style="position:absolute;top:2px;right:2px;font-size:9px;color:#06d6a0;background:rgba(0,0,0,0.6);border-radius:6px;padding:1px 4px;">🧬합체가능</div>'
+        : totalCount === 2
+        ? '<div style="position:absolute;top:2px;right:2px;font-size:9px;color:#ffd60a;background:rgba(0,0,0,0.6);border-radius:6px;padding:1px 4px;">🧬1개더</div>'
+        : '';
+      card.style.position = 'relative';
       card.innerHTML = `
+        ${mergeBadge}
         <div class="tp-emoji">${def.emoji}</div>
         <div class="tp-name" style="color:${grade.color}">${def.name}</div>
         <div class="tp-grade">${'★'.repeat(grade.stars)}</div>
@@ -850,7 +888,18 @@ class App {
     this.missionTracker = new MissionTracker();
     this.missionTracker.onComplete = (mission) => this._onMissionComplete(mission);
 
-    this.engine.onGoldChange  = g => { this.els.goldVal.textContent = g; this.refreshPullButtons(); this.buildShopBar(); };
+    this.engine.onGoldChange  = g => {
+      this.els.goldVal.textContent = g;
+      this.refreshPullButtons();
+      this.buildShopBar();
+      // v27-5: 누적 획득 골드 트래킹 (미션용)
+      if (this.missionTracker) {
+        const prev = this._lastGoldForMission ?? g;
+        if (g > prev) this.missionTracker.stats.totalGoldEarned = (this.missionTracker.stats.totalGoldEarned || 0) + (g - prev);
+        this._lastGoldForMission = g;
+        this.missionTracker.check();
+      }
+    };
     this.engine.onHitSound = () => { if (Math.random() < 0.18) this.SFX.play('hit'); };
     this.engine.onLivesChange = l => {
       // v27: 라이프 HUD 숨김 (필드누적 게임오버로 대체됨, 화면 안 씀)
@@ -863,6 +912,10 @@ class App {
     this.engine.onScoreChange = (score) => {
       const el = document.getElementById('score-val');
       if (el) el.textContent = score.toLocaleString();
+      if (this.missionTracker) {
+        this.missionTracker.stats.maxScore = Math.max(this.missionTracker.stats.maxScore || 0, score);
+        this.missionTracker.check();
+      }
     };
     const hudTimer = document.getElementById('hud-timer');
     const timerVal = document.getElementById('timer-val');
@@ -871,7 +924,8 @@ class App {
       if (remaining <= 0 && this.engine.state !== 'wave') { hudTimer.style.display = 'none'; return; }
       hudTimer.style.display = 'flex';
       timerVal.textContent = Math.ceil(remaining);
-      hudTimer.classList.toggle('timer-danger', remaining <= 8);
+      hudTimer.classList.toggle('timer-danger', remaining <= 8 && remaining > 3);
+      hudTimer.classList.toggle('timer-critical', remaining <= 3);
       hudTimer.classList.toggle('timer-warn', remaining > 8 && remaining <= 18);
     };
     this.engine.onWaveTimeout = (penalty, survivorCount) => {
@@ -898,7 +952,7 @@ class App {
       const el = document.createElement('div');
       el.className = 'wave-announce boss';
       el.innerHTML = boss._isKing
-        ? `👑 ${boss.def.emoji} 궁극의 뮤츠 (왕) 등장!<br><span style="font-size:0.7em">⚠️ 이후로는 존 이동 없이 이 자리에서 무한 강화 모드로 진입합니다</span>`
+        ? `👑 ${boss.def.emoji} 궁극의 뮤츠 (왕) 등장!<br><span style="font-size:0.85em;font-style:italic">"…감히 내 영역에 발을 들이다니."</span><br><span style="font-size:0.65em">⚠️ 이후로는 존 이동 없이 이 자리에서 무한 강화 모드로 진입합니다</span>`
         : `${boss.def.emoji} ${boss.name} 등장!<br><span style="font-size:0.7em">⚠️ 보스</span>`;
       document.getElementById('game-screen').appendChild(el);
       setTimeout(() => el.remove(), boss._isKing ? 4500 : 2800);
@@ -908,6 +962,7 @@ class App {
     this.engine.loseLife = (n) => { this.SFX.play('life_lost'); origLoseLife(n); };
     this.engine.onKingDefeated = () => {
       this.showWaveAnnounce('👑 왕을 처치했습니다! 무한 강화 모드 진입 - 20웨이브마다 적이 새로운 능력을 얻습니다', '#ffd60a');
+      this.BGM.start('infinite'); // v27-7: 무한강화 진입시 전용 BGM으로 전환 (요청5)
     };
     this.engine.onWaveComplete = (wave, bonus, timedOut) => {
       if (hudTimer) hudTimer.style.display = 'none';
@@ -953,6 +1008,46 @@ class App {
     this.buildShopBar();
     this.buildBossSummonButton();
     this.startHeroLoop();
+    this._showStarterTowerPicker(); // v27-5: 시작 시 스타터 타워 3택1 (요청B - 초반 결정 유도)
+  }
+
+  // v27-5: 시작 스타터 타워 선택 (무료, 즉시 배치) - 초반에 첫 결정을 하게 만들어 몰입 유도
+  _showStarterTowerPicker() {
+    if (!window.GachaTowerDefs) return;
+    // v27-5 fix: 랜덤 3종 대신 진짜 스타터 3종(이상해씨/파이리/꼬부기) 고정 - 상징성 있는 선택으로
+    const picks = ['bulbasaur', 'charmander', 'squirtle'].filter(id => window.GachaTowerDefs[id]);
+    const overlay = document.createElement('div');
+    overlay.className = 'skin-picker'; // 기존 풀스크린 오버레이 스타일 재사용
+    const title = document.createElement('div');
+    title.className = 'skin-picker-title';
+    title.textContent = '🎁 시작 타워를 하나 골라주세요 (무료)';
+    overlay.appendChild(title);
+    const grid = document.createElement('div');
+    grid.style.cssText = 'display:flex;gap:16px;flex-wrap:wrap;justify-content:center;';
+    for (const id of picks) {
+      const def = window.GachaTowerDefs[id];
+      if (!def) continue;
+      const card = document.createElement('div');
+      card.style.cssText = 'cursor:pointer;background:rgba(20,20,40,0.85);border:2px solid rgba(255,255,255,0.2);border-radius:14px;padding:16px;text-align:center;min-width:100px;transition:transform 0.15s;';
+      card.innerHTML = `<div style="font-size:36px">${def.emoji}</div><div style="color:#fff;font-size:13px;margin-top:6px">${def.name}</div><div style="color:#888;font-size:10px;margin-top:4px">${def.desc||''}</div>`;
+      card.addEventListener('click', () => {
+        const emptySlot = this.engine.towerSlots.find(s => !s.occupied);
+        if (emptySlot) {
+          const tower = window._createGachaTower(def, emptySlot.x, emptySlot.y, this.engine);
+          // v27-5: 스타터 시그니처 보너스 - 처음 고른 타워는 평생 데미지 +15% (선택의 무게감)
+          tower.buffDmgMul = (tower.buffDmgMul || 1) * 1.15;
+          tower._isStarter = true;
+          emptySlot.occupied = true; emptySlot.tower = tower;
+          this.engine.towers.push(tower);
+          if (this.missionTracker) this.missionTracker.stats.collectedIds.add(def.id);
+        }
+        overlay.remove();
+        this.showWaveAnnounce(`${def.emoji} ${def.name}(으)로 시작! (영구 데미지+15% 시그니처)`, '#ffd60a');
+      });
+      grid.appendChild(card);
+    }
+    overlay.appendChild(grid);
+    document.body.appendChild(overlay);
   }
 
   startHeroLoop() {
@@ -970,6 +1065,26 @@ class App {
       if (this.engine._bossSummonCooldown > 0) {
         this.engine._bossSummonCooldown -= this.engine.dt;
         this._updateBossSummonUI();
+      }
+      // v27-6: 필드 위험 비네트 (요청2, 절제된 연출)
+      if (this.engine.endless) {
+        let vig = document.getElementById('field-danger-vignette');
+        if (!vig) {
+          vig = document.createElement('div');
+          vig.id = 'field-danger-vignette';
+          document.getElementById('game-screen').appendChild(vig);
+        }
+        vig.classList.toggle('active', this.engine.enemies.length >= 180);
+      }
+      // v27-6: 최고 시너지 달성치 추적 (요청4 - 게임오버 요약화면 MVP용)
+      if (this.engine.towers.length) {
+        const maxSyn = this.engine.towers.reduce((m,t)=>Math.max(m,t.synergyBonus||0), 0);
+        this.engine._maxSynergySeen = Math.max(this.engine._maxSynergySeen||0, maxSyn);
+      }
+      // v27-5: 초반 유도미션용 트래킹 (요청C)
+      if (this.missionTracker) {
+        if (this.engine.currentWave <= 3 && this.engine.towers.length >= 4) this.missionTracker.stats.earlyDeploy4 = true;
+        if (this.engine.towers.some(t => (t.synergyBonus||0) > 0)) this.missionTracker.stats.firstSynergy = true;
       }
       // 웨이브 진행 중 타이머 + 남은 적 표시
       if (this.engine.state === 'wave') {
@@ -1032,517 +1147,14 @@ class App {
   }
 
   // ===== 타워 패널 (가챠 전용) =====
-  syncTowerPanel() {
-    let panel = document.getElementById('tower-panel');
-    if (!this.engine.selectedTower) { panel?.remove(); return; }
-
-    const t = this.engine.selectedTower;
-    const slotIdx = this.engine.towerSlots.findIndex(s => s.tower === t);
-    if (!panel) {
-      panel = document.createElement('div');
-      panel.id = 'tower-panel';
-      document.getElementById('game-screen').appendChild(panel);
-    }
-
-    const def = t.def || t;
-    const isGacha = !!t._gachaId;
-
-    if (isGacha) {
-      // ===== 가챠 타워 패널 =====
-      const grade = window.GRADES?.[def.grade] || { name:'?', color:'#fff', stars:1 };
-      const dps = (t.damage * t.fireRate).toFixed(1);
-      const sameSlots = this.engine.towerSlots.filter(s => s.occupied && s.tower?._gachaId === t._gachaId);
-      const sameCount = sameSlots.length;
-      const canMerge = sameCount >= 3;
-      const evolveId = window.MERGE_EVOLUTION?.[t._gachaId];
-      const evolveDef = evolveId ? window.GachaTowerDefs?.[evolveId] : null;
-      const synergyInfo = t.synergyBonus > 0
-        ? `<span style="color:#ffd60a;font-size:10px">⚡시너지 +${t.synergyBonus}</span>`
-        : `<span style="color:#888;font-size:10px" title="같은 타입 타워를 150px 이내에 배치하면 데미지 시너지가 붙습니다">⚡시너지 없음 (150px 이내 같은 타입 배치시 발동)</span>`;
-      const refundCosts = {normal:35, rare:84, epic:140, legend:240, unique:420};
-      const refund = refundCosts[def.grade] || 35;
-
-      // v27: 스탯 옆 (+%) 강화 표시 + 다음 강화 힌트
-      const dmgPct = Math.round(((t.buffDmgMul||1) - 1) * 100);
-      const rangePct = Math.round(((t.buffRangeMul||1) - 1) * 100);
-      const spdPct = Math.round(((t._shopSpeedMul||1) - 1) * 100);
-      const dmgTag = dmgPct !== 0 ? ` <span style="color:#4fc3f7">(+${dmgPct}%)</span>` : '';
-      const rangeTag = rangePct !== 0 ? ` <span style="color:#4fc3f7">(+${rangePct}%)</span>` : '';
-      const spdTag = spdPct !== 0 ? ` <span style="color:#4fc3f7">(+${spdPct}%)</span>` : '';
-      const tuLevel = window.TypeUpgradeLevels?.[def.type] || 0;
-      const tuNext = window.TypeUpgrades?.[def.type]?.[tuLevel];
-      const upgradeHint = tuNext
-        ? `<div style="font-size:10px;color:#7fe3ff;margin-top:2px">💡 하단 타입강화바에서 "${tuNext.label}"(💰${tuNext.cost}) 올리면 이 타워가 강해져요</div>`
-        : `<div style="font-size:10px;color:#888;margin-top:2px">💡 이 타입 강화 최대 단계 달성</div>`;
-
-      panel.innerHTML = `
-        <div class="tower-panel-name" style="color:${grade.color}">
-          ${def.emoji} ${def.name} ${'★'.repeat(grade.stars)} <span style="font-size:10px">${grade.name}</span>
-        </div>
-        <div class="tower-panel-stats">⚔️${Math.round(t.damage)}${dmgTag} · ⏱️${t.fireRate.toFixed(1)}/s${spdTag} · DPS:${dps} · 📏${Math.round(t.range)}${rangeTag} ${synergyInfo}</div>
-        ${upgradeHint}
-        <div style="font-size:10px;color:#aaa;margin:2px 0">${def.desc||''}</div>
-        <div style="font-size:10px;margin:3px 0;color:${canMerge?'#ffd60a':'#888'}">
-          ${canMerge
-            ? `✅ 합치기 가능! (${sameCount}/3)${evolveDef?' → '+evolveDef.emoji+evolveDef.name:''}`
-            : `동일 타워 ${sameCount}/3${evolveDef?' (목표: '+evolveDef.emoji+evolveDef.name+')':''}`}
-        </div>
-        <div class="tower-panel-btns">
-          ${canMerge
-            ? `<button class="tp-btn tp-upgrade" data-action="merge">✨ 합치기 진화!</button>`
-            : `<button class="tp-btn tp-maxed" disabled>합치기 ${sameCount}/3</button>`}
-          <button class="tp-btn tp-sell" data-action="sell">💸 +${refund}g</button>
-        </div>
-      `;
-
-      panel.querySelector('[data-action="merge"]')?.addEventListener('click', () => {
-        const allSameSlots = this.engine.towerSlots.filter(s => s.occupied && s.tower?._gachaId === t._gachaId);
-        if (allSameSlots.length < 3 || !evolveDef) return;
-        // 현재 선택 슬롯을 항상 진화 위치로 고정
-        const currentSlot = this.engine.towerSlots[slotIdx];
-        const otherSlots = allSameSlots.filter(s => s !== currentSlot).slice(0, 2);
-        const mergeSlots = [currentSlot, ...otherSlots];
-        for (let i = 1; i < 3; i++) {
-          this.engine.towers = this.engine.towers.filter(x => x !== mergeSlots[i].tower);
-          mergeSlots[i].occupied = false; mergeSlots[i].tower = null;
-        }
-        const evoTower = window._createGachaTower(evolveDef, currentSlot.x, currentSlot.y, this.engine);
-        this.engine.towers = this.engine.towers.filter(x => x !== currentSlot.tower);
-        this.engine.towers.push(evoTower);
-        currentSlot.tower = evoTower;
-        this.engine.selectedTower = evoTower;
-        if (window.applyTowerSynergies) window.applyTowerSynergies(this.engine.towers);
-        const evoGrade = window.GRADES[evolveDef.grade];
-        this.engine.spawnFloatingText(`✨ ${evolveDef.name}!`, currentSlot.x, currentSlot.y-40, evoGrade.color);
-        this.engine.particles.push(new BurstRing(currentSlot.x, currentSlot.y, 70, evoGrade.color));
-        this.engine.triggerScreenShake(6, 0.25);
-        if (this.missionTracker) { this.missionTracker.stats.mergeCount++; this.missionTracker.check(); }
-        this.SFX.play('merge');
-        this.syncTowerPanel();
-      });
-
-      panel.querySelector('[data-action="sell"]')?.addEventListener('click', () => {
-        // 실제 gold 환급
-        this.engine.addGold(refund);
-        this.engine.towers = this.engine.towers.filter(x => x !== t);
-        const slot = this.engine.towerSlots[slotIdx];
-        if (slot) { slot.occupied = false; slot.tower = null; }
-        if (window.applyTowerSynergies) window.applyTowerSynergies(this.engine.towers);
-        this.engine.selectedTower = null;
-        panel.remove();
-        this.refreshPullButtons();
-      });
-    } else {
-      // ===== 기존 업그레이드 타워 패널 (영웅 슬롯 등) =====
-      const dps = (t.damage * t.fireRate).toFixed(1);
-      panel.innerHTML = `
-        <div class="tower-panel-name">${t.name}</div>
-        <div class="tower-panel-stats">⚔️${Math.round(t.damage)} · ⏱️${t.fireRate.toFixed(1)}/s · DPS:${dps}</div>
-        <div class="tower-panel-btns">
-          <button class="tp-btn tp-sell" data-action="sell">💸 판매</button>
-        </div>
-      `;
-      panel.querySelector('[data-action="sell"]')?.addEventListener('click', () => {
-        this.engine.sellTower(slotIdx);
-        this.engine.selectedTower = null; panel.remove();
-      });
-    }
-  }
-
-  buildHeroSkillBar() {
-    let bar = document.getElementById('hero-skill-bar');
-    if (!bar) {
-      bar = document.createElement('div');
-      bar.id = 'hero-skill-bar';
-      document.getElementById('game-screen').appendChild(bar);
-    }
-    bar.innerHTML = '';
-    for (const hero of this.engine.heroes) {
-      const wrap = document.createElement('div');
-      wrap.className = 'hero-skills-group';
-
-      // v27 fix: label+경험치바를 세로 컬럼으로 묶어야 가로 flex 그룹 안에서 제대로 보임
-      const infoCol = document.createElement('div');
-      infoCol.style.cssText = 'display:flex;flex-direction:column;align-items:flex-start;min-width:64px;';
-      const label = document.createElement('div');
-      label.className = 'hero-skills-label';
-      label.textContent = `${hero.skin.emoji} ${hero.name} Lv${hero.level}`;
-      infoCol.appendChild(label);
-
-      const expOuter = document.createElement('div');
-      expOuter.className = 'hero-exp-bar-outer';
-      expOuter.style.cssText = 'width:100%;height:4px;background:rgba(255,255,255,0.15);border-radius:2px;margin-top:3px;overflow:hidden;';
-      const expInner = document.createElement('div');
-      expInner.className = 'hero-exp-bar-inner';
-      expInner.dataset.heroId = hero.id;
-      expInner.style.cssText = `height:100%;background:#4fc3f7;width:${Math.min(100, (hero.exp/hero.expToNext)*100)}%;transition:width 0.2s;`;
-      expOuter.appendChild(expInner);
-      infoCol.appendChild(expOuter);
-      wrap.appendChild(infoCol);
-
-      // 스킬 버튼
-      const heroIdx = this.engine.heroes.indexOf(hero);
-      const hotkeyMap = [['Q','W'],['E','R']][heroIdx] || [];
-      hero.def.skills.forEach((skill, idx) => {
-        const btn = document.createElement('button');
-        btn.className = 'skill-btn';
-        btn.dataset.heroId = hero.id;
-        btn.dataset.skillIdx = idx;
-        btn.innerHTML = `<span class="hotkey-badge">${hotkeyMap[idx]||''}</span><span class="skill-emoji">${skill.emoji}</span><span class="skill-cd"></span>`;
-        btn.title = `${skill.name}: ${skill.desc}${hotkeyMap[idx] ? ` (단축키: ${hotkeyMap[idx]})` : ''}`;
-        btn.addEventListener('click', () => {
-          if (hero.cast(idx, this.engine)) {
-            this.showWaveAnnounce(`${skill.emoji} ${skill.name}!`, '#ffd60a');
-          }
-        });
-        wrap.appendChild(btn);
-      });
-
-      // 스킬트리 버튼 (SP 있을 때만 강조)
-      const treeBtn = document.createElement('button');
-      treeBtn.className = 'skill-btn skill-tree-btn';
-      treeBtn.dataset.heroId = hero.id;
-      treeBtn.innerHTML = `<span class="skill-emoji">${hero.skillPoints > 0 ? '🌟' : '📊'}</span>`;
-      treeBtn.title = `스킬트리 (SP: ${hero.skillPoints})`;
-      if (hero.skillPoints > 0) treeBtn.style.borderColor = '#ffd60a';
-      treeBtn.addEventListener('click', () => this.openSkillTree(hero));
-      wrap.appendChild(treeBtn);
-
-      bar.appendChild(wrap);
-    }
-  }
-
-  updateHeroSkillBarUI() {
-    const bar = document.getElementById('hero-skill-bar');
-    if (!bar) return;
-    for (const hero of this.engine.heroes) {
-      const label = bar.querySelector(`.hero-skills-group .hero-skills-label`);
-      const expInner = bar.querySelector(`.hero-exp-bar-inner[data-hero-id="${hero.id}"]`);
-      if (expInner) {
-        expInner.style.width = `${Math.min(100, (hero.exp/hero.expToNext)*100)}%`;
-        const grp = expInner.closest('.hero-skills-group');
-        const lbl = grp?.querySelector('.hero-skills-label');
-        if (lbl) lbl.textContent = `${hero.skin.emoji} ${hero.name} Lv${hero.level}`;
-      }
-      hero.def.skills.forEach((skill, idx) => {
-        const btn = bar.querySelector(`.skill-btn[data-hero-id="${hero.id}"][data-skill-idx="${idx}"]`);
-        if (!btn) return;
-        const cd = hero.cooldowns[idx];
-        const cdEl = btn.querySelector('.skill-cd');
-        if (cd > 0) {
-          btn.classList.add('on-cooldown');
-          cdEl.textContent = Math.ceil(cd);
-        } else {
-          btn.classList.remove('on-cooldown');
-          cdEl.textContent = '';
-        }
-      });
-    }
-  }
-
-  buildTypeUpgradeBar() {
-    let bar = document.getElementById('type-upgrade-bar');
-    if (!bar) {
-      bar = document.createElement('div');
-      bar.id = 'type-upgrade-bar';
-      document.getElementById('game-screen').appendChild(bar);
-    }
-    bar.innerHTML = '';
-    if (!window.TypeUpgrades || !window.TYPES) return;
-
-    // v27-4: 최다 투자 속성 뱃지 계산 (item11) - 레벨이 가장 높은 타입에 표시 (1 이상이고 유일할 때만)
-    let topType = null, topLevel = 0, tieCount = 0;
-    for (const tk in window.TypeUpgrades) {
-      const lv = window.TypeUpgradeLevels?.[tk] || 0;
-      if (lv > topLevel) { topLevel = lv; topType = tk; tieCount = 1; }
-      else if (lv === topLevel && lv > 0) { tieCount++; }
-    }
-    const showBadge = topType && topLevel > 0 && tieCount === 1;
-
-    for (const typeKey in window.TypeUpgrades) {
-      const typeInfo = window.TYPES[typeKey];
-      const maxBaseTiers = window.TypeUpgrades[typeKey].length;
-      const level = window.TypeUpgradeLevels?.[typeKey] || 0;
-      // v27-4: 5단계 이후에도 숨기지 않고 무한 반복 강화로 계속 표시
-
-      const nextUpg = window.getTypeUpgradeAt(typeKey, level);
-      const dotsStr = level < maxBaseTiers
-        ? '●'.repeat(level) + '○'.repeat(maxBaseTiers-level)
-        : '★'.repeat(Math.min(5, level - maxBaseTiers + 1)); // 5단계 이후는 별로 계속 누적 표시
-      const btn = document.createElement('button');
-      btn.className = 'type-upg-btn';
-      btn.dataset.typeKey = typeKey;
-      btn.style.borderColor = typeInfo.color + '60';
-      btn.style.position = 'relative';
-      if (showBadge && typeKey === topType) {
-        btn.style.boxShadow = `0 0 10px ${typeInfo.color}`;
-      }
-      btn.innerHTML = `
-        ${showBadge && typeKey === topType ? '<span style="position:absolute;top:-6px;right:-4px;font-size:11px;">👑</span>' : ''}
-        <span>${typeInfo.emoji}</span>
-        <span style="font-size:9px;color:${typeInfo.color}">${typeInfo.name}</span>
-        <span style="font-size:8px;color:#ffd60a">💰${nextUpg.cost}</span>
-        <span style="font-size:7px;color:#888">${dotsStr}</span>
-      `;
-      btn.title = (showBadge && typeKey === topType ? '👑 가장 많이 투자한 속성\n' : '') + `${nextUpg.label}: ${nextUpg.cost}g`;
-      btn.addEventListener('click', () => {
-        if (!this.engine) return;
-        if (window.applyTypeUpgrade(typeKey, this.engine)) {
-          if (!this.missionTracker.stats.typeUpgrades) this.missionTracker.stats.typeUpgrades = {};
-          this.missionTracker.stats.typeUpgrades[typeKey] = (this.missionTracker.stats.typeUpgrades[typeKey]||0) + 1;
-          this.missionTracker.check();
-          this.SFX.play('buy');
-          this.buildTypeUpgradeBar(); // 갱신
-        } else {
-          this.showWaveAnnounce('골드 부족!', '#ff6b6b');
-        }
-      });
-      bar.appendChild(btn);
-    }
-    this.buildShopBar(); // v27 fix: 상점을 별도줄 대신 타입강화바 같은 줄 옆에 이어붙임
-  }
-
-  buildSpellBar() {
-    let bar = document.getElementById('spell-bar');
-    if (!bar) {
-      bar = document.createElement('div');
-      bar.id = 'spell-bar';
-      document.getElementById('game-screen').appendChild(bar);
-    }
-    bar.innerHTML = '';
-    for (const key in window.GlobalSpells) {
-      const spell = window.GlobalSpells[key];
-      const btn = document.createElement('button');
-      btn.className = 'spell-btn';
-      btn.dataset.spellKey = key;
-      btn.innerHTML = `
-        <span class="spell-emoji">${spell.emoji}</span>
-        <div style="display:flex;flex-direction:column;align-items:flex-start;gap:1px">
-          <span class="spell-name" style="font-size:11px;font-weight:700">${spell.name}</span>
-          <span style="font-size:9px;color:#888;line-height:1.2">${spell.desc}</span>
-        </div>
-        <span class="spell-cd"></span>
-      `;
-      btn.title = `${spell.name}: ${spell.desc} (쿨타임 ${spell.cooldown}초)`;
-      btn.addEventListener('click', () => { this.spellMgr.cast(key, this.engine); });
-      bar.appendChild(btn);
-    }
-  }
-
-  updateSpellBarUI() {
-    const bar = document.getElementById('spell-bar');
-    if (!bar) return;
-    for (const key in window.GlobalSpells) {
-      const btn = bar.querySelector(`.spell-btn[data-spell-key="${key}"]`);
-      if (!btn) continue;
-      const cd = this.spellMgr.cooldowns[key];
-      const cdEl = btn.querySelector('.spell-cd');
-      if (cd > 0) {
-        btn.classList.add('on-cooldown');
-        cdEl.textContent = Math.ceil(cd);
-      } else {
-        btn.classList.remove('on-cooldown');
-        cdEl.textContent = '';
-      }
-    }
-  }
-
-  openSkillTree(hero) {
-    const existing = document.querySelector('.skilltree-overlay');
-    if (existing) existing.remove();
-
-    const overlay = document.createElement('div');
-    overlay.className = 'skilltree-overlay';
-
-    const title = document.createElement('div');
-    title.className = 'skilltree-title';
-    title.innerHTML = `${hero.skin.emoji} ${hero.name} 스킬트리 <span class="sp-badge">SP: ${hero.skillPoints}</span>`;
-    overlay.appendChild(title);
-
-    const tree = window.SkillTrees[hero.id];
-    if (tree) {
-      const grid = document.createElement('div');
-      grid.className = 'skilltree-grid';
-
-      for (let row = 0; row < 4; row++) {
-        for (let col = 0; col < 3; col++) {
-          const node = tree.nodes.find(n => n.col === col && n.row === row);
-          const cell = document.createElement('div');
-          if (node) {
-            const isUnlocked = hero.unlockedSkills.has(node.id);
-            const canUnlock = !isUnlocked && hero.skillPoints >= node.cost &&
-                              (!node.requires || hero.unlockedSkills.has(node.requires));
-            cell.className = `st-node ${isUnlocked ? 'unlocked' : ''} ${canUnlock ? 'available' : ''} ${!isUnlocked && !canUnlock ? 'locked' : ''}`;
-            cell.innerHTML = `
-              <div class="st-emoji">${node.emoji}</div>
-              <div class="st-name">${node.name}</div>
-              <div class="st-cost">${isUnlocked ? '✅' : `💎${node.cost}`}</div>
-            `;
-            cell.title = node.desc;
-            if (canUnlock) {
-              cell.addEventListener('click', () => {
-                if (hero.unlockSkillNode(node.id, this.engine)) {
-                  this.openSkillTree(hero); // 새로고침
-                  this.buildHeroSkillBar();
-                }
-              });
-            }
-          } else {
-            cell.className = 'st-node empty';
-          }
-          grid.appendChild(cell);
-        }
-      }
-      overlay.appendChild(grid);
-    }
-
-    const closeBtn = document.createElement('button');
-    closeBtn.className = 'skin-picker-close';
-    closeBtn.textContent = '닫기';
-    closeBtn.addEventListener('click', () => overlay.remove());
-    overlay.appendChild(closeBtn);
-
-    document.getElementById('game-screen').appendChild(overlay);
-  }
-
-  _onMissionComplete(mission) {
-    // 보상 지급
-    if (mission.rewardType === 'gold' && this.engine) {
-      this.engine.addGold(mission.reward);
-    }
-    // 팝업
-    const el = document.createElement('div');
-    el.className = 'mission-popup';
-    el.innerHTML = `
-      <div class="mission-popup-title">🎯 미션 완료!</div>
-      <div class="mission-popup-name">${mission.name}</div>
-      <div class="mission-popup-reward">+${mission.reward}g 획득!</div>
-    `;
-    document.getElementById('game-screen').appendChild(el);
-    setTimeout(() => el.remove(), 3000);
-  }
-
-  // v27-4: 시너지 조합표 (요청6) - 미션판처럼 게임 진행 중에도 열람 가능 (engine.stop() 호출 안 함)
-  openSynergyChart() {
-    const existing = document.querySelector('.synergy-overlay');
-    if (existing) { existing.remove(); return; }
-
-    const overlay = document.createElement('div');
-    overlay.className = 'synergy-overlay mission-overlay'; // 미션판과 동일한 위치/스타일 재사용
-
-    const title = document.createElement('div');
-    title.className = 'skilltree-title';
-    title.textContent = '🧬 합치기 레시피 & 시너지 조합표';
-    overlay.appendChild(title);
-
-    const list = document.createElement('div');
-    list.className = 'mission-list';
-
-    // v27-4: 합치기 레시피 (item3 - 원래 요청하신 "조합표") - 같은 타워 3개 모으면 합쳐지는 표
-    const mergeHeader = document.createElement('div');
-    mergeHeader.style.cssText = 'font-size:12px;color:#ffd60a;font-weight:700;margin:4px 0 2px;';
-    mergeHeader.textContent = '🧬 합치기 (동일 타워 3개 → 상위 등급)';
-    list.appendChild(mergeHeader);
-
-    if (window.MERGE_EVOLUTION && window.GachaTowerDefs) {
-      for (const fromId in window.MERGE_EVOLUTION) {
-        const toId = window.MERGE_EVOLUTION[fromId];
-        const fromDef = window.GachaTowerDefs[fromId];
-        const toDef = window.GachaTowerDefs[toId];
-        if (!fromDef || !toDef) continue;
-        const gachaOnly = ['mew'].includes(toId) ? '' : ''; // 자리표시
-        const isMergeOnly = toId === 'mew';
-        const row = document.createElement('div');
-        row.className = 'mission-item';
-        row.innerHTML = `
-          <div>${fromDef.emoji}${fromDef.name} ×3 → ${toDef.emoji}${toDef.name}${isMergeOnly ? ' <span style=\"color:#ff6b6b;font-size:9px\">(합치기 전용! 뽑기로 안 나옴)</span>' : ''}</div>
-          <div style="color:${window.GRADES?.[toDef.grade]?.color || '#fff'};font-size:10px">${window.GRADES?.[toDef.grade]?.name || ''}</div>
-        `;
-        list.appendChild(row);
-      }
-    }
-
-    const synergyHeader = document.createElement('div');
-    synergyHeader.style.cssText = 'font-size:12px;color:#4fc3f7;font-weight:700;margin:14px 0 2px;';
-    synergyHeader.textContent = '🔗 배치 시너지 (150px 이내 인접 배치시 발동)';
-    list.appendChild(synergyHeader);
-
-    // 동일 타입
-    const sameRow = document.createElement('div');
-    sameRow.className = 'mission-item';
-    sameRow.innerHTML = `<div>⚡⚡ 같은 타입끼리</div><div style="color:#ffd60a">+8 데미지</div>`;
-    list.appendChild(sameRow);
-
-    if (window.SYNERGY_PAIRS && window.TYPES) {
-      for (const key in window.SYNERGY_PAIRS) {
-        const [ta, tb] = key.split('|');
-        const pair = window.SYNERGY_PAIRS[key];
-        const infoA = window.TYPES[ta], infoB = window.TYPES[tb];
-        const row = document.createElement('div');
-        row.className = 'mission-item';
-        row.innerHTML = `
-          <div>${infoA.emoji}${infoB.emoji} ${infoA.name}+${infoB.name} <span style="color:#888;font-size:10px">(${pair.label})</span></div>
-          <div style="color:#ffd60a">+${pair.bonus} 데미지</div>
-        `;
-        list.appendChild(row);
-      }
-    }
-    overlay.appendChild(list);
-
-    const closeBtn = document.createElement('button');
-    closeBtn.className = 'shop-close-btn';
-    closeBtn.textContent = '닫기';
-    closeBtn.addEventListener('click', () => overlay.remove());
-    overlay.appendChild(closeBtn);
-
-    document.getElementById('game-screen').appendChild(overlay);
-  }
-
-  openMissionBoard() {
-    const existing = document.querySelector('.mission-overlay');
-    if (existing) { existing.remove(); return; }
-
-    const overlay = document.createElement('div');
-    overlay.className = 'mission-overlay';
-
-    const title = document.createElement('div');
-    title.className = 'skilltree-title';
-    title.textContent = '🎯 미션 보드';
-    overlay.appendChild(title);
-
-    const list = document.createElement('div');
-    list.className = 'mission-list';
-
-    const tracker = this.missionTracker;
-    for (const m of window.MissionDefs) {
-      const done = tracker && tracker.completed.has(m.id);
-      const item = document.createElement('div');
-      item.className = `mission-item ${done ? 'done' : ''}`;
-      item.innerHTML = `
-        <span class="mission-status">${done ? '✅' : '⬜'}</span>
-        <div class="mission-info">
-          <div class="mission-name">${m.name}</div>
-          <div class="mission-desc">${m.desc}</div>
-        </div>
-        <div class="mission-reward">💰${m.reward}</div>
-      `;
-      list.appendChild(item);
-    }
-    overlay.appendChild(list);
-
-    const closeBtn = document.createElement('button');
-    closeBtn.className = 'skin-picker-close';
-    closeBtn.textContent = '닫기';
-    closeBtn.addEventListener('click', () => overlay.remove());
-    overlay.appendChild(closeBtn);
-
-    document.getElementById('game-screen').appendChild(overlay);
-  }
+  // v27-4: 시너지 조합표/미션판/타워바 등 UI 빌드 메서드는 ui-builders.js로 분리됨
 
   _startAutoWaveCountdown(nextWave) {
     if (this._autoWaveTimer) clearInterval(this._autoWaveTimer);
-    let remaining = 10;
+    // v27-5: 초반 페이스 압축 (요청E) - 웨이브10까지는 대기시간을 짧게 (지루함 방지)
+    let remaining = nextWave <= 10 ? 4 : 10;
     this.els.btnWave.textContent = `▶ Wave ${nextWave} (${remaining}초)`;
+    this._showWavePreview(nextWave); // v27-6: 다음웨이브 타입 미리보기 (요청6)
     this._autoWaveTimer = setInterval(() => {
       remaining--;
       if (!this.engine || this.engine.state !== 'idle') {
@@ -1559,88 +1171,24 @@ class App {
     }, 1000);
   }
 
-  // v27: 상시노출 상점바 (기존 5웨이브마다 뜨던 팝업 대신, 게임 멈추지 않음)
-  buildShopBar() {
-    // v27 fix: 별도 줄(#shop-bar) 대신 타입강화바(#type-upgrade-bar) 안에 이어붙임
-    const bar = document.getElementById('type-upgrade-bar');
-    if (!bar) return;
-    document.getElementById('shop-bar')?.remove(); // 예전 별도줄 잔재 정리
-    bar.querySelectorAll('.shop-bar-btn, .shop-bar-divider').forEach(b => b.remove());
-    if (!window.ShopItems || !this.engine) return;
-    if (!this.engine._shopBuyCount) this.engine._shopBuyCount = {};
-    const divider = document.createElement('div');
-    divider.className = 'shop-bar-divider';
-    divider.style.cssText = 'flex:0 0 auto;width:1px;align-self:stretch;background:rgba(255,255,255,0.15);margin:4px 2px;';
-    bar.appendChild(divider);
-    for (const item of window.ShopItems) {
-      const cost = window.shopItemCost(item, this.engine);
-      const used = item.oneTime && this.engine._oneTimeUsed?.[item.key];
-      const btn = document.createElement('button');
-      btn.className = 'shop-bar-btn';
-      btn.disabled = used || this.engine.gold < cost;
-      btn.innerHTML = used
-        ? `<span style="opacity:0.4">${item.emoji}</span><span style="font-size:8px;color:#888">사용완료</span>`
-        : `<span>${item.emoji}</span><span style="font-size:8px;color:#ffd60a">💰${cost}</span>`;
-      btn.title = used ? `${item.name}: 이미 사용함 (게임당 1회)` : `${item.name}: ${item.desc}`;
-      btn.addEventListener('click', () => {
-        if (used) return;
-        if (!this.engine.spendGold(cost)) {
-          this.showWaveAnnounce('골드가 부족합니다', '#ff6b6b');
-          return;
-        }
-        const result = item.buy(this.engine);
-        if (result === false) {
-          // 구매 취소 조건(예: 대상 없음) - 골드 환불
-          this.engine.addGold(cost);
-          return;
-        }
-        if (item.scaling) this.engine._shopBuyCount[item.key] = (this.engine._shopBuyCount[item.key] || 0) + 1;
-        if (item.oneTime) {
-          if (!this.engine._oneTimeUsed) this.engine._oneTimeUsed = {};
-          this.engine._oneTimeUsed[item.key] = true;
-        }
-        this.SFX.play('buy');
-        this.showWaveAnnounce(`${item.emoji} ${item.name} 사용!`, '#06d6a0');
-        this.buildShopBar();
-      });
-      bar.appendChild(btn);
+  // v27-6: 다음 웨이브 등장 타입 미리보기 UI (요청6 - 전략적 타입강화 타이밍 고민 유도)
+  _showWavePreview(nextWave) {
+    let el = document.getElementById('wave-preview');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'wave-preview';
+      el.style.cssText = 'position:absolute;left:50%;bottom:calc(var(--bar-h,82px) + 140px);transform:translateX(-50%);z-index:19;display:flex;gap:4px;align-items:center;background:rgba(0,0,0,0.5);border-radius:8px;padding:4px 8px;font-size:11px;color:#aaa;pointer-events:none;';
+      document.getElementById('game-screen').appendChild(el);
     }
+    const types = typeof previewWaveTypes === 'function' ? previewWaveTypes(nextWave) : [];
+    const icons = types.map(t => window.TYPES?.[t]?.emoji || '').join(' ');
+    el.innerHTML = `다음 웨이브: ${icons || '?'}`;
   }
+
+  // v27: 상시노출 상점바 (기존 5웨이브마다 뜨던 팝업 대신, 게임 멈추지 않음)
 
   // v27: 보스 소환 (스타 UMS 게이트 방식) - 영웅스킬바 옆 상시노출, 레벨별 쿨다운
   // v27-2: 단일 쿨다운(60초) + 등급 선택 방식 (한번에 여러 등급 동시소환 방지)
-  buildBossSummonButton() {
-    let bar = document.getElementById('boss-summon-bar');
-    if (bar) bar.remove();
-    bar = document.createElement('div');
-    bar.id = 'boss-summon-bar';
-    bar.style.cssText = 'position:absolute;left:8px;bottom:calc(var(--bar-h,82px) + 100px);z-index:19;display:flex;flex-direction:column;gap:3px;background:rgba(20,5,5,0.75);border-radius:10px;padding:5px;border:1px solid rgba(255,60,60,0.3);';
-    document.getElementById('game-screen').appendChild(bar);
-
-    if (this._bossSummonTier == null) this._bossSummonTier = 1;
-
-    const tierRow = document.createElement('div');
-    tierRow.style.cssText = 'display:flex;gap:3px;';
-    for (const t of BOSS_TIERS) {
-      const chip = document.createElement('button');
-      chip.className = 'boss-tier-chip';
-      chip.dataset.tier = t.tier;
-      chip.textContent = t.tier;
-      chip.title = `${t.label} (체력×${t.hpMul}, 보상×${t.rewardMul})`;
-      chip.style.cssText = 'width:22px;height:22px;border-radius:6px;border:1.5px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.4);color:#fff;font-size:11px;cursor:pointer;padding:0;';
-      chip.addEventListener('click', () => { this._bossSummonTier = t.tier; this._updateBossSummonUI(); });
-      tierRow.appendChild(chip);
-    }
-    bar.appendChild(tierRow);
-
-    const summonBtn = document.createElement('button');
-    summonBtn.id = 'boss-summon-btn';
-    summonBtn.style.cssText = 'padding:5px 8px;border-radius:8px;border:1.5px solid rgba(255,60,60,0.5);background:rgba(60,5,5,0.9);color:#fff;font-size:10px;cursor:pointer;';
-    summonBtn.addEventListener('click', () => this._summonBoss(this._bossSummonTier));
-    bar.appendChild(summonBtn);
-
-    this._updateBossSummonUI();
-  }
 
   _summonBoss(tier) {
     const e = this.engine;
@@ -1788,6 +1336,23 @@ class App {
 
     const wave = generateWave(nextWave);
 
+    // v27-5: 랜덤 이벤트 웨이브 (요청: 다채로움) - 보스/왕 웨이브는 제외, 15% 확률
+    e._globalGoldMul = 1; e._waveSpeedMul = 1; e._waveHpMul = 1;
+    const isBossWave = nextWave === KING_WAVE || nextWave % 10 === 0;
+    if (!isBossWave && nextWave >= 3 && Math.random() < 0.15) {
+      const events = [
+        { name:'💰 골드 러쉬', color:'#ffd60a', apply:()=>{ e._globalGoldMul = 2.2; } },
+        { name:'⚡ 스피드 웨이브', color:'#4fc3f7', apply:()=>{ e._waveSpeedMul = 1.5; e._waveHpMul = 0.75; } },
+        { name:'🛡️ 정예 웨이브', color:'#ff6b6b', apply:()=>{ e._waveHpMul = 1.6; e._globalGoldMul = 1.8; } },
+      ];
+      const ev = events[Math.floor(Math.random() * events.length)];
+      ev.apply();
+      this._currentWaveEvent = ev;
+      this.showWaveAnnounce(`${ev.name}! (Wave ${nextWave})`, ev.color);
+    } else {
+      this._currentWaveEvent = null;
+    }
+
     // 보스 웨이브 경고
     if (nextWave === KING_WAVE) {
       this.showWaveAnnounce(`👑 왕이 기다리고 있습니다... (Wave ${nextWave})`, '#ffd60a');
@@ -1836,6 +1401,24 @@ class App {
       bestEl.style.cssText = 'color:#ffd60a;font-size:15px;margin-bottom:8px;';
       bestEl.textContent = `🏆 최고 기록: ${best != null ? best : reached}`;
       overlay.appendChild(bestEl);
+
+      // v27-6: 이번 판 요약 (요청4) - MVP타워/최고시너지/사용 종수
+      const summary = document.createElement('div');
+      summary.style.cssText = 'background:rgba(0,0,0,0.3);border-radius:10px;padding:10px 16px;margin:6px 0;font-size:12px;color:#ccc;text-align:left;min-width:220px;';
+      const dmgStats = this.engine._towerDamageStats || {};
+      let mvpId = null, mvpDmg = 0;
+      for (const id in dmgStats) { if (dmgStats[id] > mvpDmg) { mvpDmg = dmgStats[id]; mvpId = id; } }
+      const mvpDef = mvpId && window.GachaTowerDefs?.[mvpId];
+      const varietyCount = this.missionTracker?.stats?.collectedIds?.size || 0;
+      const maxSynergy = this.engine._maxSynergySeen || 0;
+      summary.innerHTML = `
+        <div style="color:#ffd60a;font-weight:700;margin-bottom:4px;">📊 이번 판 요약</div>
+        <div>⭐ MVP 타워: ${mvpDef ? `${mvpDef.emoji} ${mvpDef.name}` : '-'}</div>
+        <div>🔗 최고 시너지: +${maxSynergy}</div>
+        <div>🎲 사용한 포켓몬 종류: ${varietyCount}종</div>
+        <div>🏅 최종 점수: ${(this.engine.score||0).toLocaleString()}</div>
+      `;
+      overlay.appendChild(summary);
     }
 
     if (victory && stars > 0) {
@@ -1875,7 +1458,7 @@ class App {
     const ctx = this.els.canvas.getContext('2d');
     ctx.clearRect(0, 0, this.els.canvas.width, this.els.canvas.height);
 
-    document.querySelectorAll('.end-overlay,.wave-announce,.shop-overlay,.skin-picker,.skilltree-overlay,.mission-overlay,.synergy-overlay,#field-warning-banner').forEach(el => el.remove());
+    document.querySelectorAll('.end-overlay,.wave-announce,.shop-overlay,.skin-picker,.skilltree-overlay,.mission-overlay,.synergy-overlay,#field-warning-banner,#field-danger-vignette,#wave-preview').forEach(el => el.remove());
     const shopBar = document.getElementById('shop-bar');
     if (shopBar) shopBar.innerHTML = '';
     const bossBtn = document.getElementById('boss-summon-bar');

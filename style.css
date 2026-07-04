@@ -487,11 +487,20 @@ html, body {
 .end-unlock-msg { font-size:12px; color:var(--accent-pur); text-align:center; }
 
 /* ===== RESPONSIVE ===== */
+/* v27-7: manifest의 orientation:landscape를 무시하는 기기(일부 안드로이드/iOS Safari) 대응.
+   세로로 들고 있으면 화면을 가리고 회전 안내를 띄움 (기존엔 죽은 셀렉터만 있고 실질적 대응이 없었음) */
+#rotate-overlay { display:none; }
 @media (orientation:portrait) {
-  #map-select-screen { padding:48px 16px 24px; }
-  .map-cards { flex-direction:column; align-items:center; }
-  .map-card { max-width:100%; width:100%; flex:none; }
-  .shop-grid { grid-template-columns:repeat(2,1fr); }
+  #rotate-overlay {
+    display:flex; position:fixed; inset:0; z-index:9999;
+    background:#080c14; color:#fff;
+    flex-direction:column; align-items:center; justify-content:center; gap:16px;
+    text-align:center; padding:24px;
+  }
+  #rotate-overlay .rotate-icon { font-size:48px; animation: rotateHint 1.6s ease-in-out infinite; }
+  #rotate-overlay .rotate-text { font-size:16px; font-weight:700; }
+  #rotate-overlay .rotate-sub { font-size:12px; color:#888; }
+  @keyframes rotateHint { 0%,100% { transform:rotate(0deg); } 50% { transform:rotate(-90deg); } }
 }
 
 /* ===== 경로 선택 버튼 ===== */
@@ -882,4 +891,26 @@ html, body {
 @media (max-height: 360px) {
   #hero-skill-bar { transform:scale(0.85); transform-origin:right bottom; }
   #boss-summon-bar { transform:scale(0.72); }
+}
+
+/* ===== v27-6: 웨이브 타이머 긴장감 (절제된 톤, 요청2) ===== */
+#hud-timer.timer-warn { color:#ffb74d; }
+#hud-timer.timer-danger { color:#ff7043; animation: timerPulseSoft 1s ease-in-out infinite; }
+#hud-timer.timer-critical { color:#ff5252; font-weight:800; animation: timerPulseHard 0.5s ease-in-out infinite; }
+@keyframes timerPulseSoft { 0%,100% { opacity:1; } 50% { opacity:0.6; } }
+@keyframes timerPulseHard { 0%,100% { opacity:1; transform:scale(1); } 50% { opacity:0.75; transform:scale(1.08); } }
+
+/* ===== v27-6: 필드 위험 화면 비네트 (은은하게, 요청2) ===== */
+#field-danger-vignette {
+  position:absolute; inset:0; pointer-events:none; z-index:10;
+  box-shadow: inset 0 0 0 0 rgba(255,60,60,0);
+  transition: box-shadow 0.6s ease;
+}
+#field-danger-vignette.active {
+  box-shadow: inset 0 0 90px 10px rgba(255,60,60,0.22);
+  animation: vignettePulse 2.4s ease-in-out infinite;
+}
+@keyframes vignettePulse {
+  0%,100% { box-shadow: inset 0 0 90px 10px rgba(255,60,60,0.16); }
+  50%     { box-shadow: inset 0 0 110px 16px rgba(255,60,60,0.28); }
 }
