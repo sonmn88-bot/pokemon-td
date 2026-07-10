@@ -349,7 +349,9 @@ class GameEngine {
       const offset = this.spawnTimer;
       let merged = this.spawnQueue.concat(waveData.map(item => ({ ...item, delay: item.delay + offset + 2 })));
       const MAX_BACKLOG = 70;
-      if (merged.length > MAX_BACKLOG) merged = merged.slice(merged.length - MAX_BACKLOG); // 오래된 것부터 정리
+      // v27-19 버그수정: slice 방향이 거꾸로였음 - "곧 나올 것"들을 지우고 "한참 뒤에 나올 것"만 남겨서
+      // 스킵 몇 번 하면 한참동안 아무것도 안 나오다가 갑자기 몰려나오는 문제였음. 곧 나올 것부터 유지해야 함.
+      if (merged.length > MAX_BACKLOG) merged = merged.slice(0, MAX_BACKLOG);
       this.spawnQueue = merged;
     } else {
       this.spawnQueue = [...waveData];
@@ -395,8 +397,9 @@ class GameEngine {
     if (!item.isKing && !item.bossTier && this.currentWave > 10) {
       let waveHpMul = 1 + (this.currentWave - 10) * 0.014;
       if (this.currentWave > 90) {
+        // v27-19: 왕 이후 난이도가 계속 너무 쉬웠음(95웨이브에도 무난히 클리어) - 지수적으로 훨씬 가파르게
         const post = this.currentWave - 90;
-        waveHpMul *= Math.pow(1 + post * 0.035, 1.3);
+        waveHpMul *= Math.pow(1.22, post);
       }
       if (this._runTrait?.key === 'swarm') waveHpMul *= 0.88;
       enemy.maxHp = Math.round(enemy.maxHp * waveHpMul);

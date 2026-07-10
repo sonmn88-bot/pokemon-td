@@ -348,6 +348,8 @@ class Enemy {
     // 상태이상 발동 시점에 총량을 즉발로 이미 지급했으므로, 여기서는 시각효과(아이콘)용으로 시간만 감소시킴.
     if (this.burning > 0) this.burning -= dt;
     if (this.poisoned > 0) this.poisoned -= dt;
+    if (this._burnCooldown > 0) this._burnCooldown -= dt;
+    if (this._poisonCooldown > 0) this._poisonCooldown -= dt;
 
     // 재생
     if (this.def.special === 'regen') {
@@ -438,9 +440,12 @@ class Enemy {
         break;
       case 'burn':
         if (this.def.special === 'poisonImmune') return; // 독/화상 면역은 불에도 약한 건 아니나 단순화
-        // v27-15: 화상 = 폭발형 (요청) - 발동 순간 주변 범위 전체에 동일한 총량 데미지 (밀집한 적에게 강함)
+        // v27-19 버그수정: 여러 화염타워가 번갈아 때리면 화상이 계속 재발동되어 사실상 도트처럼
+        // 반복 대미지가 들어가고 있었음. burning 지속시간과 별개로 "발동 쿨다운"을 둬서 확실히 막음.
+        if ((this._burnCooldown || 0) > 0) break;
+        this._burnCooldown = 5; // 5초 안에는 화상이 또 안 붙음 (누가 때리든)
         duration = Math.min(duration, 3.5);
-        if (this.burning <= 0.05) {
+        {
           this.burning = duration;
           this.burnDamage = factor || 10;
           const total = duration * this.burnDamage;
@@ -463,9 +468,10 @@ class Enemy {
         break;
       case 'poison':
         if (this.def.special === 'poisonImmune' || this.def.poisonImmune) return;
-        // v27-15: 독 = 전파형 (요청) - 총량을 나 포함 주변 최대 4마리에게 나눠서 감염시킴
-        // (폭발형인 화상과 달리 밀집도에 상관없이 항상 정해진 인원에게 고정 총량이 나뉘어 들어감 - 서로 다른 상황에 강함)
-        if (this.poisoned <= 0.05) {
+        // v27-19: 독도 화상과 동일하게 재발동 쿨다운 적용 (여러 독타워가 번갈아 때려서 반복되던 문제 방지)
+        if ((this._poisonCooldown || 0) > 0) break;
+        this._poisonCooldown = 5;
+        {
           this.poisoned = duration;
           this.poisonDamage = factor || 8;
           const total = duration * this.poisonDamage;
