@@ -64,7 +64,8 @@ function generateWave(n) {
   }
 
   // 웨이브가 진행될수록 더 많이, 더 빽빽하게 스폰 (계속 돌면서 잡는 느낌). cycle이 늘수록(90웨이브 이후 반복) 한번 더 강화
-  const enemyCount = Math.round(26 + n * 4.6 + cycle * 20);
+  let enemyCount = Math.round(26 + n * 4.6 + cycle * 20);
+  if (window.app?.engine?._runTrait?.key === 'swarm') enemyCount = Math.round(enemyCount * 1.25);
   const baseInterval = Math.max(0.26, 0.85 - n * 0.014);
   const streams = 1 + Math.min(4, Math.floor(n / 6));
 
@@ -133,6 +134,7 @@ class App {
             shoot:      { freq:[440,300],   dur:0.09, vol:0.09, type:'triangle' },
             hit:        { freq:[260,160],   dur:0.11, vol:0.10, type:'sine' },
             wave_clear: { freq:[523,659,784],dur:0.55, vol:0.15, type:'sine' },
+            king_victory: { freq:[392,523,659,784,988],dur:0.9, vol:0.18, type:'triangle' }, // v27-18: 왕 처치 전용 징글 (요청H)
             wave_start: { freq:[330,440],   dur:0.22, vol:0.13, type:'sine' },
             pull_normal:{ freq:[440,550],   dur:0.16, vol:0.11, type:'sine' },
             pull_rare:  { freq:[550,700,880],dur:0.32, vol:0.14, type:'sine' },
@@ -284,6 +286,104 @@ class App {
     }
   }
 
+  // v27-17: 왕 처치 기록 갤러리 (요청4)
+  _recordKingKill() {
+    try {
+      const list = JSON.parse(localStorage.getItem('pokemontd_king_records') || '[]');
+      const mvpDmg = this.engine._towerDamageStats || {};
+      let mvpId = null, best = 0;
+      for (const id in mvpDmg) { if (mvpDmg[id] > best) { best = mvpDmg[id]; mvpId = id; } }
+      const mvpName = mvpId && window.GachaTowerDefs?.[mvpId]?.name;
+      list.unshift({ wave: this.engine.currentWave, score: this.engine.score || 0, mvp: mvpName || '-', date: new Date().toLocaleDateString('ko-KR') });
+      localStorage.setItem('pokemontd_king_records', JSON.stringify(list.slice(0, 20)));
+    } catch (e) {}
+  }
+
+  async _showGlobalRanking() {
+    const overlay = document.createElement('div');
+    overlay.className = 'skin-picker';
+    overlay.innerHTML = `<div class="skin-picker-title">🌍 전체 랭킹</div><div id="rank-list-body" style="color:#888;padding:20px;">불러오는 중...</div>`;
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'skin-picker-close';
+    closeBtn.textContent = '닫기';
+    closeBtn.addEventListener('click', () => overlay.remove());
+    overlay.appendChild(closeBtn);
+    document.body.appendChild(overlay);
+
+    if (!window.Leaderboard || !window.Leaderboard.isEnabled()) {
+      overlay.querySelector('#rank-list-body').innerHTML =
+        '<div style="text-align:center;color:#888;max-width:280px;">랭킹 서버가 아직 설정되지 않았습니다.<br>(firebase-config.js 설정 필요)</div>';
+      return;
+    }
+    const rows = await window.Leaderboard.fetchTop(20);
+    const body = overlay.querySelector('#rank-list-body');
+    if (!rows.length) { body.textContent = '아직 등록된 기록이 없습니다.'; return; }
+    body.style.cssText = 'max-width:380px;max-height:50vh;overflow-y:auto;color:#ddd;font-size:12px;';
+    body.innerHTML = rows.map((r, i) => `
+      <div style="display:flex;justify-content:space-between;padding:8px 12px;background:rgba(255,255,255,0.05);border-radius:8px;margin-bottom:6px;">
+        <span>#${i+1} ${r.name}</span>
+        <span style="color:#ffd60a">🏅${(r.score||0).toLocaleString()}</span>
+        <span style="color:#4fc3f7">Wave ${r.wave}</span>
+      </div>`).join('');
+  }
+
+  _showKingHallOfFame() {
+    let records = [];
+    try { records = JSON.parse(localStorage.getItem('pokemontd_king_records') || '[]'); } catch (e) {}
+    const overlay = document.createElement('div');
+    overlay.className = 'skin-picker';
+    overlay.innerHTML = `
+      <div class="skin-picker-title">👑 왕 처치 명예의 전당</div>
+      <div style="max-width:380px;max-height:50vh;overflow-y:auto;color:#ddd;font-size:12px;">
+        ${records.length === 0 ? '<div style="text-align:center;color:#888;padding:20px">아직 왕을 처치한 기록이 없습니다</div>' :
+          records.map((r, i) => `
+            <div style="display:flex;justify-content:space-between;padding:8px 12px;background:rgba(255,255,255,0.05);border-radius:8px;margin-bottom:6px;">
+              <span>#${i+1} · Wave ${r.wave}</span>
+              <span style="color:#ffd60a">🏅${r.score.toLocaleString()}</span>
+              <span style="color:#4fc3f7">⭐${r.mvp}</span>
+              <span style="color:#888">${r.date}</span>
+            </div>`).join('')}
+      </div>
+    `;
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'skin-picker-close';
+    closeBtn.textContent = '닫기';
+    closeBtn.addEventListener('click', () => overlay.remove());
+    overlay.appendChild(closeBtn);
+    document.body.appendChild(overlay);
+  }
+
+  // v27-17: 영웅 궁극기 발동시 화면 테두리 플래시 (요청5)
+  _flashScreenEdge() {
+    let el = document.getElementById('skill-flash');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'skill-flash';
+      document.getElementById('game-screen').appendChild(el);
+    }
+    el.classList.remove('flash-active');
+    void el.offsetWidth; // 리플로우 강제 (애니메이션 재시작용)
+    el.classList.add('flash-active');
+  }
+
+  // v27-18: 이번 판 한정 랜덤 시드특성 (요청G) - 영구 강화 아님, 이번 판에만 적용되는 색다른 조건
+  _applyRunSeedTrait() {
+    const traits = [
+      { key:'goldBoom',   name:'💰 골드 풍년',   desc:'이번 판 모든 골드 획득 +20%' },
+      { key:'swarm',      name:'👾 몬스터 창궐', desc:'몹 물량 +25%, 대신 체력 -12%' },
+      { key:'eliteEra',   name:'⚔️ 정예의 시대', desc:'엘리트 몬스터 등장 확률 2배' },
+      { key:'headStart',  name:'🚀 빠른 출발',   desc:'시작 골드 +200' },
+      { key:'masteryBoost',name:'⭐ 숙련의 축복', desc:'숙련도 상승 효과 2배' },
+    ];
+    const trait = traits[Math.floor(Math.random() * traits.length)];
+    this.engine._runTrait = trait;
+    if (trait.key === 'headStart') this.engine.addGold(200);
+    this._runTraitInfo = trait;
+    const badge = document.getElementById('hud-trait');
+    if (badge) { badge.title = `${trait.name} — ${trait.desc}`; badge.textContent = trait.name.split(' ')[0]; }
+    setTimeout(() => this.showWaveAnnounce(`${trait.name} — ${trait.desc}`, '#4fc3f7'), 600);
+  }
+
   bindMapSelect() {
     const startBtn = document.getElementById('btn-endless-start');
     if (startBtn) startBtn.addEventListener('click', () => this.startGame());
@@ -291,6 +391,10 @@ class App {
     if (skinBtn) skinBtn.addEventListener('click', () => this.openSkinPicker(this.starterHero || 'pikachu'));
     const howtoBtn = document.getElementById('btn-howto');
     if (howtoBtn) howtoBtn.addEventListener('click', () => this._showHowToPlay());
+    const hofBtn = document.getElementById('btn-hof');
+    if (hofBtn) hofBtn.addEventListener('click', () => this._showKingHallOfFame());
+    const rankBtn = document.getElementById('btn-globalrank');
+    if (rankBtn) rankBtn.addEventListener('click', () => this._showGlobalRanking());
   }
 
   // v27-7: 신규 유저 온보딩 - 간단한 게임방법 요약 (요청3)
@@ -420,6 +524,7 @@ class App {
           if (hero.cast(skillIdx, this.engine)) {
             const skill = hero.def.skills[skillIdx];
             this.showWaveAnnounce(`${skill.emoji} ${skill.name}!`, '#ffd60a');
+            this._flashScreenEdge(); // v27-17: 궁극기 발동 화면 테두리 플래시 (요청5)
           }
         }
         return;
@@ -454,6 +559,8 @@ class App {
     if (btnMission) btnMission.addEventListener('click', () => this.openMissionBoard());
     const btnSynergy = document.getElementById('btn-synergy');
     if (btnSynergy) btnSynergy.addEventListener('click', () => this.openSynergyChart());
+    const btnPower = document.getElementById('btn-power');
+    if (btnPower) btnPower.addEventListener('click', () => this.openPowerSummary());
   }
 
   bindSpeedButtons() {
@@ -531,7 +638,7 @@ class App {
             this.missionTracker.stats.totalUniqueCount++;
           this.missionTracker.stats.collectedIds.add(r.id);
           if (!this.engine._masteryLevel) this.engine._masteryLevel = {};
-          this.engine._masteryLevel[r.id] = (this.engine._masteryLevel[r.id] || 0) + 1; // v27-5: 숙련도 (item2)
+          this.engine._masteryLevel[r.id] = (this.engine._masteryLevel[r.id] || 0) + (this.engine._runTrait?.key === 'masteryBoost' ? 2 : 1); // v27-5/18: 숙련도 (item2, 시드특성 반영)
           const newMastery = 1 + Math.min(20, this.engine._masteryLevel[r.id]) * 0.02;
           for (const s of this.engine.towerSlots) {
             if (s.occupied && s.tower?._gachaId === r.id) s.tower.masteryMul = newMastery;
@@ -592,7 +699,7 @@ class App {
       if (pullKey === 'gamble') this.missionTracker.stats.gambleCount++;
       this.missionTracker.stats.collectedIds.add(towerDef.id); // v27-5: 전체모으기 미션용
       if (!this.engine._masteryLevel) this.engine._masteryLevel = {};
-      this.engine._masteryLevel[towerDef.id] = (this.engine._masteryLevel[towerDef.id] || 0) + 1; // v27-5: 숙련도 (item2)
+      this.engine._masteryLevel[towerDef.id] = (this.engine._masteryLevel[towerDef.id] || 0) + (this.engine._runTrait?.key === 'masteryBoost' ? 2 : 1); // v27-5/18: 숙련도 (item2, 시드특성 반영)
       const newMastery = 1 + Math.min(20, this.engine._masteryLevel[towerDef.id]) * 0.02;
       for (const s of this.engine.towerSlots) {
         if (s.occupied && s.tower?._gachaId === towerDef.id) s.tower.masteryMul = newMastery;
@@ -942,11 +1049,21 @@ class App {
     };
     this.engine.onBossAppear = (boss) => {
       this.SFX.play('boss');
+      // v27-16: 보스 약점 타입 힌트 (요청1 - 타입상성 이제 실제 작동하니 시각화)
+      let weakHint = '';
+      if (window.TYPE_CYCLE && boss.typeTag) {
+        const di = window.TYPE_CYCLE.indexOf(boss.typeTag);
+        if (di >= 0) {
+          const weakType = window.TYPE_CYCLE[(di - 1 + window.TYPE_CYCLE.length) % window.TYPE_CYCLE.length];
+          const info = window.TYPES?.[weakType];
+          if (info) weakHint = `<br><span style="font-size:0.75em;color:${info.color}">💡 ${info.emoji}${info.name} 타입에 약함!</span>`;
+        }
+      }
       const el = document.createElement('div');
       el.className = 'wave-announce boss';
       el.innerHTML = boss._isKing
-        ? `👑 ${boss.def.emoji} 궁극의 뮤츠 (왕) 등장!<br><span style="font-size:0.85em;font-style:italic">"…감히 내 영역에 발을 들이다니."</span><br><span style="font-size:0.65em">⚠️ 이후로는 존 이동 없이 이 자리에서 무한 강화 모드로 진입합니다</span>`
-        : `${boss.def.emoji} ${boss.name} 등장!<br><span style="font-size:0.7em">⚠️ 보스</span>`;
+        ? `👑 ${boss.def.emoji} 궁극의 뮤츠 (왕) 등장!<br><span style="font-size:0.85em;font-style:italic">"…감히 내 영역에 발을 들이다니."</span>${weakHint}<br><span style="font-size:0.65em">⚠️ 이후로는 존 이동 없이 이 자리에서 무한 강화 모드로 진입합니다</span>`
+        : `${boss.def.emoji} ${boss.name} 등장!<br><span style="font-size:0.7em">⚠️ 보스</span>${weakHint}`;
       document.getElementById('game-screen').appendChild(el);
       setTimeout(() => el.remove(), boss._isKing ? 4500 : 2800);
       this.engine.triggerScreenShake(boss._isKing ? 16 : 10, boss._isKing ? 0.6 : 0.4);
@@ -955,7 +1072,9 @@ class App {
     this.engine.loseLife = (n) => { this.SFX.play('life_lost'); origLoseLife(n); };
     this.engine.onKingDefeated = () => {
       this.showWaveAnnounce('👑 왕을 처치했습니다! 무한 강화 모드 진입 - 20웨이브마다 적이 새로운 능력을 얻습니다', '#ffd60a');
+      this.SFX.play('king_victory'); // v27-18: 왕 처치 전용 승리 징글 (요청H)
       this.BGM.start('infinite'); // v27-7: 무한강화 진입시 전용 BGM으로 전환 (요청5)
+      this._recordKingKill(); // v27-17: 왕 처치 기록 갤러리 (요청4)
     };
     this.engine.onWaveComplete = (wave, bonus, timedOut) => {
       if (hudTimer) hudTimer.style.display = 'none';
@@ -963,7 +1082,12 @@ class App {
       if (!timedOut) this.SFX.play('wave_clear');
       // v27: 엔드리스 - 클리어 개념 없이 항상 자동으로 다음 웨이브 카운트다운
       this._startAutoWaveCountdown(wave + 1);
-      if (!timedOut) this.showWaveAnnounce(`Wave ${wave} 완료! +${bonus}g`, '#ffd60a');
+      if (!timedOut) {
+        // v27-17: 웨이브 클리어 문구 다양화 (요청2) - 필드에 남은 적이 없으면 "완벽 클리어"
+        const remaining = this.engine.enemies.length;
+        const clearMsg = remaining === 0 ? `✨ 완벽한 클리어! Wave ${wave} +${bonus}g` : `Wave ${wave} 완료! +${bonus}g`;
+        this.showWaveAnnounce(clearMsg, '#ffd60a');
+      }
       if (this.missionTracker && this.difficulty === 'hard' && !timedOut) {
         this.missionTracker.stats.hardWavesCleared = (this.missionTracker.stats.hardWavesCleared||0) + 1;
       }
@@ -1001,6 +1125,7 @@ class App {
     this.buildShopBar();
     this.buildBossSummonButton();
     this.startHeroLoop();
+    this._applyRunSeedTrait(); // v27-18: 이번 판 한정 랜덤 시드특성 (요청G)
     this._showStarterTowerPicker(); // v27-5: 시작 시 스타터 타워 3택1 (요청B - 초반 결정 유도)
   }
 
@@ -1075,6 +1200,44 @@ class App {
           fcEl.textContent = cnt;
           const cell = document.getElementById('hud-field');
           if (cell) cell.style.color = cnt >= 160 ? '#ff5252' : cnt >= 120 ? '#ffab40' : cnt >= 80 ? '#ffd60a' : '';
+        }
+      }
+      // v27-17: 황금 시간 이벤트 (요청3) - 웨이브 경계와 무관하게 가끔 30초간 전체 골드 획득량 상승
+      if (this.engine.state === 'wave' || this.engine.state === 'idle') {
+        if (!this.engine._goldenTimeActive && Math.random() < 0.0006) {
+          this.engine._goldenTimeActive = true;
+          this.engine._goldenTimeRemaining = 30;
+          this.engine._goldenTimeGoldMul = 1.8;
+          this.showWaveAnnounce('✨ 황금 시간! 30초간 골드 획득 1.8배', '#ffd60a');
+        }
+        if (this.engine._goldenTimeActive) {
+          this.engine._goldenTimeRemaining -= this.engine.dt;
+          if (this.engine._goldenTimeRemaining <= 0) {
+            this.engine._goldenTimeActive = false;
+            this.engine._goldenTimeGoldMul = 1;
+            this.showWaveAnnounce('황금 시간 종료', '#aaa');
+          }
+        }
+      }
+      // v27-16: 미니 현상금 이벤트 (요청2) - 가끔 일반 몹 하나가 반짝이며 등장, 제한시간 안에 잡으면 보너스
+      if (this.engine.state === 'wave' && this.engine.enemies.length > 0) {
+        if (!this.engine._bountyTarget && Math.random() < 0.0025) { // 평균 몇십초에 한번 정도
+          const candidates = this.engine.enemies.filter(e => !e.dead && !e.isBoss && !e._bounty);
+          if (candidates.length) {
+            const t = candidates[Math.floor(Math.random() * candidates.length)];
+            t._bounty = true; t._bountyTimer = 8;
+            this.engine._bountyTarget = t;
+            this.showWaveAnnounce('💰 현상금 몬스터 등장! (8초 안에 처치)', '#ffd60a');
+          }
+        }
+        if (this.engine._bountyTarget) {
+          const bt = this.engine._bountyTarget;
+          if (bt.dead || bt.reachedEnd) {
+            this.engine._bountyTarget = null;
+          } else {
+            bt._bountyTimer -= this.engine.dt;
+            if (bt._bountyTimer <= 0) { bt._bounty = false; this.engine._bountyTarget = null; }
+          }
         }
       }
       // v27-6: 최고 시너지 달성치 추적 (요청4 - 게임오버 요약화면 MVP용)
@@ -1398,12 +1561,38 @@ class App {
   }
 
   showWaveAnnounce(text, color) {
+    // v27-16: 배속(3x 등)에서 알림이 실시간 기준 2.2초 동안 안 사라져서 여러 개가 겹쳐 보이던 문제.
+    // 활성 알림들을 배열로 관리해서 세로로 살짝 어긋나게 쌓고, 너무 많으면 오래된 것부터 즉시 정리.
+    if (!this._activeAnnounces) this._activeAnnounces = [];
+    const MAX_STACK = 3;
+    while (this._activeAnnounces.length >= MAX_STACK) {
+      const old = this._activeAnnounces.shift();
+      old.el.remove();
+      clearTimeout(old.timer);
+    }
     const el = document.createElement('div');
     el.className = 'wave-announce';
     el.style.color = color;
     el.textContent = text;
     document.getElementById('game-screen').appendChild(el);
-    setTimeout(() => el.remove(), 2200);
+    const entry = { el, timer: null };
+    this._activeAnnounces.push(entry);
+    this._repositionAnnounces();
+    entry.timer = setTimeout(() => {
+      el.remove();
+      const idx = this._activeAnnounces.indexOf(entry);
+      if (idx >= 0) this._activeAnnounces.splice(idx, 1);
+      this._repositionAnnounces();
+    }, 1700 / (this.engine?.speedMul || 1)); // 배속이 빠를수록 조금 더 빨리 사라지게
+  }
+
+  // v27-16: 알림들을 세로로 살짝 어긋나게 배치 (겹침 방지)
+  _repositionAnnounces() {
+    if (!this._activeAnnounces) return;
+    this._activeAnnounces.forEach((entry, i) => {
+      const offset = (i - (this._activeAnnounces.length - 1) / 2) * 46;
+      entry.el.style.top = `calc(50% + ${offset}px)`;
+    });
   }
 
   showEndScreen(victory, stars, best) {
@@ -1438,14 +1627,37 @@ class App {
       const mvpDef = mvpId && window.GachaTowerDefs?.[mvpId];
       const varietyCount = this.missionTracker?.stats?.collectedIds?.size || 0;
       const maxSynergy = this.engine._maxSynergySeen || 0;
+      // v27-18: 사망 서사 (요청F)
+      const dc = this.engine._deathCause;
+      const deathLine = dc ? `<div style="color:#ff6b6b;font-style:italic;margin-top:4px">💀 ${dc.name} ${dc.count}마리에게 둘러싸여 무너졌습니다</div>` : '';
       summary.innerHTML = `
         <div style="color:#ffd60a;font-weight:700;margin-bottom:4px;">📊 이번 판 요약</div>
         <div>⭐ MVP 타워: ${mvpDef ? `${mvpDef.emoji} ${mvpDef.name}` : '-'}</div>
         <div>🔗 최고 시너지: +${maxSynergy}</div>
         <div>🎲 사용한 포켓몬 종류: ${varietyCount}종</div>
         <div>🏅 최종 점수: ${(this.engine.score||0).toLocaleString()}</div>
+        ${deathLine}
       `;
       overlay.appendChild(summary);
+
+      // v27-18: 전체 랭킹 제출 UI (요청 - 끝났을 때 이름+기록 저장)
+      if (window.Leaderboard && window.Leaderboard.isEnabled()) {
+        const rankBox = document.createElement('div');
+        rankBox.style.cssText = 'display:flex;gap:6px;margin:8px 0;align-items:center;';
+        rankBox.innerHTML = `
+          <input id="rank-name-input" maxlength="12" placeholder="이름 입력 (최대 12자)"
+            style="flex:1;padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.3);background:rgba(0,0,0,0.4);color:#fff;font-size:13px;">
+          <button id="rank-submit-btn" style="padding:8px 14px;border-radius:8px;border:none;background:#ffd60a;color:#1a1200;font-weight:700;font-size:13px;cursor:pointer;">🏆 랭킹 등록</button>
+        `;
+        overlay.appendChild(rankBox);
+        const submitBtn = rankBox.querySelector('#rank-submit-btn');
+        const nameInput = rankBox.querySelector('#rank-name-input');
+        submitBtn.addEventListener('click', async () => {
+          submitBtn.disabled = true; submitBtn.textContent = '등록 중...';
+          const res = await window.Leaderboard.submitScore(nameInput.value, this.engine.score || 0, reached);
+          submitBtn.textContent = res.ok ? '✅ 등록 완료!' : '❌ 등록 실패';
+        });
+      }
     }
 
     if (victory && stars > 0) {
@@ -1485,7 +1697,7 @@ class App {
     const ctx = this.els.canvas.getContext('2d');
     ctx.clearRect(0, 0, this.els.canvas.width, this.els.canvas.height);
 
-    document.querySelectorAll('.end-overlay,.wave-announce,.shop-overlay,.skin-picker,.skilltree-overlay,.mission-overlay,.synergy-overlay,#field-warning-banner,#field-danger-vignette,#wave-preview').forEach(el => el.remove());
+    document.querySelectorAll('.end-overlay,.wave-announce,.shop-overlay,.skin-picker,.skilltree-overlay,.mission-overlay,.synergy-overlay,.power-overlay,#field-warning-banner,#field-danger-vignette,#wave-preview').forEach(el => el.remove());
     const shopBar = document.getElementById('shop-bar');
     if (shopBar) shopBar.innerHTML = '';
     const bossBtn = document.getElementById('boss-summon-bar');

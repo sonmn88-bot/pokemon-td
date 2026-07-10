@@ -294,12 +294,19 @@ class Enemy {
   update(dt) {
     if (this.dead || this.reachedEnd) return;
 
-    // 스턴 중이면 이동 안 함
+    // v27-14 버그수정: 스턴+빙결이 각각 활성화되어 있을 때 if/else if 구조 때문에 빙결 타이머가
+    // 스턴이 끝날 때까지 아예 멈춰있어서 두 지속시간이 순차로 더해지고 있었음(요청2의 근본 원인).
+    // 이제 둘 다 독립적으로 동시에 감소함 - "못 움직이는 상태"인 건 같지만 시간은 각자 흐름.
     if (this.stunned > 0) {
       this.stunned -= dt;
-      if (this.stunned <= 0) this._stunImmune = 1.8; // v27-10: 스턴 풀리면 잠깐 면역시간 부여 (연속스턴락 방지)
-    } else if (this.frozen > 0) {
+      if (this.stunned <= 0) this._stunImmune = 1.8; // 스턴 풀리면 잠깐 면역시간 부여 (연속스턴락 방지)
+    }
+    if (this.frozen > 0) {
       this.frozen -= dt;
+      if (this.frozen <= 0) this._stunImmune = Math.max(this._stunImmune || 0, 1.8);
+    }
+    if (this.stunned > 0 || this.frozen > 0) {
+      // 못 움직이는 상태 - 이동 스킵
     } else {
       if (this._stunImmune > 0) this._stunImmune -= dt;
       // 이동 속도
@@ -337,14 +344,10 @@ class Enemy {
     }
 
     // DoT 처리
-    if (this.burning > 0) {
-      this.burning -= dt;
-      this.takeDamage(this.burnDamage * dt, 'fire');
-    }
-    if (this.poisoned > 0) {
-      this.poisoned -= dt;
-      this.takeDamage(this.poisonDamage * dt, 'poison');
-    }
+    // v27-14: 도트데미지(화상/독) 완전 제거 (요청 - 반복 재발해서 아예 매커니즘을 없앰).
+    // 상태이상 발동 시점에 총량을 즉발로 이미 지급했으므로, 여기서는 시각효과(아이콘)용으로 시간만 감소시킴.
+    if (this.burning > 0) this.burning -= dt;
+    if (this.poisoned > 0) this.poisoned -= dt;
 
     // 재생
     if (this.def.special === 'regen') {
@@ -435,25 +438,63 @@ class Enemy {
         break;
       case 'burn':
         if (this.def.special === 'poisonImmune') return; // 독/화상 면역은 불에도 약한 건 아니나 단순화
-        // v27-11: 화상 완전 논스택 (요청4) - 이미 타고 있으면 새 화상은 아예 무시 (데미지도 갱신 안 함)
+        // v27-15: 화상 = 폭발형 (요청) - 발동 순간 주변 범위 전체에 동일한 총량 데미지 (밀집한 적에게 강함)
         duration = Math.min(duration, 3.5);
         if (this.burning <= 0.05) {
           this.burning = duration;
           this.burnDamage = factor || 10;
+          const total = duration * this.burnDamage;
+          const radius = 55;
+          if (this.engine) {
+            let hitAny = false;
+            for (const e of this.engine.enemies) {
+              if (e.dead || e.reachedEnd) continue;
+              const d = Math.hypot(e.x - this.x, e.y - this.y);
+              if (d <= radius) {
+                e.takeDamage(e === this ? total : total * 0.5, 'fire'); // 원래 대상 100%, 주변은 50%
+                hitAny = true;
+              }
+            }
+            if (hitAny && window.AoeBurst) this.engine.particles.push(new AoeBurst(this.x, this.y, radius, '#ff7043'));
+          } else {
+            this.takeDamage(total, 'fire');
+          }
         }
         break;
       case 'poison':
         if (this.def.special === 'poisonImmune' || this.def.poisonImmune) return;
+        // v27-15: 독 = 전파형 (요청) - 총량을 나 포함 주변 최대 4마리에게 나눠서 감염시킴
+        // (폭발형인 화상과 달리 밀집도에 상관없이 항상 정해진 인원에게 고정 총량이 나뉘어 들어감 - 서로 다른 상황에 강함)
         if (this.poisoned <= 0.05) {
           this.poisoned = duration;
           this.poisonDamage = factor || 8;
+          const total = duration * this.poisonDamage;
+          const SPREAD_RANGE = 90, MAX_TARGETS = 4;
+          let targets = [this];
+          if (this.engine) {
+            const nearby = this.engine.enemies
+              .filter(e => e !== this && !e.dead && !e.reachedEnd && Math.hypot(e.x - this.x, e.y - this.y) <= SPREAD_RANGE)
+              .sort((a, b) => Math.hypot(a.x - this.x, a.y - this.y) - Math.hypot(b.x - this.x, b.y - this.y))
+              .slice(0, MAX_TARGETS - 1);
+            targets = targets.concat(nearby);
+          }
+          const per = total / targets.length;
+          for (const tgt of targets) {
+            tgt.takeDamage(per, 'poison');
+            if (tgt !== this) { tgt.poisoned = Math.max(tgt.poisoned, 0.6); tgt.poisonDamage = 0; } // 살짝 독기운 표시만(추가 데미지는 안 나감, 논스택 유지)
+          }
         }
         break;
       case 'freeze':
         if (this.def.special === 'iceImmune') return;
-        // v27-8: 빙결 지속시간 상한 (요청3)
+        // v27-14: 빙결도 스턴과 동일한 보호장치 적용 (면역시간+갱신감쇠) - 요청: 빙결+스턴 중첩으로 영구멈춤
+        if (this._stunImmune > 0) duration *= 0.15;
         duration = Math.min(duration, 1.8);
-        this.frozen = duration;
+        if (this.frozen > 0) {
+          this.frozen = Math.min(1.8, this.frozen + duration * 0.35);
+        } else if (duration > this.frozen) {
+          this.frozen = duration;
+        }
         break;
     }
   }
@@ -522,6 +563,19 @@ class Enemy {
     const s = this.size;
 
     ctx.save();
+
+    // v27-16: 현상금 몬스터 시각효과 (요청2)
+    if (this._bounty) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(this.x, drawY, s * 1.3, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(255,214,10,${0.6 + Math.sin(Date.now()*0.01)*0.3})`;
+      ctx.lineWidth = 3; ctx.shadowColor = '#ffd60a'; ctx.shadowBlur = 14;
+      ctx.stroke();
+      ctx.restore();
+      ctx.font = '14px serif'; ctx.textAlign = 'center';
+      ctx.fillText('💰', this.x, drawY - s * 1.6);
+    }
 
     // 스턴/빙결 효과
     if (this.stunned > 0 || this.frozen > 0) {

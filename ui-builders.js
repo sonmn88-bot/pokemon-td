@@ -111,7 +111,9 @@ Object.assign(App.prototype, {
       // v27-5: 숙련도 표시 (item2)
       const masteryLv = this.engine?._masteryLevel?.[def.id] || 0;
       const masteryTag = masteryLv > 0
-        ? `<div style="font-size:10px;color:#ce93d8;margin-top:2px">⭐ 숙련도 ${Math.min(20,masteryLv)}/20 (데미지 +${Math.min(20,masteryLv)*2}%) - 같은 포켓몬 더 뽑을수록 증가</div>`
+        ? (masteryLv >= 20
+            ? `<div style="font-size:10px;color:#ffd60a;margin-top:2px;font-weight:700">🌟 각성 완료! (데미지 +40%, 최대치)</div>`
+            : `<div style="font-size:10px;color:#ce93d8;margin-top:2px">⭐ 숙련도 ${Math.min(20,masteryLv)}/20 (데미지 +${Math.min(20,masteryLv)*2}%) - 같은 포켓몬 더 뽑을수록 증가</div>`)
         : '';
       const flavor = window.FLAVOR_TEXT?.[def.id];
       const flavorTag = flavor ? `<div style="font-size:9.5px;color:#777;font-style:italic;margin-top:3px;max-width:220px;">"${flavor}"</div>` : '';
@@ -473,6 +475,52 @@ Object.assign(App.prototype, {
     `;
     document.getElementById('game-screen').appendChild(el);
     setTimeout(() => el.remove(), 3000);
+  },
+
+  // v27-18: 종합 전력 요약 (요청E) - 타입별 배율/최고시너지/타워수를 한 화면에
+  openPowerSummary() {
+    const existing = document.querySelector('.power-overlay');
+    if (existing) { existing.remove(); return; }
+    if (!this.engine) return;
+    const overlay = document.createElement('div');
+    overlay.className = 'power-overlay mission-overlay';
+    const title = document.createElement('div');
+    title.className = 'skilltree-title';
+    title.textContent = '📈 종합 전력 요약';
+    overlay.appendChild(title);
+
+    const list = document.createElement('div');
+    list.className = 'mission-list';
+    for (const typeKey in window.TypeUpgrades || {}) {
+      const info = window.TYPES?.[typeKey];
+      const lv = window.TypeUpgradeLevels?.[typeKey] || 0;
+      let mul = 1;
+      for (let i = 0; i < lv; i++) mul *= (1 + window.getTypeUpgradeAt(typeKey, i).val);
+      const towerCount = this.engine.towers.filter(t => t.def?.type === typeKey).length;
+      const row = document.createElement('div');
+      row.className = 'mission-item';
+      row.innerHTML = `
+        <div>${info?.emoji || ''} ${info?.name || typeKey} (타워 ${towerCount}개)</div>
+        <div style="color:#ffd60a">데미지 x${mul.toFixed(2)} (강화 ${lv}단계)</div>
+      `;
+      list.appendChild(row);
+    }
+    const totalRow = document.createElement('div');
+    totalRow.style.cssText = 'margin-top:10px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.15);font-size:12px;color:#ccc;';
+    totalRow.innerHTML = `
+      <div>🏰 총 배치 타워: ${this.engine.towers.length}개</div>
+      <div>🔗 현재 최고 시너지: +${this.engine._maxSynergySeen || 0}</div>
+      <div>🎲 보유 종류: ${this.missionTracker?.stats?.collectedIds?.size || 0}종</div>
+    `;
+    list.appendChild(totalRow);
+    overlay.appendChild(list);
+
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'shop-close-btn';
+    closeBtn.textContent = '닫기';
+    closeBtn.addEventListener('click', () => overlay.remove());
+    overlay.appendChild(closeBtn);
+    document.getElementById('game-screen').appendChild(overlay);
   },
 
   openSynergyChart() {

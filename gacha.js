@@ -127,7 +127,70 @@ const GachaTowerDefs = {
     fire(t,e){ _shot(t,e,'#ffeb3b','⚡',{type:'stun',duration:0.35},500); }
   },
 
+  // v27-17: 정통 진화라인 정비 (요청) - 구구/꼬렛/피삐/뚜벅초/디그다/고라파덕/가디의 진짜 진화형 신규 추가
+  pidgeotto: {
+    id:'pidgeotto', name:'피죤', emoji:'🐦', grade:'rare', type:'normal', pokemonId:'pidgey',
+    damage:20, range:235, fireRate:2.3, desc:'비행형 적에게 데미지 +70%',
+    fire(t,e){
+      if(!t.target) return;
+      const dmg = t.target?.def?.special === 'flying' ? t.damage * 1.7 : t.damage;
+      e.projectiles.push(new Projectile(t.x,t.y,t.target,{engine:e,speed:560,damage:dmg,color:'#bcaaa4',size:5,dmgType:'special',emoji:'🪶'}));
+    }
+  },
+  raticate: {
+    id:'raticate', name:'레트라', emoji:'🐀', grade:'rare', type:'normal', pokemonId:'rattata',
+    damage:19, range:175, fireRate:3.4, desc:'같은 타겟 연속 공격시 데미지 누적(최대+80%, 강화판)',
+    fire(t,e){
+      if(!t.target) return;
+      if(t._lastTarget===t.target){ t._biteStack=Math.min(8,(t._biteStack||0)+1); } else { t._biteStack=0; }
+      t._lastTarget=t.target;
+      const dmg=t.damage*(1+t._biteStack*0.1);
+      e.projectiles.push(new Projectile(t.x,t.y,t.target,{engine:e,speed:460,damage:dmg,color:'#8d6e63',size:5,dmgType:'special',emoji:'🐀'}));
+    }
+  },
+  clefable: {
+    id:'clefable', name:'픽시블', emoji:'💫', grade:'rare', type:'normal', pokemonId:'clefairy',
+    damage:18, range:225, fireRate:1.1, desc:'주변 타워 데미지 +25% (강화판)',
+    fire(t,e){
+      _shot(t,e,'#f8bbd0','💫',null,340);
+      for(const tw of e.towers) if(tw!==t&&Math.hypot(tw.x-t.x,tw.y-t.y)<150) tw.buffDmgMul=(tw.buffDmgMul||1)*1.0025;
+    }
+  },
+  gloom: {
+    id:'gloom', name:'리본초', emoji:'🌺', grade:'rare', type:'grass', pokemonId:'oddish',
+    damage:22, range:195, fireRate:1.2, desc:'광역 독 포자 (강화판)',
+    fire(t,e){
+      _shot(t,e,'#7cb342','🍃',{type:'poison',duration:4.5,factor:12},330,null,60);
+      t._sporeTimer=(t._sporeTimer||0)+1/t.fireRate;
+      if(t._sporeTimer>=4.5){ t._sporeTimer=0;
+        for(const en of e.enemies) if(!en.dead&&!en.reachedEnd&&Math.hypot(en.x-t.x,en.y-t.y)<=115) en.applyStatus('slow',2.2,0.6);
+        e.particles.push(new AoeBurst(t.x,t.y,115,'#7cb342'));
+      }
+    }
+  },
+  dugtrio: {
+    id:'dugtrio', name:'닥트리오', emoji:'🏔️', grade:'rare', type:'normal', pokemonId:'diglett',
+    damage:24, range:170, fireRate:1.2, desc:'강한 넉백+스턴',
+    fire(t,e){ _shot(t,e,'#d4a056','💨',{type:'stun',duration:0.7},320,null,0,0,55); }
+  },
+  golduck: {
+    id:'golduck', name:'골덕', emoji:'🦆', grade:'rare', type:'water', pokemonId:'psyduck',
+    damage:20, range:215, fireRate:1.35, desc:'강한 슬로우',
+    fire(t,e){ _shot(t,e,'#4fc3f7','💫',{type:'slow',duration:3,factor:0.45},380); }
+  },
+  arcanine: {
+    id:'arcanine', name:'윈디', emoji:'🐕', grade:'rare', type:'fire', pokemonId:'growlithe',
+    damage:23, range:200, fireRate:2.4, desc:'강화 화염 속사',
+    fire(t,e){ _shot(t,e,'#ff6d00','🔥',{type:'burn',duration:2,factor:8},520); }
+  },
+
   // ===== 레어 (8종) =====
+  ivysaur: {
+    // v27-16: 이상해씨의 정상 진화(이상해풀) - 실제 이미지 없어도 이상해씨 이미지로 폴백(pokemonId)됨
+    id:'ivysaur', name:'이상해풀', emoji:'🌿', grade:'rare', type:'grass', pokemonId:'bulbasaur',
+    damage:24, range:200, fireRate:1.2, desc:'광역 독 포자 (강화판)',
+    fire(t,e){ _shot(t,e,'#7cb342','🍃',{type:'poison',duration:4,factor:9},330,null,55); }
+  },
   charmeleon: {
     id:'charmeleon', name:'리자드', emoji:'🔥', grade:'rare', type:'fire', pokemonId:'charmander',
     damage:22, range:195, fireRate:2.5, desc:'관통 화염',
@@ -152,7 +215,8 @@ const GachaTowerDefs = {
     fire(t,e){ _shot(t,e,'#a1887f','🪨',{type:'stun',duration:0.6},380,null,55); }
   },
   gastly: {
-    id:'gastly', name:'고우스트', emoji:'👻', grade:'rare', type:'psychic', pokemonId:'gastly',
+    // v27-17: 이름 오표기 수정 (고우스트→고스트, '고우스트'는 사실 haunter의 한글명이었음)
+    id:'gastly', name:'고스트', emoji:'👻', grade:'rare', type:'psychic', pokemonId:'gastly',
     damage:22, range:215, fireRate:1.3, desc:'방어 무시',
     fire(t,e){ e.projectiles.push(new Projectile(t.x,t.y,t.target,{engine:e,speed:360,damage:t.damage*1.6,color:'#7c4dff',size:7,dmgType:'special',emoji:'👻',status:{type:'slow',duration:2,factor:0.5}})); }
   },
@@ -178,6 +242,39 @@ const GachaTowerDefs = {
   },
 
   // ===== 에픽 (6종) =====
+  venusaur: {
+    // v27-16: 이상해풀의 정상 진화(이상해꽃) - pokemonId 폴백으로 이상해씨 이미지 재사용
+    id:'venusaur', name:'이상해꽃', emoji:'🌺', grade:'epic', type:'grass', pokemonId:'bulbasaur',
+    damage:40, range:220, fireRate:1.1, desc:'광역 독 포자 (최종 강화)',
+    fire(t,e){ _shot(t,e,'#558b2f','🍃',{type:'poison',duration:4.5,factor:14},340,null,70); }
+  },
+  pidgeot: {
+    id:'pidgeot', name:'피죤투', emoji:'🐦', grade:'epic', type:'normal', pokemonId:'pidgey',
+    damage:36, range:265, fireRate:2.6, desc:'비행형 적에게 데미지 +120%, 관통',
+    fire(t,e){
+      if(!t.target) return;
+      const dmg = t.target?.def?.special === 'flying' ? t.damage * 2.2 : t.damage;
+      e.projectiles.push(new Projectile(t.x,t.y,t.target,{engine:e,speed:620,damage:dmg,color:'#bcaaa4',size:6,dmgType:'special',emoji:'🪶',piercing:true,pierceWidth:24}));
+    }
+  },
+  vileplume: {
+    id:'vileplume', name:'라플레시아', emoji:'🌺', grade:'epic', type:'grass', pokemonId:'oddish',
+    damage:40, range:210, fireRate:1.25, desc:'맹독 포자 + 광역 슬로우',
+    fire(t,e){
+      _shot(t,e,'#6a1b9a','🍃',{type:'poison',duration:5,factor:18},350,null,75);
+      t._sporeTimer=(t._sporeTimer||0)+1/t.fireRate;
+      if(t._sporeTimer>=4){ t._sporeTimer=0;
+        for(const en of e.enemies) if(!en.dead&&!en.reachedEnd&&Math.hypot(en.x-t.x,en.y-t.y)<=130) en.applyStatus('slow',2.5,0.5);
+        e.particles.push(new AoeBurst(t.x,t.y,130,'#6a1b9a'));
+      }
+    }
+  },
+  haunter: {
+    // v27-17: 고스트 진화라인 정비 - 고스트(gastly)의 정통 진화형. 전용 이미지 없으면 적 폴더의 haunter.png로 자동 대체됨
+    id:'haunter', name:'고우스트', emoji:'👻', grade:'epic', type:'psychic', pokemonId:'haunter',
+    damage:40, range:230, fireRate:1.4, desc:'방어 무시 + 강한 슬로우',
+    fire(t,e){ e.projectiles.push(new Projectile(t.x,t.y,t.target,{engine:e,speed:400,damage:t.damage*1.8,color:'#7c4dff',size:8,dmgType:'special',emoji:'👻',status:{type:'slow',duration:2.5,factor:0.4}})); }
+  },
   charizard: {
     id:'charizard', name:'리자몽', emoji:'🐉', grade:'epic', type:'fire', pokemonId:'charmander',
     damage:50, range:240, fireRate:3.5, desc:'관통+폭발 25%',
@@ -263,6 +360,15 @@ const GachaTowerDefs = {
         onHit:(en)=>{ e.particles.push(new AoeBurst(en.x,en.y,80,'#fb8c00')); for(const e2 of e.enemies) if(e2!==en&&!e2.dead&&Math.hypot(e2.x-en.x,e2.y-en.y)<80) e2.takeDamage(t.damage*0.6,'special'); }}));
     }
   },
+  gengar: {
+    // v27-17: 고스트 라인 최종진화. 전용 이미지 없으면 haunter.png(적 폴더)로 자동 대체됨
+    id:'gengar', name:'팬텀', emoji:'👻', grade:'legend', type:'psychic', pokemonId:'haunter',
+    damage:62, range:250, fireRate:1.6, desc:'완전 방어무시 + 광역 슬로우',
+    fire(t,e){
+      e.projectiles.push(new Projectile(t.x,t.y,t.target,{engine:e,speed:420,damage:t.damage*2,color:'#4a148c',size:9,dmgType:'special',emoji:'👻',
+        onHit:(en)=>{ e.particles.push(new AoeBurst(en.x,en.y,90,'#4a148c')); for(const e2 of e.enemies) if(!e2.dead&&!e2.reachedEnd&&Math.hypot(e2.x-en.x,e2.y-en.y)<90) e2.applyStatus('slow',2.5,0.45); }}));
+    }
+  },
 
   // ===== 유니크 (2종) =====
   mewtwo: {
@@ -290,6 +396,13 @@ const GachaTowerDefs = {
 // v27-6: 도감 플레이버 텍스트 (요청3 - 짧은 원작 감성 문구, 타워패널에 표시)
 const FLAVOR_TEXT = {
   bulbasaur:'등에 있는 씨앗에 영양분이 가득 차 있다.', charmander:'꼬리 불이 꺼지면 생명이 위험해진다.',
+  ivysaur:'등의 봉오리가 커질수록 서있기 힘들어한다.', venusaur:'큰 꽃에 햇빛을 모아 힘으로 바꾼다는 이상해씨의 최종 진화형.',
+  pidgeotto:'세력권을 정해두고 그 안을 계속 순찰한다.', pidgeot:'한번 날면 마하 2의 속도로 활공한다는 최강의 새.',
+  raticate:'수염으로 주변 상황을 살피는 야행성 포켓몬.', clefable:'평소엔 부끄럼이 많아 잘 나타나지 않는다.',
+  gloom:'입에서 나오는 꿀이 강렬한 악취를 풍긴다.', vileplume:'세상에서 가장 큰 꽃을 피운다는 포켓몬.',
+  dugtrio:'세 마리가 지하 깊은 곳에서 뿌리처럼 이어져 있다.', golduck:'물속에서는 인어로 오해받기도 한다는 포켓몬.',
+  arcanine:'예로부터 그 늠름한 모습으로 사랑받아온 포켓몬.',
+  haunter:'혀로 핥인 상대는 계속 몸이 떨린다는 무서운 소문.', gengar:'그림자에 숨어 장난칠 상대를 노린다는 포켓몬.',
   squirtle:'등껍질 속에서 몸을 웅크리면 방어력이 급상승.', pidgey:'겁이 많지만 날개짓만은 재빠르다.',
   rattata:'무엇이든 갉아대는 습성 때문에 이빨이 계속 자란다.', clefairy:'보름달이 뜨면 춤을 춘다는 전설이 있다.',
   oddish:'낮엔 땅에 몸을 묻고 밤에만 움직인다.', diglett:'지상에 보이는 건 몸의 일부일 뿐이다.',
@@ -343,31 +456,35 @@ const PULL_COSTS = { normal:50, premium:120, gamble:320, ten:450 };
 
 const GRADE_POOLS = {
   normal:  ['bulbasaur','charmander','squirtle','pidgey','rattata','clefairy','oddish','diglett','psyduck','growlithe','abra','magnemite'],
-  rare:    ['charmeleon','wartortle','kadabra','geodude','gastly','lickitung','horsea','magneton','dratini'],
-  epic:    ['charizard','blastoise','alakazam','gyarados','lapras','aerodactyl','dragonair'],
-  legend:  ['articuno','zapdos','moltres','dragonite'],
+  rare:    ['charmeleon','wartortle','kadabra','geodude','gastly','lickitung','horsea','magneton','dratini','ivysaur','pidgeotto','raticate','clefable','gloom','dugtrio','golduck','arcanine'],
+  epic:    ['charizard','blastoise','alakazam','gyarados','lapras','aerodactyl','dragonair','venusaur','pidgeot','vileplume','haunter'],
+  legend:  ['articuno','zapdos','moltres','dragonite','gengar'],
   unique:  ['mewtwo'], // v27-4: mew는 가챠풀에서 제외 - 합치기(전설 3개→유니크)로만 획득 가능 (item3)
 };
 
 // ===== 합치기 진화 =====
 const MERGE_EVOLUTION = {
-  // 노말 3개 → 레어
-  bulbasaur:'oddish',    charmander:'charmeleon', squirtle:'wartortle',
-  pidgey:'horsea',       rattata:'lickitung',     clefairy:'kadabra',
-  oddish:'gastly',       diglett:'geodude',       psyduck:'horsea',
-  growlithe:'charmeleon',abra:'kadabra',          magnemite:'magneton',
-  // 레어 3개 → 에픽
+  // 노말 3개 → 레어 (전부 정통 진화형으로 정비, v27-17)
+  bulbasaur:'ivysaur',   charmander:'charmeleon', squirtle:'wartortle',
+  pidgey:'pidgeotto',    rattata:'raticate',      clefairy:'clefable',
+  oddish:'gloom',        diglett:'dugtrio',       psyduck:'golduck',
+  growlithe:'arcanine',  abra:'kadabra',          magnemite:'magneton',
+  // 레어 3개 → 에픽 (정통 진화가 있는 건 정통으로, 없는 건 타입 맞춰 합류)
   charmeleon:'charizard',wartortle:'blastoise',   kadabra:'alakazam',
-  geodude:'aerodactyl',  gastly:'alakazam',       lickitung:'blastoise',
-  horsea:'gyarados',     magneton:'zapdos',
-  dratini:'dragonair',
+  geodude:'aerodactyl',  lickitung:'blastoise',
+  horsea:'gyarados',     magneton:'aerodactyl',
+  dratini:'dragonair',   ivysaur:'venusaur',
+  pidgeotto:'pidgeot',   raticate:'lapras',       clefable:'alakazam',
+  gloom:'vileplume',     dugtrio:'aerodactyl',    golduck:'gyarados',
+  arcanine:'charizard',
   // 에픽 3개 → 레전드
   charizard:'moltres',   blastoise:'articuno',    alakazam:'zapdos',
   gyarados:'articuno',   lapras:'articuno',       aerodactyl:'zapdos',
-  dragonair:'dragonite',
+  dragonair:'dragonite', venusaur:'articuno',
+  pidgeot:'zapdos',      vileplume:'articuno',    haunter:'gengar',
   // 레전드 3개 → 유니크
   articuno:'mew',        zapdos:'mewtwo',         moltres:'mew',
-  dragonite:'mewtwo',
+  dragonite:'mewtwo',    gengar:'mew',
 };
 
 // ===== 뽑기 함수 =====
@@ -472,6 +589,14 @@ function _createGachaTower(def, x, y, engine) {
         ctx.lineWidth=2.5; ctx.setLineDash([5,4]);
         ctx.beginPath(); ctx.arc(this.x,this.y,27,0,Math.PI*2); ctx.stroke();
         ctx.setLineDash([]); ctx.restore();
+      }
+      // v27-17: 숙련도 각성(20/20 마스터) 오라 (요청1) - 무지개링과 겹쳐도 구분되게 바깥쪽 큰 링으로
+      if(this.masteryMul >= 1.4){ // 20중복 = 1+20*0.02 = 1.4
+        ctx.save(); const hue2=(Date.now()*0.08+120)%360;
+        ctx.strokeStyle=`hsla(${hue2},90%,70%,0.55)`;
+        ctx.lineWidth=1.5; ctx.shadowColor=`hsl(${hue2},90%,70%)`; ctx.shadowBlur=8;
+        ctx.beginPath(); ctx.arc(this.x,this.y,35+Math.sin(Date.now()*0.004)*2,0,Math.PI*2); ctx.stroke();
+        ctx.restore();
       }
       // 등급 오라
       if(def.grade!=='normal'){
@@ -633,25 +758,25 @@ function applyTypeUpgrade(type, engine) {
 
 // ===== 미션 =====
 const MissionDefs = [
-  {id:'first_rare',  name:'레어 수집가',    desc:'레어 타워 3개 뽑기',       reward:30,  condition:(s)=>s.totalRareCount>=3},
-  {id:'first_epic',  name:'에픽 수집가',  desc:'에픽 타워 3개 뽑기',       reward:60, condition:(s)=>s.totalEpicCount>=3},
+  {id:'first_rare',  name:'레어 수집가',    desc:'레어 타워 3개 뽑기',       reward:10,  condition:(s)=>s.totalRareCount>=3},
+  {id:'first_epic',  name:'에픽 수집가',  desc:'에픽 타워 3개 뽑기',       reward:20, condition:(s)=>s.totalEpicCount>=3},
   {id:'first_legend',name:'레전드!',     desc:'레전드 타워 뽑기',     reward:300, condition:(s)=>s.totalLegendCount>=1},
   {id:'first_unique',name:'유니크!',     desc:'유니크 타워 뽑기',     reward:500, condition:(s)=>s.totalUniqueCount>=1},
-  {id:'first_merge', name:'첫 합치기!',  desc:'합치기로 진화',         reward:50, condition:(s)=>s.mergeCount>=1},
+  {id:'first_merge', name:'첫 합치기!',  desc:'합치기로 진화',         reward:15, condition:(s)=>s.mergeCount>=1},
   {id:'merge5',      name:'합치기 장인', desc:'합치기 5회',            reward:200, condition:(s)=>s.mergeCount>=5},
-  {id:'combo10',     name:'콤보 20!',   desc:'콤보 20 달성',          reward:30,  condition:(s)=>s.maxCombo>=20},
+  {id:'combo10',     name:'콤보 20!',   desc:'콤보 20 달성',          reward:10,  condition:(s)=>s.maxCombo>=20},
   {id:'combo30',     name:'콤보 마스터',desc:'콤보 30 달성',           reward:200, condition:(s)=>s.maxCombo>=30},
-  {id:'wave5',       name:'웨이브 8',   desc:'웨이브 8 클리어',       reward:40, condition:(s)=>s.wavesCleared>=8},
-  {id:'wave10',      name:'웨이브 10',  desc:'웨이브 10 클리어',      reward:100, condition:(s)=>s.wavesCleared>=10},
+  {id:'wave5',       name:'웨이브 8',   desc:'웨이브 8 클리어',       reward:15, condition:(s)=>s.wavesCleared>=8},
+  {id:'wave10',      name:'웨이브 10',  desc:'웨이브 10 클리어',      reward:60, condition:(s)=>s.wavesCleared>=10},
   {id:'boss1',       name:'보스 처치',  desc:'보스 처치',              reward:250, condition:(s)=>s.bossKills>=1},
-  {id:'bosssummon1', name:'첫 소환!',   desc:'보스 소환 버튼으로 보스 1회 소환', reward:60, condition:(s)=>(s.bossSummons||0)>=1},
+  {id:'bosssummon1', name:'첫 소환!',   desc:'보스 소환 버튼으로 보스 1회 소환', reward:20, condition:(s)=>(s.bossSummons||0)>=1},
   {id:'bosssummon10',name:'소환술사',   desc:'보스 소환 10회',          reward:400, condition:(s)=>(s.bossSummons||0)>=10},
   {id:'wave90',      name:'3존 완주',   desc:'웨이브 90 도달 (엔드리스 3존 순환 완료)', reward:600, condition:(s)=>s.wavesCleared>=90},
   {id:'type_fire',   name:'불꽃 마스터',desc:'불꽃 타입 업그레이드 3단계',reward:300,condition:(s)=>(s.typeUpgrades?.fire||0)>=3},
   {id:'type_water',  name:'물 마스터',  desc:'물 타입 업그레이드 3단계',  reward:300,condition:(s)=>(s.typeUpgrades?.water||0)>=3},
-  {id:'towers8',     name:'군대 집결',  desc:'타워 14개 배치',          reward:60, condition:(s)=>s.maxTowersDeployed>=14},
-  {id:'ten_pull',    name:'10연 도전',  desc:'10연 뽑기 1회',          reward:50, condition:(s)=>s.tenPullCount>=1},
-  {id:'perfect5',    name:'완벽한 방어',desc:'시간초과 없이 웨이브 5 클리어',reward:70,condition:(s)=>s.wavesCleared>=5&&!s.timeouts},
+  {id:'towers8',     name:'군대 집결',  desc:'타워 14개 배치',          reward:20, condition:(s)=>s.maxTowersDeployed>=14},
+  {id:'ten_pull',    name:'10연 도전',  desc:'10연 뽑기 1회',          reward:15, condition:(s)=>s.tenPullCount>=1},
+  {id:'perfect5',    name:'완벽한 방어',desc:'시간초과 없이 웨이브 5 클리어',reward:20,condition:(s)=>s.wavesCleared>=5&&!s.timeouts},
   {id:'shadow_hunt', name:'흑화 사냥꾼',desc:'흑화(골드 엘리트) 5마리 처치',reward:200,condition:(s)=>(s.eliteGoldKills||0)>=5},
   {id:'hero_evolve',name:'진화의 순간',desc:'영웅을 진화시키기',        reward:200, condition:(s)=>!!s.heroEvolved},
   {id:'hard_clear',  name:'하드 정복자',desc:'하드 난이도 웨이브 10 클리어',reward:400,condition:(s)=>(s.hardWavesCleared||0)>=10},

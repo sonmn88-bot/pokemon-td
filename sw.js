@@ -11,6 +11,8 @@ const ASSETS = [
   '/pokemon-td/shop.js',
   '/pokemon-td/gacha.js',
   '/pokemon-td/main.js',
+  '/pokemon-td/leaderboard.js',
+  '/pokemon-td/firebase-config.js',
   '/pokemon-td/ui-builders.js',
   '/pokemon-td/sprites.js',
   '/pokemon-td/manifest.json',

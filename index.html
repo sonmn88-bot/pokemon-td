@@ -61,6 +61,8 @@
     <button id="btn-title-skin" style="margin:14px auto 4px;display:block;padding:10px 24px;border-radius:10px;border:1px solid rgba(255,255,255,0.25);background:rgba(0,0,0,0.35);color:#fff;font-size:14px;cursor:pointer;">👕 스킨 선택</button>
     <button id="btn-endless-start" style="margin:18px auto;display:block;padding:14px 40px;border-radius:14px;border:none;background:linear-gradient(135deg,#ffd60a,#ff8f00);color:#1a1200;font-size:18px;font-weight:800;cursor:pointer;">▶ 엔드리스 시작</button>
     <button id="btn-howto" style="margin:0 auto;display:block;padding:8px 20px;border-radius:10px;border:1px solid rgba(255,255,255,0.2);background:transparent;color:#aaa;font-size:12px;cursor:pointer;">❓ 게임 방법</button>
+    <button id="btn-hof" style="margin:6px auto 0;display:block;padding:8px 20px;border-radius:10px;border:1px solid rgba(255,214,10,0.3);background:transparent;color:#ffd60a;font-size:12px;cursor:pointer;">👑 명예의 전당</button>
+    <button id="btn-globalrank" style="margin:6px auto 0;display:block;padding:8px 20px;border-radius:10px;border:1px solid rgba(79,195,247,0.4);background:transparent;color:#4fc3f7;font-size:12px;cursor:pointer;">🌍 전체 랭킹</button>
   </div>
 
   <!-- ===== 게임 화면 ===== -->
@@ -74,6 +76,7 @@
       <div class="hud-cell" id="hud-wave">🌊 <span id="wave-val">0</span>/<span id="wave-total">∞</span></div>
       <div class="hud-cell" id="hud-score">🏅 <span id="score-val">0</span></div>
       <div class="hud-cell" id="hud-field">👾 <span id="field-count-val">0</span>/200</div>
+      <div class="hud-cell" id="hud-trait" title="이번 판 시드특성" style="cursor:help">🎲</div>
       <div class="hud-cell" id="hud-timer" style="display:none">⏱ <span id="timer-val">--</span>s</div>
       <div class="hud-cell hud-combo" id="hud-combo" style="display:none">
         🔥 <span id="combo-val">0</span>콤보 <span id="combo-mul" class="combo-mul">×1.0</span>
@@ -85,6 +88,7 @@
       </div>
       <button id="btn-mission" class="hud-btn" title="미션 보드">🎯</button>
       <button id="btn-synergy" class="hud-btn" title="합치기 레시피 & 시너지 조합표">🔗</button>
+      <button id="btn-power" class="hud-btn" title="종합 전력 요약">📈</button>
       <button id="btn-menu" class="hud-btn">⏸</button>
     </div>
 
@@ -108,6 +112,11 @@
 <script src="heroes.js"></script>
 <script src="shop.js"></script>
 <script src="gacha.js"></script>
+<!-- v27-18: 전체 랭킹용 Firebase (요청 - 구글 서비스로 기록 저장) -->
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="leaderboard.js"></script>
 <script src="main.js"></script>
 <script src="ui-builders.js"></script>
 </body>

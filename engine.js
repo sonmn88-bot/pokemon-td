@@ -82,6 +82,7 @@ class GameEngine {
     this._globalGoldMul = 1;
     this._waveSpeedMul = 1;   // v27-5: 이벤트웨이브(스피드웨이브)용
     this._waveHpMul = 1;      // v27-5: 이벤트웨이브(정예웨이브)용
+    this._goldenTimeActive = false; this._goldenTimeGoldMul = 1; // v27-17: 황금시간 이벤트(요청3)
 
     // 콜백
     this.onGoldChange = null;
@@ -240,6 +241,18 @@ class GameEngine {
     if (this.endless && (this.state === 'wave' || this.state === 'idle')) {
       const count = this.enemies.length;
       this._peakFieldCount = Math.max(this._peakFieldCount || 0, count); // v27-5: 위험보너스용 (item D)
+      // v27-16: 필드 안정 보너스 (요청5 - 위험보너스의 반대) - 낮게 오래 유지하면 소소한 보상
+      if (count <= 30) {
+        this._stableTimer = (this._stableTimer || 0) + this.dt;
+        if (this._stableTimer >= 25) {
+          this._stableTimer = 0;
+          const stableBonus = 25 + Math.round(this.currentWave * 0.6);
+          this.addGold(stableBonus);
+          this.spawnFloatingText(`🛡️ 안정 관리 보너스! +${stableBonus}g`, this.width/2, 140, '#06d6a0');
+        }
+      } else {
+        this._stableTimer = 0;
+      }
       for (const lvl of this.fieldWarnLevels) {
         if (count >= lvl && !this._fieldWarnFired[lvl]) {
           this._fieldWarnFired[lvl] = true;
@@ -254,12 +267,43 @@ class GameEngine {
   }
 
   _onEnemyDie(enemy) {
-    if (enemy._elite === 'gold') this.onEliteKill && this.onEliteKill(enemy);
+    if (enemy._elite === 'gold') {
+      this.onEliteKill && this.onEliteKill(enemy);
+      // v27-16: 골드 엘리트 고유 기믹 (요청4) - 처치시 주변 적에게 폭발 데미지 (클러스터 정리 보상)
+      const novaDmg = 25 + this.currentWave * 0.8;
+      let hitCount = 0;
+      for (const e2 of this.enemies) {
+        if (e2 === enemy || e2.dead || e2.reachedEnd) continue;
+        if (Math.hypot(e2.x - enemy.x, e2.y - enemy.y) <= 90) { e2.takeDamage(novaDmg, 'special'); hitCount++; }
+      }
+      if (hitCount > 0) {
+        if (window.AoeBurst) this.particles.push(new AoeBurst(enemy.x, enemy.y, 90, '#ffd60a'));
+        this.spawnFloatingText(`✨골드 엘리트 폭발! ${hitCount}마리 추가타격`, enemy.x, enemy.y - 45, '#ffd60a');
+      }
+    }
     if (enemy._isKing) this.onKingDefeated && this.onKingDefeated();
     const baseReward = enemy.reward;
-    const bonus = Math.floor(baseReward * (this._globalGoldMul - 1));
-    this.addGold(baseReward + bonus);
+    const traitGoldMul = this._runTrait?.key === 'goldBoom' ? 1.2 : 1;
+    const effectiveGoldMul = this._globalGoldMul * (this._goldenTimeActive ? this._goldenTimeGoldMul : 1) * traitGoldMul;
+    const bonus = Math.floor(baseReward * (effectiveGoldMul - 1));
+    // v27-16: 현상금 몬스터 보너스 (요청2)
+    let bountyBonus = 0;
+    if (enemy._bounty) { bountyBonus = 40 + Math.round(this.currentWave * 1.5); this.spawnFloatingText(`💰현상금 +${bountyBonus}g!`, enemy.x, enemy.y - 30, '#ffd60a'); }
+    this.addGold(baseReward + bonus + bountyBonus);
     this.spawnFloatingText(`+${baseReward + bonus}g`, enemy.x, enemy.y - 10, '#ffd60a');
+
+    // v27-16: 처치 다양성 스트릭 보너스 (요청3) - 다른 종류의 몹을 연속으로 잡으면 보상
+    if (enemy.typeId !== this._lastKilledType) {
+      this._varietyStreak = (this._varietyStreak || 0) + 1;
+    } else {
+      this._varietyStreak = 1;
+    }
+    this._lastKilledType = enemy.typeId;
+    if ([5, 10, 15, 20].includes(this._varietyStreak)) {
+      const varietyBonus = this._varietyStreak * 4;
+      this.addGold(varietyBonus);
+      this.spawnFloatingText(`🎯 다양성 스트릭 ${this._varietyStreak}! +${varietyBonus}g`, enemy.x, enemy.y - 50, '#4fc3f7');
+    }
 
     // v27-4: 점수 공식 (item 13,19) - 생존이 지배적, 킬은 보너스 수준
     // 일반킬 1-3(엘리트는 조금 더), 미니보스 25, 일반보스 80, 왕 120
@@ -298,16 +342,20 @@ class GameEngine {
     if (this.state !== 'idle') return false;
     this.currentWave++;
     this.state = 'wave';
-    // v27-11: 이전 웨이브에서 스킵되어 아직 안 나온 몬스터가 있으면 지우지 않고 이어서 스폰 (요청5)
+    // v27-14 버그수정: 연속 스킵하면 이월 큐가 계속 쌓여서, 나중에 한꺼번에 몰아서 스폰되며
+    // 필드 누적수가 갑자기 확 튀는 문제가 있었음 (요청4). 백로그 상한을 둬서 너무 많이 쌓이지 않게 함.
     const carryOver = this.spawnQueue.length;
     if (carryOver > 0) {
       const offset = this.spawnTimer;
-      this.spawnQueue = this.spawnQueue.concat(waveData.map(item => ({ ...item, delay: item.delay + offset + 2 })));
+      let merged = this.spawnQueue.concat(waveData.map(item => ({ ...item, delay: item.delay + offset + 2 })));
+      const MAX_BACKLOG = 70;
+      if (merged.length > MAX_BACKLOG) merged = merged.slice(merged.length - MAX_BACKLOG); // 오래된 것부터 정리
+      this.spawnQueue = merged;
     } else {
       this.spawnQueue = [...waveData];
       this.spawnTimer = 0;
     }
-    this.activeSpawns = carryOver + waveData.length;
+    this.activeSpawns = this.spawnQueue.length;
     this.waveTimeRemaining = timeLimit || this.waveTimeLimit;
     this.onWaveChange && this.onWaveChange(this.currentWave, this.totalWaves);
     this.onWaveTimerChange && this.onWaveTimerChange(this.waveTimeRemaining, this.waveTimeRemaining);
@@ -350,6 +398,7 @@ class GameEngine {
         const post = this.currentWave - 90;
         waveHpMul *= Math.pow(1 + post * 0.035, 1.3);
       }
+      if (this._runTrait?.key === 'swarm') waveHpMul *= 0.88;
       enemy.maxHp = Math.round(enemy.maxHp * waveHpMul);
       enemy.hp = enemy.maxHp;
     }
@@ -385,7 +434,8 @@ class GameEngine {
     }
 
     // 엘리트 변형 (10% 확률, 수동소환 보스는 제외)
-    if (!enemy.isBoss && Math.random() < 0.10) {
+    const eliteChance = this._runTrait?.key === 'eliteEra' ? 0.20 : 0.10;
+    if (!enemy.isBoss && Math.random() < eliteChance) {
       enemy._elite = Math.random() < 0.15 ? 'gold' : 'silver';
       const mul = enemy._elite === 'gold' ? 2.2 : 1.5;
       enemy.maxHp = Math.floor(enemy.maxHp * mul);
@@ -448,6 +498,15 @@ class GameEngine {
   }
   triggerGameOver() {
     this.state = 'gameover';
+    // v27-18: 사망 서사 (요청F) - 게임오버 시점에 필드에 가장 많던 적 종류를 기록
+    const counts = {};
+    for (const e of this.enemies) {
+      if (e.dead) continue;
+      counts[e.name] = (counts[e.name] || 0) + 1;
+    }
+    let topName = null, topCount = 0;
+    for (const name in counts) { if (counts[name] > topCount) { topCount = counts[name]; topName = name; } }
+    this._deathCause = topName ? { name: topName, count: topCount } : null;
     this.onGameOver && this.onGameOver();
   }
 
