@@ -21,11 +21,11 @@ const BOSS_POOL = ['lugia', 'mewtwo'];
 // v27-3: 보스 난이도 추가 상향 - 기본 배율을 더 키우고, 소환 시점 웨이브에 비례해서도 더 강해지게
 // (10라운드째에도 5단계까지 다 잡히던 문제 - 고정배율만으론 후반에 상대적으로 계속 약해지므로 웨이브연동 필수)
 const BOSS_TIERS = [
-  { tier: 1, type: 'gyarados', label: '갸라도스',   hpMul: 10, rewardMul: 5  },
-  { tier: 2, type: 'dragonite', label: '망나뇽',    hpMul: 18, rewardMul: 9  },
-  { tier: 3, type: 'lugia',    label: '루기아',      hpMul: 30, rewardMul: 14 },
-  { tier: 4, type: 'mewtwo',   label: '뮤츠',        hpMul: 48, rewardMul: 20 },
-  { tier: 5, type: 'mewtwo',   label: '뮤츠(각성)',  hpMul: 80, rewardMul: 30 },
+  { tier: 1, type: 'gyarados', label: '갸라도스',   hpMul: 10, rewardMul: 9  },
+  { tier: 2, type: 'dragonite', label: '망나뇽',    hpMul: 18, rewardMul: 16 },
+  { tier: 3, type: 'lugia',    label: '루기아',      hpMul: 30, rewardMul: 26 },
+  { tier: 4, type: 'mewtwo',   label: '뮤츠',        hpMul: 48, rewardMul: 40 },
+  { tier: 5, type: 'mewtwo',   label: '뮤츠(각성)',  hpMul: 80, rewardMul: 60 },
 ];
 const BOSS_SUMMON_COOLDOWN = 60;
 function bossWaveScaleMul(wave) { return 1 + Math.max(0, wave) * 0.07; } // 웨이브 진행할수록 소환보스도 계속 강해짐
@@ -553,7 +553,14 @@ class App {
       if (this.engine && this.engine.state === 'wave') this._skipWave();
       else this.sendWave();
     });
-    this.els.btnBack.addEventListener('click', () => this.backToMapSelect());
+    this.els.btnBack.addEventListener('click', () => {
+      // v27-20: 뒤로가기 확인 팝업 (요청4) - 실수로 진행중인 판이 꺼지는 것 방지
+      if (this.engine && (this.engine.state === 'wave' || this.engine.state === 'idle' || this.engine.state === 'paused')) {
+        if (confirm('타이틀로 돌아가시겠습니까? 진행 중인 게임은 저장되지 않습니다.')) this.backToMapSelect();
+      } else {
+        this.backToMapSelect();
+      }
+    });
     this.els.btnMenu.addEventListener('click', () => this.togglePause());
     const btnMission = document.getElementById('btn-mission');
     if (btnMission) btnMission.addEventListener('click', () => this.openMissionBoard());
@@ -1640,7 +1647,7 @@ class App {
       `;
       overlay.appendChild(summary);
 
-      // v27-18: 전체 랭킹 제출 UI (요청 - 끝났을 때 이름+기록 저장)
+      // v27-18/20: 전체 랭킹 제출 UI (요청 - 끝났을 때 이름+기록 저장)
       if (window.Leaderboard && window.Leaderboard.isEnabled()) {
         const rankBox = document.createElement('div');
         rankBox.style.cssText = 'display:flex;gap:6px;margin:8px 0;align-items:center;';
@@ -1657,6 +1664,12 @@ class App {
           const res = await window.Leaderboard.submitScore(nameInput.value, this.engine.score || 0, reached);
           submitBtn.textContent = res.ok ? '✅ 등록 완료!' : '❌ 등록 실패';
         });
+      } else {
+        // v27-20: 조용히 안 보이던 것 대신 명확한 안내 (요청6 - 등록UI가 아예 안보여서 헷갈렸음)
+        const noticeEl = document.createElement('div');
+        noticeEl.style.cssText = 'font-size:11px;color:#888;margin:6px 0;text-align:center;';
+        noticeEl.textContent = '🌍 랭킹 서버 미설정 (firebase-config.js에 본인 Firebase 프로젝트 값을 입력해야 등록 가능)';
+        overlay.appendChild(noticeEl);
       }
     }
 

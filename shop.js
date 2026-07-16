@@ -65,8 +65,8 @@ const ShopItems = [
     }
   },
   {
-    key: 'rarecandy', name: '이상한사탕', emoji: '🍬', cost: 350, oneTime: true,
-    desc: '3성(에픽) 타워 1개를 레전드로 진화 (게임당 1회만 사용 가능)',
+    key: 'rarecandy', name: '이상한사탕', emoji: '🍬', cost: 1800, oneTime: true,
+    desc: '3성(에픽) 타워 1개를 레전드로 진화 (게임당 1회만 사용 가능) - 후반 전략용 고가 아이템',
     buy(engine) {
       // v27 fix: 아무 등급이나 무한정 되던 걸 3성(epic) 한정 + 1회용으로 변경 (안 그러면 도배해서 다 5성 만들어버림)
       const gachaSlots = engine.towerSlots.filter(s => s.occupied && s.tower?._gachaId && s.tower.def?.grade === 'epic');

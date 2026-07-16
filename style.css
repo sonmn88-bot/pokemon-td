@@ -870,7 +870,7 @@ html, body {
   #hero-skill-bar { bottom:calc(var(--bar-h) + 40px); gap:4px; }
   .hero-skills-group { padding:3px 6px; gap:4px; }
   .skill-btn { width:30px; height:30px; }
-  #boss-summon-bar { bottom:calc(var(--bar-h) + 40px) !important; transform:scale(0.85); transform-origin:left bottom; }
+  #boss-summon-bar { bottom:calc(var(--bar-h) + 78px) !important; left:4px !important; transform:scale(0.8); transform-origin:left bottom; }
   #spell-bar { top:calc(var(--hud-h) + 3px); }
   .spell-btn { padding:2px 5px; }
   #hud-top { height:var(--hud-h,44px); }

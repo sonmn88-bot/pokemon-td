@@ -302,7 +302,7 @@ const GachaTowerDefs = {
     fire(t,e){
       _shot(t,e,'#1e88e5','🌊',{type:'slow',duration:2.5,factor:0.45},400,null,60);
       t._rageTimer=(t._rageTimer||0)+1/t.fireRate;
-      if(t._rageTimer>=6){ t._rageTimer=0; for(const en of e.enemies) if(!en.dead&&!en.reachedEnd) { en.takeDamage(t.damage*0.5,'special'); en.applyStatus('slow',2,0.55); } e.particles.push(new AoeBurst(t.x,t.y,t.range,'#4fc3f7')); e.spawnFloatingText('🌊분노!',t.x,t.y-30,'#29b6f6'); }
+      if(t._rageTimer>=9){ t._rageTimer=0; for(const en of e.enemies) if(!en.dead&&!en.reachedEnd&&Math.hypot(en.x-t.x,en.y-t.y)<=t.range) { en.takeDamage(t.damage*0.35,'special'); en.applyStatus('slow',2,0.55); } e.particles.push(new AoeBurst(t.x,t.y,t.range,'#4fc3f7')); e.spawnFloatingText('🌊분노!',t.x,t.y-30,'#29b6f6'); }
     }
   },
   lapras: {
@@ -332,7 +332,7 @@ const GachaTowerDefs = {
       const sorted=e.enemies.filter(en=>!en.dead&&!en.reachedEnd&&Math.hypot(en.x-t.x,en.y-t.y)<=t.range).sort((a,b)=>b.distTraveled-a.distTraveled).slice(0,3);
       for(const tgt of sorted) e.projectiles.push(new Projectile(t.x,t.y,tgt,{engine:e,speed:460,damage:t.damage,color:'#b3e5fc',size:7,dmgType:'special',emoji:'❄️',status:{type:'freeze',duration:2.8}}));
       t._blizTimer=(t._blizTimer||0)+1/t.fireRate;
-      if(t._blizTimer>=6){ t._blizTimer=0; for(const en of e.enemies) if(!en.dead&&!en.reachedEnd) en.applyStatus('slow',3.5,0.3); e.particles.push(new AoeBurst(t.x,t.y,t.range,'#b3e5fc')); e.spawnFloatingText('🌨️눈보라!',t.x,t.y-36,'#80deea'); }
+      if(t._blizTimer>=6){ t._blizTimer=0; for(const en of e.enemies) if(!en.dead&&!en.reachedEnd&&Math.hypot(en.x-t.x,en.y-t.y)<=t.range) en.applyStatus('slow',3.5,0.3); e.particles.push(new AoeBurst(t.x,t.y,t.range,'#b3e5fc')); e.spawnFloatingText('🌨️눈보라!',t.x,t.y-36,'#80deea'); }
     }
   },
   zapdos: {
@@ -378,7 +378,7 @@ const GachaTowerDefs = {
       const all=e.enemies.filter(en=>!en.dead&&!en.reachedEnd&&Math.hypot(en.x-t.x,en.y-t.y)<=t.range).sort((a,b)=>b.distTraveled-a.distTraveled).slice(0,6);
       for(const tgt of all){ let dmg=t.damage; if(Math.random()<0.35){dmg*=3;e.spawnFloatingText('🔮크리!',tgt.x,tgt.y-20,'#b39ddb');} e.projectiles.push(new Projectile(t.x,t.y,tgt,{engine:e,color:'#b39ddb',size:5,beam:true,beamLife:0.2})); tgt.takeDamage(dmg,'special'); tgt.applyStatus('slow',2.5,0.35); e.spawnHitParticle(tgt.x,tgt.y,'#7c4dff'); }
       t._psyTimer=(t._psyTimer||0)+1/t.fireRate;
-      if(t._psyTimer>=4){ t._psyTimer=0; for(const en of e.enemies) if(!en.dead&&!en.reachedEnd) en.applyStatus('slow',1.5,0.5); e.particles.push(new AoeBurst(t.x,t.y,t.range,'#7c4dff')); }
+      if(t._psyTimer>=4){ t._psyTimer=0; for(const en of e.enemies) if(!en.dead&&!en.reachedEnd&&Math.hypot(en.x-t.x,en.y-t.y)<=t.range) en.applyStatus('slow',1.5,0.5); e.particles.push(new AoeBurst(t.x,t.y,t.range,'#7c4dff')); }
     }
   },
   mew: {
@@ -447,12 +447,13 @@ function _shot(tower, engine, color, emoji, status, speed, onHit, splash, knockb
 // ===== 뽑기 확률 =====
 // v27-3: 도박뽑기 확률이 너무 후해서 초반부터 전설급을 금방 채웠던 문제 - 확률 낮추고 가격 상향
 const PULL_TABLES = {
-  normal:   [{grade:'normal',weight:62},{grade:'rare',weight:32},{grade:'epic',weight:5.5},{grade:'legend',weight:0.45},{grade:'unique',weight:0.05}],
-  premium:  [{grade:'normal',weight:22},{grade:'rare',weight:50},{grade:'epic',weight:25},{grade:'legend',weight:2.8},{grade:'unique',weight:0.2}],
-  gamble:   [{grade:'normal',weight:25},{grade:'rare',weight:42},{grade:'epic',weight:28},{grade:'legend',weight:4.5},{grade:'unique',weight:0.5}],
-  ten_base: [{grade:'normal',weight:62},{grade:'rare',weight:32},{grade:'epic',weight:5.5},{grade:'legend',weight:0.45},{grade:'unique',weight:0.05}], // v27-9: 일반뽑기와 동일 확률로 수정 (요청5 - 그냥 10개 묶음할인 개념이어야 함, 확률우대 아님)
+  // v27-20: 뽑기 확률 전면 재설계 (요청8)
+  normal:   [{grade:'normal',weight:100}], // 일반뽑기 = 1성(노말)만 나옴
+  premium:  [{grade:'normal',weight:55},{grade:'rare',weight:41},{grade:'epic',weight:4}], // 1~3성, 3성은 희귀
+  gamble:   [{grade:'rare',weight:52},{grade:'epic',weight:41.5},{grade:'legend',weight:6.3},{grade:'unique',weight:0.2}], // 2~5성, 4성 극악 5성 극극극극극악
+  ten_base: [{grade:'normal',weight:100}], // 10연뽑 = 일반뽑기 10번 묶음(동일확률, 개당만 할인)
 };
-const PULL_COSTS = { normal:50, premium:120, gamble:320, ten:450 };
+const PULL_COSTS = { normal:50, premium:130, gamble:900, ten:450 }; // v27-20: 도박뽑기 320→900으로 대폭 인상
 
 const GRADE_POOLS = {
   normal:  ['bulbasaur','charmander','squirtle','pidgey','rattata','clefairy','oddish','diglett','psyduck','growlithe','abra','magnemite'],

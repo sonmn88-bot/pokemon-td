@@ -246,7 +246,7 @@ class GameEngine {
         this._stableTimer = (this._stableTimer || 0) + this.dt;
         if (this._stableTimer >= 25) {
           this._stableTimer = 0;
-          const stableBonus = 25 + Math.round(this.currentWave * 0.6);
+          const stableBonus = 10 + Math.round(Math.min(this.currentWave, 60) * 0.25);
           this.addGold(stableBonus);
           this.spawnFloatingText(`🛡️ 안정 관리 보너스! +${stableBonus}g`, this.width/2, 140, '#06d6a0');
         }
@@ -348,10 +348,9 @@ class GameEngine {
     if (carryOver > 0) {
       const offset = this.spawnTimer;
       let merged = this.spawnQueue.concat(waveData.map(item => ({ ...item, delay: item.delay + offset + 2 })));
-      const MAX_BACKLOG = 70;
-      // v27-19 버그수정: slice 방향이 거꾸로였음 - "곧 나올 것"들을 지우고 "한참 뒤에 나올 것"만 남겨서
-      // 스킵 몇 번 하면 한참동안 아무것도 안 나오다가 갑자기 몰려나오는 문제였음. 곧 나올 것부터 유지해야 함.
-      if (merged.length > MAX_BACKLOG) merged = merged.slice(0, MAX_BACKLOG);
+      // v27-20: 백로그 상한을 완전히 제거 (요청3) - 예전엔 70개 넘으면 "곧 나올 것"들이 통째로 삭제돼서
+      // 스킵을 아무리 많이 해도 결국 몬스터 상당수가 영원히 안 나오는 사실상 무료스킵이 되고 있었음.
+      // 이제 몇 번을 스킵하든 큐에 있는 몬스터는 전부 나중에라도 반드시 나옵니다 (밀린 만큼 필드가 위험해짐 - 의도된 페널티).
       this.spawnQueue = merged;
     } else {
       this.spawnQueue = [...waveData];
@@ -472,7 +471,7 @@ class GameEngine {
 
   waveCleared() {
     this.state = 'idle';
-    let bonus = 14 + this.currentWave * 5;
+    let bonus = 6 + Math.min(this.currentWave, 60) * 1.1; // v27-20: 웨이브클리어 자동보상 대폭 하향 (요청7) - 90웨이브 기준 464g->72g 수준
     if (this._nextWaveGoldMul) { bonus = Math.round(bonus * this._nextWaveGoldMul); this._nextWaveGoldMul = null; }
     // v27-5: 위험보너스 (item D) - 필드에 120마리 이상 쌓인 채로 웨이브를 넘기면 리스크 감수 보상
     let riskBonus = 0;
