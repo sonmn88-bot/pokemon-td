@@ -17,7 +17,7 @@ class GameEngine {
 
     // 상태
     this.state = 'idle';
-    this.gold = 250;
+    this.gold = 180; // v27-31: 시작골드 하향 (요청: 초반 골드가 너무 여유로움, 아슬아슬하게 가야함)
     this.lives = 20;
     this.currentWave = 0;
     this.totalWaves = 20;
@@ -420,6 +420,7 @@ class GameEngine {
       enemy.reward = Math.round(enemy.reward * 40);
       enemy.isBoss = true;
       enemy._isKing = true;
+      enemy._spawnGraceTimer = 6; // v27-34: 왕도 동일하게 스폰 유예기간 적용
     }
 
     // v27: 수동 보스소환 등급 배율 (1~5단계, 너무 약해서 순삭당하던 문제 수정)
@@ -429,6 +430,9 @@ class GameEngine {
       enemy.reward = Math.round(enemy.reward * item.rewardMul);
       enemy._bossTier = item.bossTier;
       enemy.isBoss = true;
+      // v27-34: 보스 스폰 유예기간 (요청 - 원인이 뭐든 결과적으로 3초컷 자체를 막기 위한 안전장치)
+      // 등장 후 5초간은 받는 피해가 60%로 감소, 이후 서서히 정상으로 회복. 최소 생존시간을 보장함.
+      enemy._spawnGraceTimer = 5;
     }
 
     // 엘리트 변형 (10% 확률, 수동소환 보스는 제외)
@@ -467,7 +471,7 @@ class GameEngine {
 
   waveCleared() {
     this.state = 'idle';
-    let bonus = 3 + Math.min(this.currentWave, 60) * 0.5; // v27-28: 뽑기값 2배 인상에 맞춰 유입 골드도 추가 하향
+    let bonus = 1 + Math.min(this.currentWave, 60) * 0.22; // v27-31: 요청대로 초반 골드 추가 하향 (아슬아슬하게)
     if (this._nextWaveGoldMul) { bonus = Math.round(bonus * this._nextWaveGoldMul); this._nextWaveGoldMul = null; }
     // v27-5: 위험보너스 (item D) - 필드에 120마리 이상 쌓인 채로 웨이브를 넘기면 리스크 감수 보상
     let riskBonus = 0;

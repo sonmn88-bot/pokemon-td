@@ -86,9 +86,11 @@ function generateWave(n) {
   if (n === KING_WAVE) {
     arr.push({ type: 'mewtwo', delay: lastDelay + 5, isKing: true });
   } else if (n % 30 === 0) {
-    arr.push({ type: BOSS_POOL[Math.floor(Math.random() * BOSS_POOL.length)], delay: lastDelay + 4 });
+    // v27-32 버그수정: 존보스가 소환보스와 달리 별도 체력배율이 전혀 없어서 일반몹 수준(예: 갸라도스
+    // 기본체력 489)으로 취급되고 있었음 - "초반 보스가 너무 빨리 죽는다"는 문제의 진짜 원인이었을 가능성 높음
+    arr.push({ type: BOSS_POOL[Math.floor(Math.random() * BOSS_POOL.length)], delay: lastDelay + 4, bossTier: true, hpMul: 12 + n * 0.4, rewardMul: 4 }); // v27-33: 3초컷 문제로 대폭 재상향
   } else if (n % 10 === 0) {
-    arr.push({ type: MINIBOSS_POOL[Math.floor(Math.random() * MINIBOSS_POOL.length)], delay: lastDelay + 4 });
+    arr.push({ type: MINIBOSS_POOL[Math.floor(Math.random() * MINIBOSS_POOL.length)], delay: lastDelay + 4, bossTier: true, hpMul: 8 + n * 0.3, rewardMul: 2.5 }); // v27-33: 3초컷 문제로 대폭 재상향
   }
 
   return arr;

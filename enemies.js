@@ -349,6 +349,7 @@ class Enemy {
     if (this.burning > 0) this.burning -= dt;
     if (this.poisoned > 0) this.poisoned -= dt;
     if (this._burnCooldown > 0) this._burnCooldown -= dt;
+    if (this._spawnGraceTimer > 0) this._spawnGraceTimer -= dt; // v27-34: 보스 스폰유예 감소
     if (this._poisonCooldown > 0) this._poisonCooldown -= dt;
 
     // 재생
@@ -397,6 +398,8 @@ class Enemy {
     let dmg = amount;
     if (this.def.special === 'ghost' && type === 'physical') dmg *= 0.5;
     if (this.def.special === 'armor' && type === 'physical') dmg *= 0.1;
+    // v27-34: 보스 스폰 유예기간 - 등장 직후 순삭 방지용 안전장치 (요청: 원인불문 최소 생존시간 보장)
+    if (this._spawnGraceTimer > 0) dmg *= 0.4;
 
     this.hp -= dmg;
     this.flashTimer = 0.1;
