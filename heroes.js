@@ -312,9 +312,12 @@ const HeroDefs = {
         name:'행복의알', emoji:'🥚', baseCooldown:24,
         desc:'모든 타워 데미지 +25% (8초)',
         cast(hero, engine) {
+          // v27-29 버그수정: buffDmgMul(영구필드)에 직접 곱하고 타이머 해제 로직이 아예 없어서,
+          // 쿨다운 24초마다 재사용할 때마다 데미지가 영구적으로 복리 누적되고 있었음(요청 - 지속피해
+          // 원인 재검토 결과 발견. 셋 중 쿨다운이 제일 짧아 가장 심각했을 가능성). 임시배율 필드로 교체.
           for (const t of engine.towers) {
-            t.buffDmgMul = (t.buffDmgMul||1) * 1.25;
-            t._happyEggTimer = 8;
+            t._tempDmgMul = 1.25;
+            t._pokecenterTimer = 8; // 타워 update()의 만료처리 로직 재사용
           }
           engine.spawnFloatingText('🥚행복의알!', hero.x, hero.y-32, '#fff59d');
         }

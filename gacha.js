@@ -83,7 +83,6 @@ const GachaTowerDefs = {
     damage:8, range:195, fireRate:1.0, desc:'주변 타워 데미지 +10%',
     fire(t,e){
       _shot(t,e,'#f48fb1','⭐',null,320);
-      for(const tw of e.towers) if(tw!==t&&Math.hypot(tw.x-t.x,tw.y-t.y)<130) tw.buffDmgMul=(tw.buffDmgMul||1)*1.001;
     }
   },
   oddish: {
@@ -153,7 +152,6 @@ const GachaTowerDefs = {
     damage:18, range:225, fireRate:1.1, desc:'주변 타워 데미지 +25% (강화판)',
     fire(t,e){
       _shot(t,e,'#f8bbd0','💫',null,340);
-      for(const tw of e.towers) if(tw!==t&&Math.hypot(tw.x-t.x,tw.y-t.y)<150) tw.buffDmgMul=(tw.buffDmgMul||1)*1.0025;
     }
   },
   gloom: {
@@ -388,7 +386,17 @@ const GachaTowerDefs = {
       const all=e.enemies.filter(en=>!en.dead&&!en.reachedEnd&&Math.hypot(en.x-t.x,en.y-t.y)<=t.range).sort((a,b)=>b.distTraveled-a.distTraveled).slice(0,4);
       for(const tgt of all){ e.projectiles.push(new Projectile(t.x,t.y,tgt,{engine:e,color:'#f48fb1',size:5,beam:true,beamLife:0.18})); tgt.takeDamage(t.damage,'special'); tgt.applyStatus('slow',3,0.4); }
       t._buffTimer=(t._buffTimer||0)+1/t.fireRate;
-      if(t._buffTimer>=8){ t._buffTimer=0; for(const tw of e.towers) tw.buffDmgMul=(tw.buffDmgMul||1)*1.02; e.spawnFloatingText('💗전체버프!',t.x,t.y-30,'#f48fb1'); }
+      if(t._buffTimer>=8){
+        t._buffTimer=0;
+        // v27-29 버그수정: 뮤의 전체버프가 상한 없이 8초마다 전체 타워 데미지를 영구 복리 누적하고
+        // 있었음(요청 - 화상 아니어도 잘못된 지속피해 원인 재검토). 완전 자동발동이라 사실상 시간이
+        // 지날수록 전체 데미지가 무한히 커지는 구조였음. 최대 25회(약 +64%)로 상한을 둠.
+        e._mewBuffStacks = (e._mewBuffStacks || 0) + 1;
+        if (e._mewBuffStacks <= 25) {
+          for(const tw of e.towers) tw.buffDmgMul=(tw.buffDmgMul||1)*1.02;
+          e.spawnFloatingText('💗전체버프!',t.x,t.y-30,'#f48fb1');
+        }
+      }
     }
   },
 };
@@ -453,7 +461,7 @@ const PULL_TABLES = {
   gamble:   [{grade:'rare',weight:52},{grade:'epic',weight:41.5},{grade:'legend',weight:6.3},{grade:'unique',weight:0.2}], // 2~5성, 4성 극악 5성 극극극극극악
   ten_base: [{grade:'normal',weight:100}], // 10연뽑 = 일반뽑기 10번 묶음(동일확률, 개당만 할인)
 };
-const PULL_COSTS = { normal:50, premium:130, gamble:1500, ten:450 }; // v27-24: 900→1500으로 추가 인상
+const PULL_COSTS = { normal:100, premium:260, gamble:3000, ten:900 }; // v27-28: 요청대로 전체 2배 인상
 
 const GRADE_POOLS = {
   normal:  ['bulbasaur','charmander','squirtle','pidgey','rattata','clefairy','oddish','diglett','psyduck','growlithe','abra','magnemite'],
@@ -529,9 +537,10 @@ function _createGachaTower(def, x, y, engine) {
     name:def.name, level:1, path:null, totalSpent:0,
     cooldown:0, fireFlash:0, _rotAngle:0,
     synergyBonus:0, buffRangeMul:muls.range, buffDmgMul:muls.dmg, _shopSpeedMul:muls.speed, target:null, masteryMul,
+    _tempDmgMul:1, _pokecenterTimer:0, _auraDmgMul:1, // v27-29: 임시버프+오라 전용 필드 (영구곱연산 버그 수정)
     get range(){ return (def.range+(this.synergyBonus*2))*Math.min(this.buffRangeMul, BUFF_CAPS.range); },
     get damage(){
-      const base = (def.damage+this.synergyBonus)*Math.min(this.buffDmgMul, BUFF_CAPS.damage)*this.masteryMul;
+      const base = (def.damage+this.synergyBonus)*Math.min(this.buffDmgMul, BUFF_CAPS.damage)*this.masteryMul*(this._tempDmgMul||1)*(this._auraDmgMul||1);
       const mul = window.typeEffectiveness ? window.typeEffectiveness(def.type, this.target && this.target.typeTag) : 1;
       return base * mul;
     },
@@ -564,6 +573,12 @@ function _createGachaTower(def, x, y, engine) {
       if(this.fireFlash>0) this.fireFlash-=dt;
       if(this._typeGlowTimer>0) this._typeGlowTimer-=dt;
       if(this._evolveGlowTimer>0) this._evolveGlowTimer-=dt; // v27-5: 합체진화 연출 (item1)
+      // v27-29 버그수정: 포켓몬센터 임시버프가 만료 처리가 아예 없어서 재사용할 때마다 데미지가
+      // 영구적으로 곱연산 누적되고 있었음(핵심 버그) - 이제 타이머 소진시 정상적으로 원상복귀됨
+      if(this._pokecenterTimer>0){
+        this._pokecenterTimer-=dt;
+        if(this._pokecenterTimer<=0) this._tempDmgMul=1;
+      }
       this._rotAngle+=dt*0.5;
       this.target=this.findTarget(enemies);
       if(this.target&&this.cooldown<=0){
@@ -704,21 +719,26 @@ const SYNERGY_PAIRS = {
   'psychic|normal':{ bonus: 5, label:'염력지원' },
 };
 function applyTowerSynergies(towers) {
-  for(const t of towers) t.synergyBonus=0;
+  for(const t of towers) { t.synergyBonus=0; t._auraDmgMul=1; } // v27-29: 오라도 매번 새로 계산 (비누적)
   for(let i=0;i<towers.length;i++){
     for(let j=i+1;j<towers.length;j++){
       const a=towers[i],b=towers[j];
       if(!a.def||!b.def) continue;
-      if(Math.hypot(a.x-b.x,a.y-b.y)>150) continue;
+      // v27-29 버그수정: 피삐/픽시블의 "주변 데미지+" 오라가 발사할 때마다 영구 복리누적되고 있었음
+      // (노말등급이라 누구나 보유 - 이번 세션 내내 겪은 문제의 핵심 원인 추정). 여기서 매번 새로
+      // 계산되는 비누적 방식으로 처리 (여러 명이 중첩되면 가장 센 것 하나만 적용).
+      const dist = Math.hypot(a.x-b.x,a.y-b.y);
+      if(a.def.id==='clefairy' && dist<130) b._auraDmgMul=Math.max(b._auraDmgMul,1.10);
+      if(b.def.id==='clefairy' && dist<130) a._auraDmgMul=Math.max(a._auraDmgMul,1.10);
+      if(a.def.id==='clefable' && dist<150) b._auraDmgMul=Math.max(b._auraDmgMul,1.25);
+      if(b.def.id==='clefable' && dist<150) a._auraDmgMul=Math.max(a._auraDmgMul,1.25);
+      if(dist>150) continue;
       if(a.def.type===b.def.type){ a.synergyBonus+=8; b.synergyBonus+=8; continue; }
       const key = [a.def.type,b.def.type].sort().join('|');
       const pair = SYNERGY_PAIRS[key];
       if(pair){ a.synergyBonus+=pair.bonus; b.synergyBonus+=pair.bonus; }
     }
   }
-  // v27-27 버그수정: 시너지 보너스에 상한이 없어서, 타워를 촘촘하게 배치하면 수십 개 페어가 전부 더해져
-  // 수백까지도 치솟을 수 있었음 (요청 - "시너지가 밸런싱 안된 채로 데미지가 쎄진 것 아니냐"는 의심이 맞았음).
-  // 기본 데미지가 5~15 수준인 노말타워 기준, 40 정도로 상한을 둬도 여전히 강력한 보너스임.
   const SYNERGY_CAP = 40;
   for(const t of towers) t.synergyBonus = Math.min(t.synergyBonus, SYNERGY_CAP);
 }

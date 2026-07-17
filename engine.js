@@ -467,7 +467,7 @@ class GameEngine {
 
   waveCleared() {
     this.state = 'idle';
-    let bonus = 4 + Math.min(this.currentWave, 60) * 0.7; // v27-27: 초반 골드 과다 문제로 추가 하향
+    let bonus = 3 + Math.min(this.currentWave, 60) * 0.5; // v27-28: 뽑기값 2배 인상에 맞춰 유입 골드도 추가 하향
     if (this._nextWaveGoldMul) { bonus = Math.round(bonus * this._nextWaveGoldMul); this._nextWaveGoldMul = null; }
     // v27-5: 위험보너스 (item D) - 필드에 120마리 이상 쌓인 채로 웨이브를 넘기면 리스크 감수 보상
     let riskBonus = 0;

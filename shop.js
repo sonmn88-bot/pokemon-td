@@ -102,8 +102,10 @@ const GlobalSpells = {
     desc: '모든 타워 6초간 데미지 +18%',
     cast(engine) {
       // v27: 라이프 회복 제거 (필드누적 게임오버로 바뀌어 라이프가 의미없어짐)
+      // v27-29 버그수정: buffDmgMul(타입강화용 영구필드)에 직접 곱해서 재사용할 때마다 데미지가
+      // 영구누적되고 있었음 - 전용 임시배율 필드로 교체해서 6초 후 확실히 원상복귀되도록 함
       for (const t of engine.towers) {
-        t.buffDmgMul = (t.buffDmgMul || 1) * 1.18;
+        t._tempDmgMul = 1.18;
         t._pokecenterTimer = 6;
       }
       engine.spawnFloatingText('🏥 포켓몬센터! 전체 데미지+18%', engine.width/2, 80, '#06d6a0');

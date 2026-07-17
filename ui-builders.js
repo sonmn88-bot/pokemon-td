@@ -32,7 +32,7 @@ Object.assign(App.prototype, {
         <span class="tower-btn-cost">💰${cost}</span>
       `;
       btn.title = p.key === 'gamble' ? '2~5성 확정! (단, 4성 극희귀·5성 극악희귀, 고가) (단축키: ' + p.hotkey + ')' :
-                  p.key === 'ten'    ? '10개 묶음 (개당 45g, 일반뽑기와 동일 확률=1성만) (단축키: ' + p.hotkey + ')' :
+                  p.key === 'ten'    ? '10개 묶음 (개당 90g, 일반뽑기와 동일 확률=1성만) (단축키: ' + p.hotkey + ')' :
                   p.key === 'premium'? '1~3성 (3성은 희귀) (단축키: ' + p.hotkey + ')' : '1성(노말)만 나옵니다 (단축키: ' + p.hotkey + ')';
       btn.addEventListener('click', () => this.doPull(p.key, btn));
       scroll.appendChild(btn);

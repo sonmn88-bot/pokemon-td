@@ -21,14 +21,14 @@ const BOSS_POOL = ['lugia', 'mewtwo'];
 // v27-3: 보스 난이도 추가 상향 - 기본 배율을 더 키우고, 소환 시점 웨이브에 비례해서도 더 강해지게
 // (10라운드째에도 5단계까지 다 잡히던 문제 - 고정배율만으론 후반에 상대적으로 계속 약해지므로 웨이브연동 필수)
 const BOSS_TIERS = [
-  { tier: 1, type: 'gyarados', label: '갸라도스',   hpMul: 10, rewardMul: 9  },
-  { tier: 2, type: 'dragonite', label: '망나뇽',    hpMul: 18, rewardMul: 16 },
-  { tier: 3, type: 'lugia',    label: '루기아',      hpMul: 30, rewardMul: 26 },
-  { tier: 4, type: 'mewtwo',   label: '뮤츠',        hpMul: 48, rewardMul: 40 },
-  { tier: 5, type: 'mewtwo',   label: '뮤츠(각성)',  hpMul: 80, rewardMul: 60 },
+  { tier: 1, type: 'gyarados', label: '갸라도스',   hpMul: 10, rewardMul: 9,  minWave: 1  },
+  { tier: 2, type: 'dragonite', label: '망나뇽',    hpMul: 18, rewardMul: 16, minWave: 15 },
+  { tier: 3, type: 'lugia',    label: '루기아',      hpMul: 30, rewardMul: 26, minWave: 35 },
+  { tier: 4, type: 'mewtwo',   label: '뮤츠',        hpMul: 48, rewardMul: 40, minWave: 55 },
+  { tier: 5, type: 'mewtwo',   label: '뮤츠(각성)',  hpMul: 80, rewardMul: 60, minWave: 75 },
 ];
 const BOSS_SUMMON_COOLDOWN = 60;
-function bossWaveScaleMul(wave) { return 1 + Math.max(0, wave) * 0.16; } // v27-27: 초반 소환보스가 너무 쉽게 녹아서(요청) 웨이브당 보정 0.07→0.16로 대폭 상향
+function bossWaveScaleMul(wave) { return 1 + Math.max(0, wave) * 0.22; } // v27-28: 최소웨이브 제한 추가와 함께 계수도 재차 상향 (요청: 여전히 너무 쉬움)
 
 // v27-4: 존별 적 타입 편향 (item17) - 존마다 특정 타입이 더 자주 나와서 전략적 예측/대응 여지를 줌
 const ZONE_TYPE_BIAS = ['grass', 'psychic', 'fire']; // 숲=풀 위주 / 동굴=에스퍼 위주 / 도시=불 위주
@@ -1195,6 +1195,17 @@ class App {
         this.engine._bossSummonCooldown -= this.engine.dt;
         this._updateBossSummonUI();
       }
+      // v27-28: window resize 이벤트가 안 뜨는 내부 CSS 레이아웃 변경(오버레이 열림/닫힘, 모바일 브라우저
+      // 주소창 접힘 등)으로도 캔버스 표시크기가 바뀔 수 있어서, 낮은 빈도로 직접 감시 (요청: "몬스터 안보이는데
+      // 필드엔 있다"는 문제가 리사이즈 이벤트 대응만으론 안 잡혔을 가능성)
+      this._dimCheckTimer = (this._dimCheckTimer || 0) + this.engine.dt;
+      if (this._dimCheckTimer >= 1) {
+        this._dimCheckTimer = 0;
+        const cw = this.engine.canvas.clientWidth, ch = this.engine.canvas.clientHeight;
+        if (cw > 0 && ch > 0 && (Math.abs(cw - this.engine.width) > 2 || Math.abs(ch - this.engine.height) > 2)) {
+          this._realignAfterResize();
+        }
+      }
       // v27-6: 필드 위험 비네트 (요청2, 절제된 연출)
       if (this.engine.endless) {
         let vig = document.getElementById('field-danger-vignette');
@@ -1370,6 +1381,11 @@ class App {
     if (!e || !tierDef) return;
     if (e.state !== 'wave') { this.showWaveAnnounce('웨이브 진행 중에만 소환 가능', '#ff6b6b'); return; }
     if ((e._bossSummonCooldown || 0) > 0) return;
+    // v27-28: 보스 티어별 최소 웨이브 요구 (요청: 초반부터 뮤츠까지 쉽게 소환/처치되던 문제)
+    if (e.currentWave < tierDef.minWave) {
+      this.showWaveAnnounce(`🔒 ${tierDef.label}은(는) 웨이브 ${tierDef.minWave} 이후에 소환 가능`, '#ff6b6b');
+      return;
+    }
     const waveMul = bossWaveScaleMul(e.currentWave);
     e._spawnEnemy({ type: tierDef.type, bossTier: tier, hpMul: tierDef.hpMul * waveMul, rewardMul: tierDef.rewardMul });
     e._bossSummonCooldown = BOSS_SUMMON_COOLDOWN;
@@ -1392,6 +1408,9 @@ class App {
     if (cd > 0) {
       btn.disabled = true;
       btn.textContent = `⏳ 재사용 대기 (${Math.ceil(cd)}s)`;
+    } else if (this.engine.currentWave < (tierDef.minWave || 1)) {
+      btn.disabled = true;
+      btn.textContent = `🔒 웨이브 ${tierDef.minWave} 이후 소환가능`;
     } else {
       btn.disabled = false;
       btn.textContent = `🔮 ${tierDef.label} 소환`;
@@ -1498,35 +1517,38 @@ class App {
       // 그대로 남아있는 심각한 버그였음 (요청4 - "몬스터 안보이는데 100+마리 있다고 게임오버"의 원인 추정).
       // 1) 디바운스로 과도한 재생성 방지 2) 재생성시 기존 적들을 새 경로 위 같은 진행률 지점으로 재정렬.
       clearTimeout(this._resizeDebounceTimer);
-      this._resizeDebounceTimer = setTimeout(() => {
-        const oldW = this.engine.width || 1, oldH = this.engine.height || 1;
-        const oldEnemyRatios = this.engine.enemies.map(en => ({
-          en, ratio: en.totalLen ? (en.distTraveled / en.totalLen) : 0,
-        }));
-        // v27-25 추가발견: 영웅도 절대좌표라 리사이즈 후 위치가 안 맞게 되고 있었음 (같은 캐싱 패턴 버그)
-        const oldHeroRatios = this.engine.heroes.map(h => ({ h, rx: h.x / oldW, ry: h.y / oldH }));
-        this.engine.resize();
-        this.engine.buildPaths();
-        this.engine.buildTowerSlots();
-        this.engine._bgDirty = true;
-        // 기존 적들을 새 경로 위의 같은 진행률(%) 지점으로 재배치
-        const newPath = this.engine.paths && this.engine.paths[0];
-        if (newPath) {
-          const newLen = typeof totalPathLength === 'function' ? totalPathLength(newPath) : 0;
-          for (const { en, ratio } of oldEnemyRatios) {
-            if (en.dead) continue;
-            en.path = newPath;
-            en.totalLen = newLen;
-            en.distTraveled = newLen * ratio;
-          }
-        }
-        // 영웅도 같은 비율 위치로 재배치
-        for (const { h, rx, ry } of oldHeroRatios) {
-          h.x = rx * this.engine.width;
-          h.y = ry * this.engine.height;
-        }
-      }, 300);
+      this._resizeDebounceTimer = setTimeout(() => this._realignAfterResize(), 300);
     });
+  }
+
+  // v27-28: 리사이즈/레이아웃변경 후 적·영웅 위치 재정렬 (재사용 가능하게 메서드로 분리 - 요청: 여전히
+  // "몬스터 안보이는데 필드에 있다"는 문제가 있어서, window resize 이벤트 없이도 내부 CSS 레이아웃
+  // 변경만으로 캔버스 표시크기가 바뀌는 경우까지 잡기 위해 매 프레임 감시도 추가함)
+  _realignAfterResize() {
+    if (!this.engine) return;
+    const oldW = this.engine.width || 1, oldH = this.engine.height || 1;
+    const oldEnemyRatios = this.engine.enemies.map(en => ({
+      en, ratio: en.totalLen ? (en.distTraveled / en.totalLen) : 0,
+    }));
+    const oldHeroRatios = this.engine.heroes.map(h => ({ h, rx: h.x / oldW, ry: h.y / oldH }));
+    this.engine.resize();
+    this.engine.buildPaths();
+    this.engine.buildTowerSlots();
+    this.engine._bgDirty = true;
+    const newPath = this.engine.paths && this.engine.paths[0];
+    if (newPath) {
+      const newLen = typeof totalPathLength === 'function' ? totalPathLength(newPath) : 0;
+      for (const { en, ratio } of oldEnemyRatios) {
+        if (en.dead) continue;
+        en.path = newPath;
+        en.totalLen = newLen;
+        en.distTraveled = newLen * ratio;
+      }
+    }
+    for (const { h, rx, ry } of oldHeroRatios) {
+      h.x = rx * this.engine.width;
+      h.y = ry * this.engine.height;
+    }
   }
 
   // v27-10: 웨이브 강제 스킵 (요청8 - 잔여 몹 1마리 때문에 100초를 다 기다려야 하던 문제)
