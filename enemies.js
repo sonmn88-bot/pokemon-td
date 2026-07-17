@@ -399,7 +399,21 @@ class Enemy {
     if (this.def.special === 'ghost' && type === 'physical') dmg *= 0.5;
     if (this.def.special === 'armor' && type === 'physical') dmg *= 0.1;
     // v27-34: 보스 스폰 유예기간 - 등장 직후 순삭 방지용 안전장치 (요청: 원인불문 최소 생존시간 보장)
-    if (this._spawnGraceTimer > 0) dmg *= 0.4;
+    if (this._spawnGraceTimer > 0) dmg *= 0.15; // v27-35: 60%감소로도 부족해서 85%감소로 대폭 강화
+
+    // v27-36: 보스 초당 데미지 상한 (요청 - "체력 올려도 중첩버그면 소용없다"는 지적이 맞음. 숨은 배율버그를
+    // 못 찾아도 결과적으로 순삭을 물리적으로 차단하기 위해, 보스는 최대체력의 12%까지만 1초 안에 받도록 제한)
+    if (this.isBoss && this.maxHp > 0) {
+      const now = performance.now();
+      if (!this._dmgWindowStart || now - this._dmgWindowStart > 1000) {
+        this._dmgWindowStart = now;
+        this._dmgWindowTotal = 0;
+      }
+      const capPerWindow = this.maxHp * 0.12;
+      const remaining = Math.max(0, capPerWindow - this._dmgWindowTotal);
+      dmg = Math.min(dmg, remaining);
+      this._dmgWindowTotal += dmg;
+    }
 
     this.hp -= dmg;
     this.flashTimer = 0.1;
@@ -446,7 +460,7 @@ class Enemy {
         // v27-19 버그수정: 여러 화염타워가 번갈아 때리면 화상이 계속 재발동되어 사실상 도트처럼
         // 반복 대미지가 들어가고 있었음. burning 지속시간과 별개로 "발동 쿨다운"을 둬서 확실히 막음.
         if ((this._burnCooldown || 0) > 0) break;
-        this._burnCooldown = 5; // 5초 안에는 화상이 또 안 붙음 (누가 때리든)
+        this._burnCooldown = 7.5; // v27-37: 클러스터에서 연쇄폭발처럼 들리는 문제로 쿨다운 연장
         duration = Math.min(duration, 3.5);
         {
           this.burning = duration;
@@ -462,7 +476,7 @@ class Enemy {
                 // v27-22 버그수정: 스플래시로 맞는 주변 적들은 쿨다운이 안 걸려서, 클러스터 안의 적이
                 // 여러 화염타워의 폭발에 계속 무방비로 맞아 "드드드드" 반복피해를 입던 진짜 원인이었음.
                 if ((e._burnCooldown || 0) > 0) continue;
-                e._burnCooldown = 5;
+                e._burnCooldown = 7.5;
                 e.takeDamage(e === this ? total : total * 0.5, 'fire'); // 원래 대상 100%, 주변은 50%
                 hitAny = true;
               }
@@ -477,7 +491,7 @@ class Enemy {
         if (this.def.special === 'poisonImmune' || this.def.poisonImmune) return;
         // v27-19: 독도 화상과 동일하게 재발동 쿨다운 적용 (여러 독타워가 번갈아 때려서 반복되던 문제 방지)
         if ((this._poisonCooldown || 0) > 0) break;
-        this._poisonCooldown = 5;
+        this._poisonCooldown = 7.5;
         {
           this.poisoned = duration;
           this.poisonDamage = factor || 8;
@@ -494,7 +508,7 @@ class Enemy {
           const per = total / targets.length;
           for (const tgt of targets) {
             if ((tgt._poisonCooldown || 0) > 0) continue; // v27-22: 전파 대상도 쿨다운 체크
-            tgt._poisonCooldown = 5;
+            tgt._poisonCooldown = 7.5;
             tgt.takeDamage(per, 'poison');
             if (tgt !== this) { tgt.poisoned = Math.max(tgt.poisoned, 0.6); tgt.poisonDamage = 0; } // 살짝 독기운 표시만(추가 데미지는 안 나감, 논스택 유지)
           }
