@@ -241,18 +241,8 @@ class GameEngine {
     if (this.endless && (this.state === 'wave' || this.state === 'idle')) {
       const count = this.enemies.length;
       this._peakFieldCount = Math.max(this._peakFieldCount || 0, count); // v27-5: 위험보너스용 (item D)
-      // v27-16: 필드 안정 보너스 (요청5 - 위험보너스의 반대) - 낮게 오래 유지하면 소소한 보상
-      if (count <= 30) {
-        this._stableTimer = (this._stableTimer || 0) + this.dt;
-        if (this._stableTimer >= 25) {
-          this._stableTimer = 0;
-          const stableBonus = 10 + Math.round(Math.min(this.currentWave, 60) * 0.25);
-          this.addGold(stableBonus);
-          this.spawnFloatingText(`🛡️ 안정 관리 보너스! +${stableBonus}g`, this.width/2, 140, '#06d6a0');
-        }
-      } else {
-        this._stableTimer = 0;
-      }
+      // v27-24: 필드 안정 보너스 완전 제거함 (요청) - 게임 시작 전 idle 상태에서도 계속 발동돼서
+      // 가만히 놔둬도 골드가 쌓이는 문제가 있었음.
       for (const lvl of this.fieldWarnLevels) {
         if (count >= lvl && !this._fieldWarnFired[lvl]) {
           this._fieldWarnFired[lvl] = true;
@@ -379,9 +369,15 @@ class GameEngine {
 
   updateSpawn() {
     this.spawnTimer += this.dt;
-    while (this.spawnQueue.length > 0 && this.spawnTimer >= this.spawnQueue[0].delay) {
+    // v27-25: 한꺼번에 밀려있던 스폰이 단일 프레임에 전부 처리되면 순간 버벅임(스터터)을 유발할 수 있어
+    // 프레임당 스폰 처리 개수에 상한을 둠 (요청3 - 안정성). 나머지는 다음 프레임에 이어서 처리되므로
+    // 몬스터가 사라지지는 않고, 아주 살짝(수 프레임) 늦게 나오는 정도의 차이만 생김.
+    let spawnedThisFrame = 0;
+    const MAX_SPAWN_PER_FRAME = 15;
+    while (this.spawnQueue.length > 0 && this.spawnTimer >= this.spawnQueue[0].delay && spawnedThisFrame < MAX_SPAWN_PER_FRAME) {
       const item = this.spawnQueue.shift();
       this._spawnEnemy(item);
+      spawnedThisFrame++;
     }
   }
 

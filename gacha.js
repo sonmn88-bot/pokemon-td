@@ -426,7 +426,7 @@ window.FLAVOR_TEXT = FLAVOR_TEXT;
 // v27-3: 사거리 추가 하향 (0.93 -> 0.72) - 위치별 배치가 의미 있어지고, 사거리 강화템 구매가 가치있어지도록
 for (const id in GachaTowerDefs) {
   const d = GachaTowerDefs[id];
-  d.damage   = Math.round(d.damage * 0.80 * 0.72 * 10) / 10;
+  d.damage   = Math.round(d.damage * 0.80 * 0.72 * 0.80 * 10) / 10;
   d.fireRate = Math.round(d.fireRate * 0.68 * 100) / 100;
   d.range    = Math.round(d.range * 0.72);
 }
@@ -453,7 +453,7 @@ const PULL_TABLES = {
   gamble:   [{grade:'rare',weight:52},{grade:'epic',weight:41.5},{grade:'legend',weight:6.3},{grade:'unique',weight:0.2}], // 2~5성, 4성 극악 5성 극극극극극악
   ten_base: [{grade:'normal',weight:100}], // 10연뽑 = 일반뽑기 10번 묶음(동일확률, 개당만 할인)
 };
-const PULL_COSTS = { normal:50, premium:130, gamble:900, ten:450 }; // v27-20: 도박뽑기 320→900으로 대폭 인상
+const PULL_COSTS = { normal:50, premium:130, gamble:1500, ten:450 }; // v27-24: 900→1500으로 추가 인상
 
 const GRADE_POOLS = {
   normal:  ['bulbasaur','charmander','squirtle','pidgey','rattata','clefairy','oddish','diglett','psyduck','growlithe','abra','magnemite'],
@@ -541,6 +541,12 @@ function _createGachaTower(def, x, y, engine) {
       if(this.target&&!this.target.dead&&!this.target.reachedEnd){
         if(Math.hypot(this.target.x-this.x,this.target.y-this.y)<=this.range) return this.target;
       }
+      // v27-25: 타겟이 없을 때의 전체스캔을 초당 최대 10회로 제한 (요청2 - 필드 밀집시 매프레임 O(타워x적)
+      // 전수조사가 누적되어 모바일 프레임드랍 유발 가능성) - 유효 타겟 있을 때는 기존처럼 즉시 반환하니 반응성 손실 없음
+      const nowMs = performance.now();
+      if (this._lastScanAt && nowMs - this._lastScanAt < 100 && this._noTargetCache !== undefined) {
+        return this._noTargetCache;
+      }
       let best=null,bestP=-1;
       for(const e of enemies){
         if(e.dead||e.reachedEnd) continue;
@@ -548,6 +554,8 @@ function _createGachaTower(def, x, y, engine) {
         if(d>this.range) continue;
         if(e.distTraveled>bestP){ bestP=e.distTraveled; best=e; }
       }
+      this._lastScanAt = nowMs;
+      this._noTargetCache = best;
       return best;
     },
     update(dt,enemies,engine){

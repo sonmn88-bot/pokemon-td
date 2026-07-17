@@ -40,7 +40,7 @@ const ShopItems = [
     }
   },
   {
-    key: 'revive', name: '확장 부지', emoji: '🏗️', cost: 180, scaling: true,
+    key: 'revive', name: '확장 부지', emoji: '🏗️', cost: 450, scaling: true,
     desc: '트랙 안쪽에 빈 배치슬롯 1개 즉시 추가 (살수록 비싸짐)',
     buy(engine) {
       const w = engine.width, h = engine.height;

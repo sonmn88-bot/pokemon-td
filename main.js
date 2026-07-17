@@ -316,7 +316,11 @@ class App {
       return;
     }
     const rows = await window.Leaderboard.fetchTop(20);
+    // v27-26: 조회 중(비동기 대기) 사용자가 창을 닫아버리면, 이미 DOM에서 떨어져나간 요소를
+    // 계속 건드리려던 문제 - isConnected로 확인 후 안전하게 중단 (요청: 안정성 바로 조치)
+    if (!overlay.isConnected) return;
     const body = overlay.querySelector('#rank-list-body');
+    if (!body) return;
     if (!rows.length) { body.textContent = '아직 등록된 기록이 없습니다.'; return; }
     body.style.cssText = 'max-width:380px;max-height:50vh;overflow-y:auto;color:#ddd;font-size:12px;';
     body.innerHTML = rows.map((r, i) => `
@@ -1209,23 +1213,8 @@ class App {
           if (cell) cell.style.color = cnt >= 160 ? '#ff5252' : cnt >= 120 ? '#ffab40' : cnt >= 80 ? '#ffd60a' : '';
         }
       }
-      // v27-17: 황금 시간 이벤트 (요청3) - 웨이브 경계와 무관하게 가끔 30초간 전체 골드 획득량 상승
-      if (this.engine.state === 'wave' || this.engine.state === 'idle') {
-        if (!this.engine._goldenTimeActive && Math.random() < 0.0006) {
-          this.engine._goldenTimeActive = true;
-          this.engine._goldenTimeRemaining = 30;
-          this.engine._goldenTimeGoldMul = 1.8;
-          this.showWaveAnnounce('✨ 황금 시간! 30초간 골드 획득 1.8배', '#ffd60a');
-        }
-        if (this.engine._goldenTimeActive) {
-          this.engine._goldenTimeRemaining -= this.engine.dt;
-          if (this.engine._goldenTimeRemaining <= 0) {
-            this.engine._goldenTimeActive = false;
-            this.engine._goldenTimeGoldMul = 1;
-            this.showWaveAnnounce('황금 시간 종료', '#aaa');
-          }
-        }
-      }
+      // v27-24: 황금 시간 이벤트 완전 제거함 (요청 - 게임을 시작도 안 했는데 idle 상태에서 계속 발동돼서
+      // 가만히 놔둬도 골드가 쌓이는 심각한 문제가 있었음. 아예 매커니즘 삭제.
       // v27-16: 미니 현상금 이벤트 (요청2) - 가끔 일반 몹 하나가 반짝이며 등장, 제한시간 안에 잡으면 보너스
       if (this.engine.state === 'wave' && this.engine.enemies.length > 0) {
         if (!this.engine._bountyTarget && Math.random() < 0.0025) { // 평균 몇십초에 한번 정도
@@ -1501,11 +1490,42 @@ class App {
       this.engine.handleHover(pos.x, pos.y);
     });
 
+    this._resizeDebounceTimer = null;
     window.addEventListener('resize', () => {
-      this.engine.resize();
-      this.engine.buildPaths();
-      this.engine.buildTowerSlots();
-      this.engine._bgDirty = true;
+      // v27-24 버그수정: 모바일에서 스크롤/키보드/방향전환 때마다 resize가 연속으로 여러 번 발생하는데,
+      // 그때마다 경로/슬롯을 통째로 재생성하고 있었음. 게다가 이미 스폰된 적들은 예전 경로 참조를 그대로
+      // 들고 있어서 화면 비율이 바뀌면 위치가 트랙과 어긋나 화면 밖으로 사라지는데 카운트(필드누적)에는
+      // 그대로 남아있는 심각한 버그였음 (요청4 - "몬스터 안보이는데 100+마리 있다고 게임오버"의 원인 추정).
+      // 1) 디바운스로 과도한 재생성 방지 2) 재생성시 기존 적들을 새 경로 위 같은 진행률 지점으로 재정렬.
+      clearTimeout(this._resizeDebounceTimer);
+      this._resizeDebounceTimer = setTimeout(() => {
+        const oldW = this.engine.width || 1, oldH = this.engine.height || 1;
+        const oldEnemyRatios = this.engine.enemies.map(en => ({
+          en, ratio: en.totalLen ? (en.distTraveled / en.totalLen) : 0,
+        }));
+        // v27-25 추가발견: 영웅도 절대좌표라 리사이즈 후 위치가 안 맞게 되고 있었음 (같은 캐싱 패턴 버그)
+        const oldHeroRatios = this.engine.heroes.map(h => ({ h, rx: h.x / oldW, ry: h.y / oldH }));
+        this.engine.resize();
+        this.engine.buildPaths();
+        this.engine.buildTowerSlots();
+        this.engine._bgDirty = true;
+        // 기존 적들을 새 경로 위의 같은 진행률(%) 지점으로 재배치
+        const newPath = this.engine.paths && this.engine.paths[0];
+        if (newPath) {
+          const newLen = typeof totalPathLength === 'function' ? totalPathLength(newPath) : 0;
+          for (const { en, ratio } of oldEnemyRatios) {
+            if (en.dead) continue;
+            en.path = newPath;
+            en.totalLen = newLen;
+            en.distTraveled = newLen * ratio;
+          }
+        }
+        // 영웅도 같은 비율 위치로 재배치
+        for (const { h, rx, ry } of oldHeroRatios) {
+          h.x = rx * this.engine.width;
+          h.y = ry * this.engine.height;
+        }
+      }, 300);
     });
   }
 
@@ -1664,9 +1684,13 @@ class App {
         overlay.appendChild(rankBox);
         const submitBtn = rankBox.querySelector('#rank-submit-btn');
         const nameInput = rankBox.querySelector('#rank-name-input');
+        const blockUnload = (e) => { e.preventDefault(); e.returnValue = ''; };
         submitBtn.addEventListener('click', async () => {
           submitBtn.disabled = true; submitBtn.textContent = '등록 중...';
+          window.addEventListener('beforeunload', blockUnload); // v27-26: 등록 중 새로고침/닫기 방지 (요청1)
           const res = await window.Leaderboard.submitScore(nameInput.value, this.engine.score || 0, reached);
+          window.removeEventListener('beforeunload', blockUnload);
+          if (!submitBtn.isConnected) return; // v27-26: 등록 대기 중 화면이 닫혔으면 안전하게 중단
           submitBtn.textContent = res.ok ? '✅ 등록 완료!' : '❌ 등록 실패';
         });
       } else {
@@ -1703,6 +1727,7 @@ class App {
 
   backToMapSelect() {
     if (this._autoWaveTimer) { clearInterval(this._autoWaveTimer); this._autoWaveTimer = null; }
+    if (this._resizeDebounceTimer) { clearTimeout(this._resizeDebounceTimer); this._resizeDebounceTimer = null; } // v27-26: 안 쓰는 타이머 정리
     this.BGM.stop();
     if (this.engine) { this.engine.stop(); this.engine = null; }
     // 배속 초기화
@@ -1737,12 +1762,15 @@ class App {
 
   togglePause() {
     if (!this.engine) return;
-    if (this.engine.state === 'wave') {
+    // v27-24 버그수정: 'wave' 상태에서만 작동해서, 웨이브 사이 idle 상태(꽤 자주 있음)에선
+    // 눌러도 아무 반응이 없어 "의미없는 버튼"처럼 보였음 (요청5) - idle도 지원하도록 확장.
+    if (this.engine.state === 'wave' || this.engine.state === 'idle') {
+      this._pausedFromState = this.engine.state;
       this.engine.state = 'paused';
       this.engine.stop();
       this.els.btnMenu.textContent = '▶';
     } else if (this.engine.state === 'paused') {
-      this.engine.state = 'wave';
+      this.engine.state = this._pausedFromState || 'wave';
       this.engine.start();
       this.els.btnMenu.textContent = '☰';
     }

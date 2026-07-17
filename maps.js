@@ -8,30 +8,33 @@ const MapDefs = {
     bgColor:'#2a5418', bgImage:'assets/bg_forest.jpg',
     pathColor:'#c8a44a', pathColorDark:'#7a5510',
     pathHighlight:'rgba(255,235,160,0.22)',
-    pathArrow:'rgba(255,210,80,0.32)', pathWidth:34,
+    pathArrow:'rgba(255,210,80,0.32)', pathWidth:20,
 
     // 순환 트랙 (스타 랜덤디펜스 스타일): 적이 사각 트랙을 계속 돌며,
     // 제한시간 내에 처치해야 한다. 슬롯은 트랙 안쪽에 격자로 배치.
     loopMargin: {x:0.09, y:0.13},
     slotGrid: {cols:5, rows:4},
 
-    // v27-22: 단순 사각루프 대신 3단 지그재그 경로로 변경 (요청 - 다이나믹하고 전략적인 배치)
+    // v27-24 버그수정: 대각선으로 그려지던 문제(중간 꺾이는 점 누락) 수정 - 세로이동/가로이동을
+    // 항상 분리된 점으로 나눠서 직각 지그재그가 되도록 함. 5단으로 확장 (요청 - 더 꼬불꼬불하게)
     getPaths(w, h) {
       const mx = w*0.15, my = h*0.20;
       const innerGap = w*0.30; // 지그재그가 왼쪽에서 멈추는 지점 (왼쪽 가장자리는 복귀 통로로 남김)
-      const rowY1 = my + (h - 2*my) * 0.33;
-      const rowY2 = my + (h - 2*my) * 0.66;
-      return [[
-        {x:mx, y:my},
-        {x:w-mx, y:my},
-        {x:w-mx, y:rowY1},
-        {x:mx+innerGap, y:rowY1},
-        {x:mx+innerGap, y:rowY2},
-        {x:w-mx, y:rowY2},
-        {x:w-mx, y:h-my},
-        {x:mx, y:h-my},
-        {x:mx, y:my},
-      ]];
+      const FOLDS = 4; // 내부 왕복 횟수 (밴드는 FOLDS+1개 생김)
+      const pts = [{x:mx, y:my}, {x:w-mx, y:my}];
+      let curX = w-mx;
+      for (let i = 1; i <= FOLDS; i++) {
+        const y = my + (h - 2*my) * (i / (FOLDS + 1));
+        const goLeft = i % 2 === 1;
+        const nextX = goLeft ? mx+innerGap : w-mx;
+        pts.push({ x: curX, y });      // 세로로 내려감 (x는 그대로)
+        pts.push({ x: nextX, y });     // 가로로 이동 (y는 그대로)
+        curX = nextX;
+      }
+      pts.push({ x: curX, y: h-my });  // 마지막 밴드까지 세로로 내려감
+      pts.push({ x: mx, y: h-my });    // 바닥을 가로질러 왼쪽 끝으로
+      pts.push({ x: mx, y: my });      // 왼쪽 가장자리를 타고 복귀 (루프 닫힘)
+      return [pts];
     },
 
     // v27-22: 지그재그 경로의 3개 밴드(위/중간/아래) 사이 공간에 슬롯 배치 - 경로 선과 안 겹치게
@@ -39,11 +42,16 @@ const MapDefs = {
       const slots = [];
       const mx = w*0.15, my = h*0.20;
       const innerGap = w*0.30;
-      const rowY1 = my + (h - 2*my) * 0.33;
-      const rowY2 = my + (h - 2*my) * 0.66;
-      const bandY = [ (my+rowY1)/2, (rowY1+rowY2)/2, (rowY2+(h-my))/2 ]; // 각 밴드 중앙
+      const FOLDS = 4; // getPaths와 동일해야 밴드가 맞물림
+      // 밴드 경계 y좌표들 (getPaths의 꺾이는 지점과 동일하게 계산)
+      const bounds = [my];
+      for (let i = 1; i <= FOLDS; i++) bounds.push(my + (h - 2*my) * (i / (FOLDS + 1)));
+      bounds.push(h - my);
+      const bandY = [];
+      for (let i = 0; i < bounds.length - 1; i++) bandY.push((bounds[i] + bounds[i+1]) / 2); // 각 밴드 중앙
       const x0 = mx + innerGap + w*0.05, x1 = w - mx - w*0.04;
-      const cols = 6;
+      // v27-24: 좁은 화면(모바일)에서는 슬롯이 너무 촘촘해지지 않도록 컬럼수를 줄임 (요청1)
+      const cols = w < 500 ? 4 : w < 750 ? 5 : 6;
       for (const y of bandY) {
         for (let c = 0; c < cols; c++) {
           slots.push({ x: x0 + (x1-x0) * (c/(cols-1)), y });
@@ -51,8 +59,8 @@ const MapDefs = {
       }
       // 왼쪽 복귀 통로 옆 여유공간에도 세로로 슬롯 몇 개 추가 (공간 활용)
       const leftX = mx * 0.5 + innerGap * 0.15;
-      for (const y of [my + (rowY1-my)*0.5, rowY1 + (rowY2-rowY1)*0.5, rowY2 + (h-my-rowY2)*0.5]) {
-        slots.push({ x: leftX, y });
+      for (let i = 0; i < bounds.length - 1; i++) {
+        slots.push({ x: leftX, y: (bounds[i] + bounds[i+1]) / 2 });
       }
       return slots;
     },
@@ -96,26 +104,29 @@ const MapDefs = {
     bgColor:'#180600', bgImage:'assets/bg_city.jpg',
     pathColor:'#6b4428', pathColorDark:'#3a1a08',
     pathHighlight:'rgba(255,120,40,0.18)',
-    pathArrow:'rgba(255,140,60,0.32)', pathWidth:34,
+    pathArrow:'rgba(255,140,60,0.32)', pathWidth:20,
 
     // v27-3: 존 전환해도 타워 위치가 깨지지 않도록 3맵 모두 동일한 트랙/슬롯 좌표 사용 (숲맵 기준 통일)
-    // v27-22: 단순 사각루프 대신 3단 지그재그 경로로 변경 (요청 - 다이나믹하고 전략적인 배치)
+    // v27-24 버그수정: 대각선으로 그려지던 문제(중간 꺾이는 점 누락) 수정 - 세로이동/가로이동을
+    // 항상 분리된 점으로 나눠서 직각 지그재그가 되도록 함. 5단으로 확장 (요청 - 더 꼬불꼬불하게)
     getPaths(w, h) {
       const mx = w*0.15, my = h*0.20;
       const innerGap = w*0.30; // 지그재그가 왼쪽에서 멈추는 지점 (왼쪽 가장자리는 복귀 통로로 남김)
-      const rowY1 = my + (h - 2*my) * 0.33;
-      const rowY2 = my + (h - 2*my) * 0.66;
-      return [[
-        {x:mx, y:my},
-        {x:w-mx, y:my},
-        {x:w-mx, y:rowY1},
-        {x:mx+innerGap, y:rowY1},
-        {x:mx+innerGap, y:rowY2},
-        {x:w-mx, y:rowY2},
-        {x:w-mx, y:h-my},
-        {x:mx, y:h-my},
-        {x:mx, y:my},
-      ]];
+      const FOLDS = 4; // 내부 왕복 횟수 (밴드는 FOLDS+1개 생김)
+      const pts = [{x:mx, y:my}, {x:w-mx, y:my}];
+      let curX = w-mx;
+      for (let i = 1; i <= FOLDS; i++) {
+        const y = my + (h - 2*my) * (i / (FOLDS + 1));
+        const goLeft = i % 2 === 1;
+        const nextX = goLeft ? mx+innerGap : w-mx;
+        pts.push({ x: curX, y });      // 세로로 내려감 (x는 그대로)
+        pts.push({ x: nextX, y });     // 가로로 이동 (y는 그대로)
+        curX = nextX;
+      }
+      pts.push({ x: curX, y: h-my });  // 마지막 밴드까지 세로로 내려감
+      pts.push({ x: mx, y: h-my });    // 바닥을 가로질러 왼쪽 끝으로
+      pts.push({ x: mx, y: my });      // 왼쪽 가장자리를 타고 복귀 (루프 닫힘)
+      return [pts];
     },
 
     // v27-22: 지그재그 경로의 3개 밴드(위/중간/아래) 사이 공간에 슬롯 배치 - 경로 선과 안 겹치게
@@ -123,11 +134,16 @@ const MapDefs = {
       const slots = [];
       const mx = w*0.15, my = h*0.20;
       const innerGap = w*0.30;
-      const rowY1 = my + (h - 2*my) * 0.33;
-      const rowY2 = my + (h - 2*my) * 0.66;
-      const bandY = [ (my+rowY1)/2, (rowY1+rowY2)/2, (rowY2+(h-my))/2 ]; // 각 밴드 중앙
+      const FOLDS = 4; // getPaths와 동일해야 밴드가 맞물림
+      // 밴드 경계 y좌표들 (getPaths의 꺾이는 지점과 동일하게 계산)
+      const bounds = [my];
+      for (let i = 1; i <= FOLDS; i++) bounds.push(my + (h - 2*my) * (i / (FOLDS + 1)));
+      bounds.push(h - my);
+      const bandY = [];
+      for (let i = 0; i < bounds.length - 1; i++) bandY.push((bounds[i] + bounds[i+1]) / 2); // 각 밴드 중앙
       const x0 = mx + innerGap + w*0.05, x1 = w - mx - w*0.04;
-      const cols = 6;
+      // v27-24: 좁은 화면(모바일)에서는 슬롯이 너무 촘촘해지지 않도록 컬럼수를 줄임 (요청1)
+      const cols = w < 500 ? 4 : w < 750 ? 5 : 6;
       for (const y of bandY) {
         for (let c = 0; c < cols; c++) {
           slots.push({ x: x0 + (x1-x0) * (c/(cols-1)), y });
@@ -135,8 +151,8 @@ const MapDefs = {
       }
       // 왼쪽 복귀 통로 옆 여유공간에도 세로로 슬롯 몇 개 추가 (공간 활용)
       const leftX = mx * 0.5 + innerGap * 0.15;
-      for (const y of [my + (rowY1-my)*0.5, rowY1 + (rowY2-rowY1)*0.5, rowY2 + (h-my-rowY2)*0.5]) {
-        slots.push({ x: leftX, y });
+      for (let i = 0; i < bounds.length - 1; i++) {
+        slots.push({ x: leftX, y: (bounds[i] + bounds[i+1]) / 2 });
       }
       return slots;
     },
@@ -171,27 +187,30 @@ const MapDefs = {
     bgColor:'#050210', bgImage:'assets/bg_cave.jpg',
     pathColor:'#3e2860', pathColorDark:'#1e1030',
     pathHighlight:'rgba(180,120,255,0.18)',
-    pathArrow:'rgba(160,120,255,0.28)', pathWidth:32,
+    pathArrow:'rgba(160,120,255,0.28)', pathWidth:20,
     ghostBonus:0.30,
 
     // v27-3: 존 전환해도 타워 위치가 깨지지 않도록 3맵 모두 동일한 트랙/슬롯 좌표 사용 (숲맵 기준 통일)
-    // v27-22: 단순 사각루프 대신 3단 지그재그 경로로 변경 (요청 - 다이나믹하고 전략적인 배치)
+    // v27-24 버그수정: 대각선으로 그려지던 문제(중간 꺾이는 점 누락) 수정 - 세로이동/가로이동을
+    // 항상 분리된 점으로 나눠서 직각 지그재그가 되도록 함. 5단으로 확장 (요청 - 더 꼬불꼬불하게)
     getPaths(w, h) {
       const mx = w*0.15, my = h*0.20;
       const innerGap = w*0.30; // 지그재그가 왼쪽에서 멈추는 지점 (왼쪽 가장자리는 복귀 통로로 남김)
-      const rowY1 = my + (h - 2*my) * 0.33;
-      const rowY2 = my + (h - 2*my) * 0.66;
-      return [[
-        {x:mx, y:my},
-        {x:w-mx, y:my},
-        {x:w-mx, y:rowY1},
-        {x:mx+innerGap, y:rowY1},
-        {x:mx+innerGap, y:rowY2},
-        {x:w-mx, y:rowY2},
-        {x:w-mx, y:h-my},
-        {x:mx, y:h-my},
-        {x:mx, y:my},
-      ]];
+      const FOLDS = 4; // 내부 왕복 횟수 (밴드는 FOLDS+1개 생김)
+      const pts = [{x:mx, y:my}, {x:w-mx, y:my}];
+      let curX = w-mx;
+      for (let i = 1; i <= FOLDS; i++) {
+        const y = my + (h - 2*my) * (i / (FOLDS + 1));
+        const goLeft = i % 2 === 1;
+        const nextX = goLeft ? mx+innerGap : w-mx;
+        pts.push({ x: curX, y });      // 세로로 내려감 (x는 그대로)
+        pts.push({ x: nextX, y });     // 가로로 이동 (y는 그대로)
+        curX = nextX;
+      }
+      pts.push({ x: curX, y: h-my });  // 마지막 밴드까지 세로로 내려감
+      pts.push({ x: mx, y: h-my });    // 바닥을 가로질러 왼쪽 끝으로
+      pts.push({ x: mx, y: my });      // 왼쪽 가장자리를 타고 복귀 (루프 닫힘)
+      return [pts];
     },
 
     // v27-22: 지그재그 경로의 3개 밴드(위/중간/아래) 사이 공간에 슬롯 배치 - 경로 선과 안 겹치게
@@ -199,11 +218,16 @@ const MapDefs = {
       const slots = [];
       const mx = w*0.15, my = h*0.20;
       const innerGap = w*0.30;
-      const rowY1 = my + (h - 2*my) * 0.33;
-      const rowY2 = my + (h - 2*my) * 0.66;
-      const bandY = [ (my+rowY1)/2, (rowY1+rowY2)/2, (rowY2+(h-my))/2 ]; // 각 밴드 중앙
+      const FOLDS = 4; // getPaths와 동일해야 밴드가 맞물림
+      // 밴드 경계 y좌표들 (getPaths의 꺾이는 지점과 동일하게 계산)
+      const bounds = [my];
+      for (let i = 1; i <= FOLDS; i++) bounds.push(my + (h - 2*my) * (i / (FOLDS + 1)));
+      bounds.push(h - my);
+      const bandY = [];
+      for (let i = 0; i < bounds.length - 1; i++) bandY.push((bounds[i] + bounds[i+1]) / 2); // 각 밴드 중앙
       const x0 = mx + innerGap + w*0.05, x1 = w - mx - w*0.04;
-      const cols = 6;
+      // v27-24: 좁은 화면(모바일)에서는 슬롯이 너무 촘촘해지지 않도록 컬럼수를 줄임 (요청1)
+      const cols = w < 500 ? 4 : w < 750 ? 5 : 6;
       for (const y of bandY) {
         for (let c = 0; c < cols; c++) {
           slots.push({ x: x0 + (x1-x0) * (c/(cols-1)), y });
@@ -211,8 +235,8 @@ const MapDefs = {
       }
       // 왼쪽 복귀 통로 옆 여유공간에도 세로로 슬롯 몇 개 추가 (공간 활용)
       const leftX = mx * 0.5 + innerGap * 0.15;
-      for (const y of [my + (rowY1-my)*0.5, rowY1 + (rowY2-rowY1)*0.5, rowY2 + (h-my-rowY2)*0.5]) {
-        slots.push({ x: leftX, y });
+      for (let i = 0; i < bounds.length - 1; i++) {
+        slots.push({ x: leftX, y: (bounds[i] + bounds[i+1]) / 2 });
       }
       return slots;
     },
