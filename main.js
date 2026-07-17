@@ -28,7 +28,7 @@ const BOSS_TIERS = [
   { tier: 5, type: 'mewtwo',   label: '뮤츠(각성)',  hpMul: 80, rewardMul: 60 },
 ];
 const BOSS_SUMMON_COOLDOWN = 60;
-function bossWaveScaleMul(wave) { return 1 + Math.max(0, wave) * 0.07; } // 웨이브 진행할수록 소환보스도 계속 강해짐
+function bossWaveScaleMul(wave) { return 1 + Math.max(0, wave) * 0.16; } // v27-27: 초반 소환보스가 너무 쉽게 녹아서(요청) 웨이브당 보정 0.07→0.16로 대폭 상향
 
 // v27-4: 존별 적 타입 편향 (item17) - 존마다 특정 타입이 더 자주 나와서 전략적 예측/대응 여지를 줌
 const ZONE_TYPE_BIAS = ['grass', 'psychic', 'fire']; // 숲=풀 위주 / 동굴=에스퍼 위주 / 도시=불 위주
@@ -1000,7 +1000,7 @@ class App {
     this.missionTracker.onComplete = (mission) => this._onMissionComplete(mission);
 
     this.engine.onGoldChange  = g => {
-      this.els.goldVal.textContent = g;
+      this.els.goldVal.textContent = Math.round(g);
       this.refreshPullButtons();
       this.buildShopBar();
       // v27-5: 누적 획득 골드 트래킹 (미션용)
@@ -1122,7 +1122,7 @@ class App {
     this.engine.gold = dm.goldStart;
     this.engine.init(mapId);
 
-    this.els.goldVal.textContent = this.engine.gold;
+    this.els.goldVal.textContent = Math.round(this.engine.gold);
     this.els.livesVal.textContent = this.engine.lives;
     this.els.waveVal.textContent = 0;
     this.els.waveTotal.textContent = '∞';

@@ -449,7 +449,7 @@ function _shot(tower, engine, color, emoji, status, speed, onHit, splash, knockb
 const PULL_TABLES = {
   // v27-20: 뽑기 확률 전면 재설계 (요청8)
   normal:   [{grade:'normal',weight:100}], // 일반뽑기 = 1성(노말)만 나옴
-  premium:  [{grade:'normal',weight:60},{grade:'rare',weight:38.5},{grade:'epic',weight:1.5}], // 1~3성, 3성은 극희귀
+  premium:  [{grade:'normal',weight:62},{grade:'rare',weight:37},{grade:'epic',weight:1}], // 1~3성, 3성은 극희귀
   gamble:   [{grade:'rare',weight:52},{grade:'epic',weight:41.5},{grade:'legend',weight:6.3},{grade:'unique',weight:0.2}], // 2~5성, 4성 극악 5성 극극극극극악
   ten_base: [{grade:'normal',weight:100}], // 10연뽑 = 일반뽑기 10번 묶음(동일확률, 개당만 할인)
 };
@@ -716,6 +716,11 @@ function applyTowerSynergies(towers) {
       if(pair){ a.synergyBonus+=pair.bonus; b.synergyBonus+=pair.bonus; }
     }
   }
+  // v27-27 버그수정: 시너지 보너스에 상한이 없어서, 타워를 촘촘하게 배치하면 수십 개 페어가 전부 더해져
+  // 수백까지도 치솟을 수 있었음 (요청 - "시너지가 밸런싱 안된 채로 데미지가 쎄진 것 아니냐"는 의심이 맞았음).
+  // 기본 데미지가 5~15 수준인 노말타워 기준, 40 정도로 상한을 둬도 여전히 강력한 보너스임.
+  const SYNERGY_CAP = 40;
+  for(const t of towers) t.synergyBonus = Math.min(t.synergyBonus, SYNERGY_CAP);
 }
 
 // ===== 타입 업그레이드 (6종, v27: 3단계 -> 5단계 확장 + 가격 상향) =====

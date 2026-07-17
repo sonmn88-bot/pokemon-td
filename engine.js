@@ -467,7 +467,7 @@ class GameEngine {
 
   waveCleared() {
     this.state = 'idle';
-    let bonus = 6 + Math.min(this.currentWave, 60) * 1.1; // v27-20: 웨이브클리어 자동보상 대폭 하향 (요청7) - 90웨이브 기준 464g->72g 수준
+    let bonus = 4 + Math.min(this.currentWave, 60) * 0.7; // v27-27: 초반 골드 과다 문제로 추가 하향
     if (this._nextWaveGoldMul) { bonus = Math.round(bonus * this._nextWaveGoldMul); this._nextWaveGoldMul = null; }
     // v27-5: 위험보너스 (item D) - 필드에 120마리 이상 쌓인 채로 웨이브를 넘기면 리스크 감수 보상
     let riskBonus = 0;
@@ -485,8 +485,8 @@ class GameEngine {
   }
 
   // ===== GOLD / LIVES =====
-  addGold(n) { this.gold += n; this.onGoldChange && this.onGoldChange(this.gold); }
-  spendGold(n) { if (this.gold < n) return false; this.gold -= n; this.onGoldChange && this.onGoldChange(this.gold); return true; }
+  addGold(n) { this.gold = Math.round(this.gold + n); this.onGoldChange && this.onGoldChange(this.gold); } // v27-27: 부동소수점 오차 누적 방지 (요청: 833.300000000001 표시버그)
+  spendGold(n) { if (this.gold < n) return false; this.gold = Math.round(this.gold - n); this.onGoldChange && this.onGoldChange(this.gold); return true; }
   loseLife(n=1) {
     this.lives = Math.max(0, this.lives - n);
     this.onLivesChange && this.onLivesChange(this.lives);
