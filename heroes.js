@@ -174,7 +174,7 @@ const HeroDefs = {
       { id:'raichu', name:'라이츄', color:'#ff9800', statMul:1.20 },
     ]},
     attack:{
-      baseRange:175, baseDamage:10, baseFireRate:1.1,
+      baseRange:119, baseDamage:10, baseFireRate:1.1,
       rangePerLevel:7, damagePerLevel:3,
       projColor:'#fff176', projEmoji:'⚡', dmgType:'special',
       status:{type:'stun', duration:0.15},
@@ -226,7 +226,7 @@ const HeroDefs = {
     role:'광역 슬로우 / 버프',
     passive:'모든 타워 사거리 +10%',
     attack:{
-      baseRange:220, baseDamage:12, baseFireRate:1.1,
+      baseRange:150, baseDamage:12, baseFireRate:1.1,
       rangePerLevel:8, damagePerLevel:3,
       projColor:'#ce93d8', projEmoji:'🔮', dmgType:'special',
       status:{type:'slow', duration:1.5, factor:0.7},
@@ -278,7 +278,7 @@ const HeroDefs = {
       { id:'togetic', name:'토게틱', color:'#f8bbd0', statMul:1.20 },
     ]},
     attack:{
-      baseRange:165, baseDamage:7, baseFireRate:1.0,
+      baseRange:112, baseDamage:7, baseFireRate:1.0,
       rangePerLevel:6, damagePerLevel:2,
       projColor:'#fff59d', projEmoji:'✨', dmgType:'special',
     },
@@ -329,7 +329,7 @@ HeroDefs.charizard = {
   role:'화염 딜러',
   passive:'불꽃 타입 타워 데미지 +15%',
   attack:{
-    baseRange:210, baseDamage:18, baseFireRate:1.2,
+    baseRange:143, baseDamage:18, baseFireRate:1.2,
     rangePerLevel:6, damagePerLevel:4,
     projColor:'#ff7043', projEmoji:'🔥', dmgType:'special',
     status:{type:'burn', duration:2, factor:8},
@@ -377,7 +377,7 @@ HeroDefs.blastoise = {
   role:'제어 / 서포터',
   passive:'물 타입 타워 사거리 +10%',
   attack:{
-    baseRange:220, baseDamage:14, baseFireRate:1.1,
+    baseRange:150, baseDamage:14, baseFireRate:1.1,
     rangePerLevel:7, damagePerLevel:3,
     projColor:'#4fc3f7', projEmoji:'💧', dmgType:'special',
     status:{type:'slow', duration:1.8, factor:0.65},
@@ -426,7 +426,7 @@ HeroDefs.eevee = {
   role:'만능형 (진화로 특화)',
   passive:'모든 타워 데미지 +5%',
   attack:{
-    baseRange:170, baseDamage:7, baseFireRate:0.95,
+    baseRange:116, baseDamage:7, baseFireRate:0.95,
     rangePerLevel:6, damagePerLevel:2,
     projColor:'#d7ccc8', projEmoji:'⭐', dmgType:'special',
   },

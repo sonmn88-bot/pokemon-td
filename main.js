@@ -1472,8 +1472,10 @@ class App {
       };
     };
 
+    let lastTouchTapTime = 0;
     canvas.addEventListener('touchstart', e => {
       e.preventDefault();
+      lastTouchTapTime = Date.now(); // v27-21: 터치 직후 합성 click이 중복 발동되는 것 방지용 (요청11)
       const pos = getPos(e);
       if (this._tryTapHero(pos.x, pos.y)) return;
       this.engine.handleTap(pos.x, pos.y);
@@ -1486,6 +1488,9 @@ class App {
     }, { passive: false });
 
     canvas.addEventListener('click', e => {
+      // v27-21 버그수정: 터치 직후에는 브라우저가 합성 click을 한 번 더 쏴서 탭 하나에 handleTap이
+      // 두 번 불리고 있었음(선택→즉시재선택 등으로 "안 눌리는 것처럼" 보이던 원인 추정). 800ms 내 중복 무시.
+      if (Date.now() - lastTouchTapTime < 800) return;
       const pos = getPos(e);
       if (this._tryTapHero(pos.x, pos.y)) return;
       this.engine.handleTap(pos.x, pos.y);

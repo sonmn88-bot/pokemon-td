@@ -341,7 +341,7 @@ const GachaTowerDefs = {
     fire(t,e){
       e.projectiles.push(new Projectile(t.x,t.y,t.target,{engine:e,speed:650,damage:t.damage,color:'#fff176',size:6,dmgType:'special',emoji:'⚡',status:{type:'stun',duration:1.0},chain:5,chainRange:180}));
       t._empTimer=(t._empTimer||0)+1/t.fireRate;
-      if(t._empTimer>=5){ t._empTimer=0; for(const en of e.enemies) if(!en.dead&&!en.reachedEnd&&Math.hypot(en.x-t.x,en.y-t.y)<=t.range) { en.takeDamage(t.damage*1.5,'special'); en.applyStatus('stun',1.5,0); } e.particles.push(new AoeBurst(t.x,t.y,t.range,'#fff176')); }
+      if(t._empTimer>=8){ t._empTimer=0; for(const en of e.enemies) if(!en.dead&&!en.reachedEnd&&Math.hypot(en.x-t.x,en.y-t.y)<=t.range*0.6) { en.takeDamage(t.damage*0.8,'special'); en.applyStatus('stun',1.5,0); } e.particles.push(new AoeBurst(t.x,t.y,t.range*0.6,'#fff176')); }
     }
   },
   moltres: {
@@ -349,7 +349,7 @@ const GachaTowerDefs = {
     damage:70, range:295, fireRate:3.0, desc:'불꽃폭풍 광역',
     fire(t,e){
       e.projectiles.push(new Projectile(t.x,t.y,t.target,{engine:e,speed:540,damage:t.damage,color:'#ff7043',size:6,dmgType:'special',emoji:'🔥',piercing:true,pierceWidth:30,status:{type:'burn',duration:4,factor:13.5},
-        onHit:(en)=>{ if(Math.random()<0.4){ for(const e2 of e.enemies) if(Math.hypot(e2.x-en.x,e2.y-en.y)<90) e2.takeDamage(t.damage*1.3,'special'); e.particles.push(new AoeBurst(en.x,en.y,90,'#ff6f00')); }}}));
+        onHit:(en)=>{ if(Math.random()<0.4){ for(const e2 of e.enemies) if(e2!==en && !e2.dead && !e2.reachedEnd && Math.hypot(e2.x-en.x,e2.y-en.y)<90) e2.takeDamage(t.damage*0.65,'special'); e.particles.push(new AoeBurst(en.x,en.y,90,'#ff6f00')); }}}));
     }
   },
   dragonite: {
@@ -357,7 +357,7 @@ const GachaTowerDefs = {
     damage:80, range:300, fireRate:1.8, desc:'용의분노 관통+광역폭발',
     fire(t,e){
       e.projectiles.push(new Projectile(t.x,t.y,t.target,{engine:e,speed:560,damage:t.damage,color:'#fb8c00',size:7,dmgType:'special',emoji:'🐉',piercing:true,pierceWidth:32,
-        onHit:(en)=>{ e.particles.push(new AoeBurst(en.x,en.y,80,'#fb8c00')); for(const e2 of e.enemies) if(e2!==en&&!e2.dead&&Math.hypot(e2.x-en.x,e2.y-en.y)<80) e2.takeDamage(t.damage*0.6,'special'); }}));
+        onHit:(en)=>{ e.particles.push(new AoeBurst(en.x,en.y,70,'#fb8c00')); for(const e2 of e.enemies) if(e2!==en&&!e2.dead&&!e2.reachedEnd&&Math.hypot(e2.x-en.x,e2.y-en.y)<70) e2.takeDamage(t.damage*0.35,'special'); }}));
     }
   },
   gengar: {
@@ -426,7 +426,7 @@ window.FLAVOR_TEXT = FLAVOR_TEXT;
 // v27-3: 사거리 추가 하향 (0.93 -> 0.72) - 위치별 배치가 의미 있어지고, 사거리 강화템 구매가 가치있어지도록
 for (const id in GachaTowerDefs) {
   const d = GachaTowerDefs[id];
-  d.damage   = Math.round(d.damage * 0.80 * 10) / 10;
+  d.damage   = Math.round(d.damage * 0.80 * 0.72 * 10) / 10;
   d.fireRate = Math.round(d.fireRate * 0.68 * 100) / 100;
   d.range    = Math.round(d.range * 0.72);
 }
@@ -449,7 +449,7 @@ function _shot(tower, engine, color, emoji, status, speed, onHit, splash, knockb
 const PULL_TABLES = {
   // v27-20: 뽑기 확률 전면 재설계 (요청8)
   normal:   [{grade:'normal',weight:100}], // 일반뽑기 = 1성(노말)만 나옴
-  premium:  [{grade:'normal',weight:55},{grade:'rare',weight:41},{grade:'epic',weight:4}], // 1~3성, 3성은 희귀
+  premium:  [{grade:'normal',weight:60},{grade:'rare',weight:38.5},{grade:'epic',weight:1.5}], // 1~3성, 3성은 극희귀
   gamble:   [{grade:'rare',weight:52},{grade:'epic',weight:41.5},{grade:'legend',weight:6.3},{grade:'unique',weight:0.2}], // 2~5성, 4성 극악 5성 극극극극극악
   ten_base: [{grade:'normal',weight:100}], // 10연뽑 = 일반뽑기 10번 묶음(동일확률, 개당만 할인)
 };

@@ -456,6 +456,10 @@ class Enemy {
               if (e.dead || e.reachedEnd) continue;
               const d = Math.hypot(e.x - this.x, e.y - this.y);
               if (d <= radius) {
+                // v27-22 버그수정: 스플래시로 맞는 주변 적들은 쿨다운이 안 걸려서, 클러스터 안의 적이
+                // 여러 화염타워의 폭발에 계속 무방비로 맞아 "드드드드" 반복피해를 입던 진짜 원인이었음.
+                if ((e._burnCooldown || 0) > 0) continue;
+                e._burnCooldown = 5;
                 e.takeDamage(e === this ? total : total * 0.5, 'fire'); // 원래 대상 100%, 주변은 50%
                 hitAny = true;
               }
@@ -486,6 +490,8 @@ class Enemy {
           }
           const per = total / targets.length;
           for (const tgt of targets) {
+            if ((tgt._poisonCooldown || 0) > 0) continue; // v27-22: 전파 대상도 쿨다운 체크
+            tgt._poisonCooldown = 5;
             tgt.takeDamage(per, 'poison');
             if (tgt !== this) { tgt.poisoned = Math.max(tgt.poisoned, 0.6); tgt.poisonDamage = 0; } // 살짝 독기운 표시만(추가 데미지는 안 나감, 논스택 유지)
           }

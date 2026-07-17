@@ -122,6 +122,16 @@ Object.assign(App.prototype, {
       const upgradeHint = tuNext
         ? `<div style="font-size:10px;color:#7fe3ff;margin-top:2px">💡 하단 타입강화바에서 "${tuNext.label}"(💰${tuNext.cost}) 올리면 이 타워가 강해져요</div>`
         : `<div style="font-size:10px;color:#888;margin-top:2px">💡 이 타입 강화 최대 단계 달성</div>`;
+      // v27-23: 데미지 배율 breakdown (요청1) - 여러 배율이 어디서 왔는지 한눈에
+      const teMul = window.typeEffectiveness && t.target ? window.typeEffectiveness(def.type, t.target.typeTag) : 1;
+      const breakdown = `
+        <div style="font-size:9.5px;color:#999;margin-top:4px;line-height:1.5;border-top:1px dashed rgba(255,255,255,0.1);padding-top:3px;">
+          📐 데미지 breakdown: 기본${def.damage}${t.synergyBonus>0?`+시너지${t.synergyBonus}`:''}
+          × 타입강화${(t.buffDmgMul||1).toFixed(2)}
+          × 숙련도${(t.masteryMul||1).toFixed(2)}
+          ${teMul!==1?`× 상성${teMul.toFixed(1)}`:''}
+          = <span style="color:#ffd60a">${Math.round(t.damage)}</span>
+        </div>`;
 
       panel.innerHTML = `
         <div class="tower-panel-name" style="color:${grade.color}">
@@ -131,6 +141,7 @@ Object.assign(App.prototype, {
         ${upgradeHint}
         ${masteryTag}
         ${flavorTag}
+        ${breakdown}
         <div style="font-size:10px;color:#aaa;margin:2px 0">${def.desc||''}</div>
         <div style="font-size:10px;margin:3px 0;color:${canMerge?'#ffd60a':'#888'}">
           ${canMerge

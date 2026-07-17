@@ -156,6 +156,11 @@ html, body {
   z-index:20;
   padding-top:env(safe-area-inset-top,0);
   box-shadow:0 2px 12px rgba(0,0,0,0.5);
+  /* v27-21: 화면이 좁으면 잘려서 안 보이던 요소(배속버튼 등)를 가로 스크롤로 접근 가능하게 (요청1) */
+  overflow-x:auto; overflow-y:hidden; scrollbar-width:none; -webkit-overflow-scrolling:touch; touch-action:pan-x;
+}
+#hud-top::-webkit-scrollbar { display:none; }
+#hud-top > * { flex-shrink:0; }
 }
 .hud-cell {
   display:flex; align-items:center; gap:5px;
@@ -230,7 +235,7 @@ html, body {
 }
 .tower-bar-real { overflow:hidden; }
 .tower-bar-scroll {
-  display:flex; gap:7px; overflow-x:auto; width:100%;
+  display:flex; gap:7px; overflow-x:auto; width:100%; touch-action:pan-x; overflow-y:hidden;
   padding:6px 10px;
   -webkit-overflow-scrolling:touch;
   scrollbar-width:none;
@@ -357,7 +362,7 @@ html, body {
 
 /* ===== BACK BUTTON ===== */
 .back-btn {
-  position:absolute; left:8px; bottom:calc(var(--bar-h) + 6px);
+  position:absolute; right:8px; top:calc(env(safe-area-inset-top,0) + var(--hud-h) + 6px);
   z-index:20;
   background:rgba(255,255,255,0.07);
   border:1px solid var(--border); color:var(--text-mid);
@@ -815,7 +820,7 @@ html, body {
   padding:0 8px; gap:5px;
   background:rgba(5,8,18,0.85);
   border-top:1px solid rgba(255,255,255,0.06);
-  overflow-x:auto; scrollbar-width:none;
+  overflow-x:auto; overflow-y:hidden; scrollbar-width:none; touch-action:pan-x;
 }
 #type-upgrade-bar::-webkit-scrollbar { display:none; }
 .type-upg-btn {
@@ -840,7 +845,7 @@ html, body {
   padding:0 8px; gap:5px;
   background:rgba(8,5,18,0.85);
   border-top:1px solid rgba(255,255,255,0.06);
-  overflow-x:auto; scrollbar-width:none;
+  overflow-x:auto; overflow-y:hidden; scrollbar-width:none; touch-action:pan-x;
 }
 #shop-bar::-webkit-scrollbar { display:none; }
 .shop-bar-btn {

@@ -15,24 +15,44 @@ const MapDefs = {
     loopMargin: {x:0.09, y:0.13},
     slotGrid: {cols:5, rows:4},
 
+    // v27-22: 단순 사각루프 대신 3단 지그재그 경로로 변경 (요청 - 다이나믹하고 전략적인 배치)
     getPaths(w, h) {
-      const mx = w*0.15, my = h*0.20; // v27-10: 트랙을 가운데로 모음 (요청1 - 가장자리 여유 확보)
+      const mx = w*0.15, my = h*0.20;
+      const innerGap = w*0.30; // 지그재그가 왼쪽에서 멈추는 지점 (왼쪽 가장자리는 복귀 통로로 남김)
+      const rowY1 = my + (h - 2*my) * 0.33;
+      const rowY2 = my + (h - 2*my) * 0.66;
       return [[
-        {x:mx, y:my}, {x:w-mx, y:my}, {x:w-mx, y:h-my}, {x:mx, y:h-my}, {x:mx, y:my}
+        {x:mx, y:my},
+        {x:w-mx, y:my},
+        {x:w-mx, y:rowY1},
+        {x:mx+innerGap, y:rowY1},
+        {x:mx+innerGap, y:rowY2},
+        {x:w-mx, y:rowY2},
+        {x:w-mx, y:h-my},
+        {x:mx, y:h-my},
+        {x:mx, y:my},
       ]];
     },
 
+    // v27-22: 지그재그 경로의 3개 밴드(위/중간/아래) 사이 공간에 슬롯 배치 - 경로 선과 안 겹치게
     getSlots(w, h) {
       const slots = [];
-      const cols=5, rows=4;
-      const x0=w*0.26, x1=w*0.74, y0=h*0.32, y1=h*0.76; // v27-10: 슬롯 간격 좁힘 (요청1)
-      for (let r=0; r<rows; r++) {
-        for (let c=0; c<cols; c++) {
-          slots.push({
-            x: x0 + (x1-x0) * (c/(cols-1)),
-            y: y0 + (y1-y0) * (r/(rows-1)),
-          });
+      const mx = w*0.15, my = h*0.20;
+      const innerGap = w*0.30;
+      const rowY1 = my + (h - 2*my) * 0.33;
+      const rowY2 = my + (h - 2*my) * 0.66;
+      const bandY = [ (my+rowY1)/2, (rowY1+rowY2)/2, (rowY2+(h-my))/2 ]; // 각 밴드 중앙
+      const x0 = mx + innerGap + w*0.05, x1 = w - mx - w*0.04;
+      const cols = 6;
+      for (const y of bandY) {
+        for (let c = 0; c < cols; c++) {
+          slots.push({ x: x0 + (x1-x0) * (c/(cols-1)), y });
         }
+      }
+      // 왼쪽 복귀 통로 옆 여유공간에도 세로로 슬롯 몇 개 추가 (공간 활용)
+      const leftX = mx * 0.5 + innerGap * 0.15;
+      for (const y of [my + (rowY1-my)*0.5, rowY1 + (rowY2-rowY1)*0.5, rowY2 + (h-my-rowY2)*0.5]) {
+        slots.push({ x: leftX, y });
       }
       return slots;
     },
@@ -79,24 +99,44 @@ const MapDefs = {
     pathArrow:'rgba(255,140,60,0.32)', pathWidth:34,
 
     // v27-3: 존 전환해도 타워 위치가 깨지지 않도록 3맵 모두 동일한 트랙/슬롯 좌표 사용 (숲맵 기준 통일)
+    // v27-22: 단순 사각루프 대신 3단 지그재그 경로로 변경 (요청 - 다이나믹하고 전략적인 배치)
     getPaths(w, h) {
-      const mx = w*0.15, my = h*0.20; // v27-10: 트랙을 가운데로 모음 (요청1 - 가장자리 여유 확보)
+      const mx = w*0.15, my = h*0.20;
+      const innerGap = w*0.30; // 지그재그가 왼쪽에서 멈추는 지점 (왼쪽 가장자리는 복귀 통로로 남김)
+      const rowY1 = my + (h - 2*my) * 0.33;
+      const rowY2 = my + (h - 2*my) * 0.66;
       return [[
-        {x:mx, y:my}, {x:w-mx, y:my}, {x:w-mx, y:h-my}, {x:mx, y:h-my}, {x:mx, y:my}
+        {x:mx, y:my},
+        {x:w-mx, y:my},
+        {x:w-mx, y:rowY1},
+        {x:mx+innerGap, y:rowY1},
+        {x:mx+innerGap, y:rowY2},
+        {x:w-mx, y:rowY2},
+        {x:w-mx, y:h-my},
+        {x:mx, y:h-my},
+        {x:mx, y:my},
       ]];
     },
 
+    // v27-22: 지그재그 경로의 3개 밴드(위/중간/아래) 사이 공간에 슬롯 배치 - 경로 선과 안 겹치게
     getSlots(w, h) {
       const slots = [];
-      const cols=5, rows=4;
-      const x0=w*0.26, x1=w*0.74, y0=h*0.32, y1=h*0.76; // v27-10: 슬롯 간격 좁힘 (요청1)
-      for (let r=0; r<rows; r++) {
-        for (let c=0; c<cols; c++) {
-          slots.push({
-            x: x0 + (x1-x0) * (c/(cols-1)),
-            y: y0 + (y1-y0) * (r/(rows-1)),
-          });
+      const mx = w*0.15, my = h*0.20;
+      const innerGap = w*0.30;
+      const rowY1 = my + (h - 2*my) * 0.33;
+      const rowY2 = my + (h - 2*my) * 0.66;
+      const bandY = [ (my+rowY1)/2, (rowY1+rowY2)/2, (rowY2+(h-my))/2 ]; // 각 밴드 중앙
+      const x0 = mx + innerGap + w*0.05, x1 = w - mx - w*0.04;
+      const cols = 6;
+      for (const y of bandY) {
+        for (let c = 0; c < cols; c++) {
+          slots.push({ x: x0 + (x1-x0) * (c/(cols-1)), y });
         }
+      }
+      // 왼쪽 복귀 통로 옆 여유공간에도 세로로 슬롯 몇 개 추가 (공간 활용)
+      const leftX = mx * 0.5 + innerGap * 0.15;
+      for (const y of [my + (rowY1-my)*0.5, rowY1 + (rowY2-rowY1)*0.5, rowY2 + (h-my-rowY2)*0.5]) {
+        slots.push({ x: leftX, y });
       }
       return slots;
     },
@@ -135,24 +175,44 @@ const MapDefs = {
     ghostBonus:0.30,
 
     // v27-3: 존 전환해도 타워 위치가 깨지지 않도록 3맵 모두 동일한 트랙/슬롯 좌표 사용 (숲맵 기준 통일)
+    // v27-22: 단순 사각루프 대신 3단 지그재그 경로로 변경 (요청 - 다이나믹하고 전략적인 배치)
     getPaths(w, h) {
-      const mx = w*0.15, my = h*0.20; // v27-10: 트랙을 가운데로 모음 (요청1 - 가장자리 여유 확보)
+      const mx = w*0.15, my = h*0.20;
+      const innerGap = w*0.30; // 지그재그가 왼쪽에서 멈추는 지점 (왼쪽 가장자리는 복귀 통로로 남김)
+      const rowY1 = my + (h - 2*my) * 0.33;
+      const rowY2 = my + (h - 2*my) * 0.66;
       return [[
-        {x:mx, y:my}, {x:w-mx, y:my}, {x:w-mx, y:h-my}, {x:mx, y:h-my}, {x:mx, y:my}
+        {x:mx, y:my},
+        {x:w-mx, y:my},
+        {x:w-mx, y:rowY1},
+        {x:mx+innerGap, y:rowY1},
+        {x:mx+innerGap, y:rowY2},
+        {x:w-mx, y:rowY2},
+        {x:w-mx, y:h-my},
+        {x:mx, y:h-my},
+        {x:mx, y:my},
       ]];
     },
 
+    // v27-22: 지그재그 경로의 3개 밴드(위/중간/아래) 사이 공간에 슬롯 배치 - 경로 선과 안 겹치게
     getSlots(w, h) {
       const slots = [];
-      const cols=5, rows=4;
-      const x0=w*0.26, x1=w*0.74, y0=h*0.32, y1=h*0.76; // v27-10: 슬롯 간격 좁힘 (요청1)
-      for (let r=0; r<rows; r++) {
-        for (let c=0; c<cols; c++) {
-          slots.push({
-            x: x0 + (x1-x0) * (c/(cols-1)),
-            y: y0 + (y1-y0) * (r/(rows-1)),
-          });
+      const mx = w*0.15, my = h*0.20;
+      const innerGap = w*0.30;
+      const rowY1 = my + (h - 2*my) * 0.33;
+      const rowY2 = my + (h - 2*my) * 0.66;
+      const bandY = [ (my+rowY1)/2, (rowY1+rowY2)/2, (rowY2+(h-my))/2 ]; // 각 밴드 중앙
+      const x0 = mx + innerGap + w*0.05, x1 = w - mx - w*0.04;
+      const cols = 6;
+      for (const y of bandY) {
+        for (let c = 0; c < cols; c++) {
+          slots.push({ x: x0 + (x1-x0) * (c/(cols-1)), y });
         }
+      }
+      // 왼쪽 복귀 통로 옆 여유공간에도 세로로 슬롯 몇 개 추가 (공간 활용)
+      const leftX = mx * 0.5 + innerGap * 0.15;
+      for (const y of [my + (rowY1-my)*0.5, rowY1 + (rowY2-rowY1)*0.5, rowY2 + (h-my-rowY2)*0.5]) {
+        slots.push({ x: leftX, y });
       }
       return slots;
     },

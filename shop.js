@@ -65,7 +65,7 @@ const ShopItems = [
     }
   },
   {
-    key: 'rarecandy', name: '이상한사탕', emoji: '🍬', cost: 1800, oneTime: true,
+    key: 'rarecandy', name: '이상한사탕', emoji: '🍬', cost: 2500, oneTime: true,
     desc: '3성(에픽) 타워 1개를 레전드로 진화 (게임당 1회만 사용 가능) - 후반 전략용 고가 아이템',
     buy(engine) {
       // v27 fix: 아무 등급이나 무한정 되던 걸 3성(epic) 한정 + 1회용으로 변경 (안 그러면 도배해서 다 5성 만들어버림)
@@ -98,24 +98,24 @@ const ShopItems = [
 // ===== 글로벌 스펠 =====
 const GlobalSpells = {
   pokecenter: {
-    name: '포켓몬센터', emoji: '🏥', cooldown: 90,
-    desc: '모든 타워 8초간 데미지 +30%',
+    name: '포켓몬센터', emoji: '🏥', cooldown: 150,
+    desc: '모든 타워 6초간 데미지 +18%',
     cast(engine) {
       // v27: 라이프 회복 제거 (필드누적 게임오버로 바뀌어 라이프가 의미없어짐)
       for (const t of engine.towers) {
-        t.buffDmgMul = (t.buffDmgMul || 1) * 1.3;
-        t._pokecenterTimer = 8;
+        t.buffDmgMul = (t.buffDmgMul || 1) * 1.18;
+        t._pokecenterTimer = 6;
       }
-      engine.spawnFloatingText('🏥 포켓몬센터! 전체 데미지+30%', engine.width/2, 80, '#06d6a0');
+      engine.spawnFloatingText('🏥 포켓몬센터! 전체 데미지+18%', engine.width/2, 80, '#06d6a0');
     }
   },
   masterball: {
-    name: '마스터볼', emoji: '🟣', cooldown: 60,
-    desc: '전체 적 즉시 큰 피해 + 3초 슬로우',
+    name: '마스터볼', emoji: '🟣', cooldown: 100,
+    desc: '전체 적 즉시 피해 + 3초 슬로우',
     cast(engine) {
       for (const e of engine.enemies) {
         if (e.dead || e.reachedEnd) continue;
-        e.takeDamage(80, 'special');
+        e.takeDamage(48, 'special');
         e.applyStatus('slow', 3, 0.4);
       }
       if (window.AoeBurst)
