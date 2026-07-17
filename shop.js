@@ -44,18 +44,19 @@ const ShopItems = [
     desc: '트랙 안쪽에 빈 배치슬롯 1개 즉시 추가 (살수록 비싸짐)',
     buy(engine) {
       const w = engine.width, h = engine.height;
-      const HUD=52, BAR=82, PAD=20;
-      // v27-11: 맵 트랙을 가운데로 좁힌 것에 맞춰 확장부지 탐색범위도 같이 좁힘 (요청7)
-      const top = Math.max(HUD+PAD, h*0.22), bot = Math.min(h-BAR-PAD, h*0.78);
+      // v27-36: 5단 지그재그 맵 좌표에 맞춰 탐색범위 재조정 (요청5 - 가끔 실패해서 돈만 나가던 문제,
+      // 맵을 지그재그로 바꾸면서 예전 좌표 기준 탐색범위가 새 트랙과 안 맞았을 가능성)
+      const mx = w*0.15, my = h*0.20, innerGap = w*0.30;
+      const top = my + h*0.03, bot = h - my - h*0.03;
       let best = null, bestMinDist = -1;
-      for (let tries=0; tries<40; tries++) {
-        const x = w*0.22 + Math.random()*w*0.56;
+      for (let tries=0; tries<60; tries++) {
+        const x = (mx+innerGap+w*0.03) + Math.random()*(w-mx-w*0.05-(mx+innerGap+w*0.03));
         const y = top + Math.random()*(bot-top);
         let minDist = Infinity;
         for (const s of engine.towerSlots) minDist = Math.min(minDist, Math.hypot(s.x-x, s.y-y));
         if (minDist > bestMinDist) { bestMinDist = minDist; best = {x,y}; }
       }
-      if (best && bestMinDist > 62) {
+      if (best && bestMinDist > 55) {
         engine.towerSlots.push({ x: best.x, y: best.y, occupied: false, tower: null });
         engine.spawnFloatingText('🏗️ 새 슬롯 확보!', best.x, best.y, '#06d6a0');
       } else {

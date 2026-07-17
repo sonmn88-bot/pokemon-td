@@ -480,7 +480,7 @@ const MERGE_EVOLUTION = {
   growlithe:'arcanine',  abra:'kadabra',          magnemite:'magneton',
   // 레어 3개 → 에픽 (정통 진화가 있는 건 정통으로, 없는 건 타입 맞춰 합류)
   charmeleon:'charizard',wartortle:'blastoise',   kadabra:'alakazam',
-  geodude:'aerodactyl',  lickitung:'blastoise',
+  geodude:'aerodactyl',  lickitung:'blastoise',   gastly:'haunter',
   horsea:'gyarados',     magneton:'aerodactyl',
   dratini:'dragonair',   ivysaur:'venusaur',
   pidgeotto:'pidgeot',   raticate:'lapras',       clefable:'alakazam',
@@ -662,8 +662,14 @@ function _createGachaTower(def, x, y, engine) {
       ctx.beginPath(); ctx.arc(this.x,this.y,21,0,Math.PI*2);
       ctx.fillStyle=grade.bg+'cc';
       ctx.strokeStyle=grade.color; ctx.lineWidth=def.grade==='unique'?3:2;
-      if(def.grade!=='normal'){ ctx.shadowColor=grade.color; ctx.shadowBlur=8; }
+      // v27-38: shadowBlur는 캔버스에서 가장 무거운 연산 중 하나인데, 레어+ 타워 전부가 매 프레임 이걸
+      // 그리고 있어서 보드가 커질수록 발열/버벅임의 원인이 되고 있었음 (요청: 발열 검토). 시각적으로
+      // 비슷해 보이는 이중 테두리 방식으로 교체 - shadowBlur 없이 훨씬 저렴함.
       ctx.fill(); ctx.stroke();
+      if(def.grade!=='normal'){
+        ctx.beginPath(); ctx.arc(this.x,this.y,23,0,Math.PI*2);
+        ctx.globalAlpha=0.35; ctx.lineWidth=1.5; ctx.stroke(); ctx.globalAlpha=1;
+      }
       // 포켓몬 이미지: 진화단계 전용(id) 이미지 우선, 없으면 라인 공통(pokemonId) 이미지로 폴백
       // v27 fix: towers 폴더에 이미지가 없으면 같은 이름의 enemies 폴더 이미지로 자동 폴백 (파일 중복 업로드 불필요)
       const imgPath=window.TowerSpriteImages?.[def.id] || window.TowerSpriteImages?.[def.pokemonId]

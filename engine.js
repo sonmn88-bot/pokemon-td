@@ -420,7 +420,7 @@ class GameEngine {
       enemy.reward = Math.round(enemy.reward * 40);
       enemy.isBoss = true;
       enemy._isKing = true;
-      enemy._spawnGraceTimer = 6; // v27-34: 왕도 동일하게 스폰 유예기간 적용
+      enemy._spawnGraceTimer = 8; // v27-35: 유예기간도 연장
     }
 
     // v27: 수동 보스소환 등급 배율 (1~5단계, 너무 약해서 순삭당하던 문제 수정)
@@ -432,7 +432,7 @@ class GameEngine {
       enemy.isBoss = true;
       // v27-34: 보스 스폰 유예기간 (요청 - 원인이 뭐든 결과적으로 3초컷 자체를 막기 위한 안전장치)
       // 등장 후 5초간은 받는 피해가 60%로 감소, 이후 서서히 정상으로 회복. 최소 생존시간을 보장함.
-      enemy._spawnGraceTimer = 5;
+      enemy._spawnGraceTimer = 7;
     }
 
     // 엘리트 변형 (10% 확률, 수동소환 보스는 제외)
@@ -589,6 +589,12 @@ class GameEngine {
   }
 
   _drawBgCached(ctx) {
+    // v27-36: 배경이 까매지는 문제 방어 (요청3) - width/height가 비정상(0 이하 등)이면 배경 재생성을
+    // 건너뛰고 기존 캐시를 그대로 사용 (레이아웃 과도기에 순간적으로 크기가 이상해지는 경우 대비)
+    if (this.width <= 0 || this.height <= 0) {
+      if (this._bgCanvas) ctx.drawImage(this._bgCanvas, 0, 0);
+      return;
+    }
     if (this._bgDirty || !this._bgCanvas ||
         this._bgCanvas.width !== this.width || this._bgCanvas.height !== this.height) {
       const bc = document.createElement('canvas');

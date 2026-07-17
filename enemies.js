@@ -606,10 +606,10 @@ class Enemy {
       ctx.fillText('💰', this.x, drawY - s * 1.6);
     }
 
-    // 스턴/빙결 효과
+    // 스턴/빙결 효과 (v27-38: shadowBlur 대신 저비용 방식 - 다수의 적이 동시에 CC 걸리면 부담이 컸음)
+    let ccGlow = null;
     if (this.stunned > 0 || this.frozen > 0) {
-      ctx.shadowColor = this.frozen > 0 ? '#81d4fa' : '#fff176';
-      ctx.shadowBlur = 8;
+      ccGlow = this.frozen > 0 ? '#81d4fa' : '#fff176';
     }
 
     // 유령 반투명
@@ -635,14 +635,19 @@ class Enemy {
       ctx.restore();
     }
 
+    // v27-38: 스턴/빙결 저비용 링 (shadowBlur 대신)
+    if (ccGlow) {
+      ctx.save();
+      ctx.beginPath(); ctx.arc(this.x, drawY, s * 1.05, 0, Math.PI * 2);
+      ctx.strokeStyle = ccGlow; ctx.lineWidth = 2.5; ctx.globalAlpha = 0.8;
+      ctx.stroke();
+      ctx.restore();
+    }
+
     // 몸통: 이미지 스프라이트 (없으면 원+이모지 폴백)
     const imgPath = EnemySpriteImages[this.typeId];
     const img = imgPath ? window.loadSpriteImage(imgPath) : null;
-
-    if (this._elite === 'gold') {
-      // 골드 엘리트 = 흑화(섀도) 버전: 어둡고 채도 높은 필터로 위압감 연출
-      ctx.filter = 'brightness(0.45) saturate(2.1) hue-rotate(265deg) contrast(1.25)';
-    }
+    const isDarkElite = this._elite === 'gold'; // v27-38: ctx.filter(4중 체인, 매우 비쌈) 대신 저비용 틴트로 교체
 
     if (img && img.complete && img.naturalWidth > 0) {
       const drawSize = s * 1.7;
@@ -660,6 +665,14 @@ class Enemy {
       } else {
         if (b) ctx.drawImage(img, b.x, b.y, b.w, b.h, this.x - drawSize / 2, drawY - drawSize / 2, drawSize, drawSize);
         else ctx.drawImage(img, this.x - drawSize / 2, drawY - drawSize / 2, drawSize, drawSize);
+        if (isDarkElite) {
+          // v27-38: 골드 엘리트 흑화 연출 - filter 대신 저비용 색조 오버레이
+          ctx.save();
+          ctx.globalCompositeOperation = 'source-atop';
+          ctx.fillStyle = 'rgba(60,0,90,0.55)';
+          ctx.fillRect(this.x - drawSize / 2, drawY - drawSize / 2, drawSize, drawSize);
+          ctx.restore();
+        }
       }
     } else {
       // 폴백: 도형 + 이모지

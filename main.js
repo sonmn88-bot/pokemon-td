@@ -21,11 +21,11 @@ const BOSS_POOL = ['lugia', 'mewtwo'];
 // v27-3: 보스 난이도 추가 상향 - 기본 배율을 더 키우고, 소환 시점 웨이브에 비례해서도 더 강해지게
 // (10라운드째에도 5단계까지 다 잡히던 문제 - 고정배율만으론 후반에 상대적으로 계속 약해지므로 웨이브연동 필수)
 const BOSS_TIERS = [
-  { tier: 1, type: 'gyarados', label: '갸라도스',   hpMul: 10, rewardMul: 9,  minWave: 1  },
-  { tier: 2, type: 'dragonite', label: '망나뇽',    hpMul: 18, rewardMul: 16, minWave: 15 },
-  { tier: 3, type: 'lugia',    label: '루기아',      hpMul: 30, rewardMul: 26, minWave: 35 },
-  { tier: 4, type: 'mewtwo',   label: '뮤츠',        hpMul: 48, rewardMul: 40, minWave: 55 },
-  { tier: 5, type: 'mewtwo',   label: '뮤츠(각성)',  hpMul: 80, rewardMul: 60, minWave: 75 },
+  { tier: 1, type: 'gyarados', label: '갸라도스',   hpMul: 18, rewardMul: 10,  minWave: 1  },
+  { tier: 2, type: 'dragonite', label: '망나뇽',    hpMul: 28, rewardMul: 18, minWave: 15 },
+  { tier: 3, type: 'lugia',    label: '루기아',      hpMul: 42, rewardMul: 28, minWave: 35 },
+  { tier: 4, type: 'mewtwo',   label: '뮤츠',        hpMul: 60, rewardMul: 42, minWave: 55 },
+  { tier: 5, type: 'mewtwo',   label: '뮤츠(각성)',  hpMul: 95, rewardMul: 62, minWave: 75 },
 ];
 const BOSS_SUMMON_COOLDOWN = 60;
 function bossWaveScaleMul(wave) { return 1 + Math.max(0, wave) * 0.22; } // v27-28: 최소웨이브 제한 추가와 함께 계수도 재차 상향 (요청: 여전히 너무 쉬움)
@@ -1021,6 +1021,7 @@ class App {
     this.engine.onWaveChange  = (w, t) => {
       this.els.waveVal.textContent = w;
       this.els.waveTotal.textContent = '∞';
+      this._updateBossSummonUI(); // v27-36 버그수정: 웨이브 넘어가도 소환버튼 잠김상태가 안 풀리던 문제
     };
     this.engine.onScoreChange = (score) => {
       const el = document.getElementById('score-val');
@@ -1228,27 +1229,7 @@ class App {
       }
       // v27-24: 황금 시간 이벤트 완전 제거함 (요청 - 게임을 시작도 안 했는데 idle 상태에서 계속 발동돼서
       // 가만히 놔둬도 골드가 쌓이는 심각한 문제가 있었음. 아예 매커니즘 삭제.
-      // v27-16: 미니 현상금 이벤트 (요청2) - 가끔 일반 몹 하나가 반짝이며 등장, 제한시간 안에 잡으면 보너스
-      if (this.engine.state === 'wave' && this.engine.enemies.length > 0) {
-        if (!this.engine._bountyTarget && Math.random() < 0.0025) { // 평균 몇십초에 한번 정도
-          const candidates = this.engine.enemies.filter(e => !e.dead && !e.isBoss && !e._bounty);
-          if (candidates.length) {
-            const t = candidates[Math.floor(Math.random() * candidates.length)];
-            t._bounty = true; t._bountyTimer = 8;
-            this.engine._bountyTarget = t;
-            this.showWaveAnnounce('💰 현상금 몬스터 등장! (8초 안에 처치)', '#ffd60a');
-          }
-        }
-        if (this.engine._bountyTarget) {
-          const bt = this.engine._bountyTarget;
-          if (bt.dead || bt.reachedEnd) {
-            this.engine._bountyTarget = null;
-          } else {
-            bt._bountyTimer -= this.engine.dt;
-            if (bt._bountyTimer <= 0) { bt._bounty = false; this.engine._bountyTarget = null; }
-          }
-        }
-      }
+      // v27-36: 미니 현상금 이벤트 완전 제거함 (요청 - 금방 잡히는데 돈만 많이 줘서 경제에 안 좋았음)
       // v27-6: 최고 시너지 달성치 추적 (요청4 - 게임오버 요약화면 MVP용)
       if (this.engine.towers.length) {
         const maxSyn = this.engine.towers.reduce((m,t)=>Math.max(m,t.synergyBonus||0), 0);
@@ -1470,6 +1451,18 @@ class App {
   }
 
   bindCanvasInput() {
+    // v27-36: 모바일은 마우스 호버가 없어서 title 속성(스킬/아이템 설명)을 볼 방법이 없었음 (요청8).
+    // 버튼을 터치하는 순간 title 텍스트를 짧게 화면에 띄워주고, 원래 탭 동작(클릭)은 그대로 진행되게 함
+    // (설명 확인과 실제 사용을 방해하지 않고 동시에 되도록 - preventDefault 안 씀).
+    document.addEventListener('touchstart', (e) => {
+      let el = e.target;
+      while (el && el !== document.body && !el.title) el = el.parentElement;
+      if (el && el.title) {
+        this.showWaveAnnounce(el.title, '#4fc3f7');
+      }
+    }, { passive: true });
+
+
     const canvas = this.els.canvas;
     const getPos = (e) => {
       const rect = canvas.getBoundingClientRect();
