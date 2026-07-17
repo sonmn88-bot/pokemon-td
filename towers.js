@@ -61,8 +61,10 @@ class Projectile {
     }
     const dx = tx - this.x, dy = ty - this.y;
     const dist = Math.hypot(dx, dy);
-    this.vx = dist > 0 ? dx / dist : 0;
-    this.vy = dist > 0 ? dy / dist : 0;
+    // v27-39 버그수정: 타겟이 정확히 이 지점에서 죽으면(dist=0) 속도가 0,0이 되어 화면밖 판정에도
+    // 안 걸려서 그 자리에 영원히 박제되는 투사체가 생기고 있었음 (요청3). 이전 방향을 유지하도록 함.
+    if (dist > 0) { this.vx = dx / dist; this.vy = dy / dist; }
+    else if (!this.vx && !this.vy) { this.vx = 1; this.vy = 0; } // 방향 정보가 아예 없으면 임의 방향으로라도 진행
     const moveDist = this.speed * dt;
 
     if (!this.piercing && this.target && dist <= moveDist) {

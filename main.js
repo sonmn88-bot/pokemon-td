@@ -6,7 +6,7 @@ const ZONE_LABELS = ['🌲 초원 지대', '🌌 우주 동굴', '🌋 화산 �
 const KING_WAVE = 90;
 // v27-4: 90웨이브부터는 존 전환 없이 마지막 존(화산 도시)에 고정 - "왕 조우 후 무한강화" 구조 (item 9)
 function zoneIndexForWave(n) { return n >= KING_WAVE ? ZONE_MAPS.length - 1 : Math.floor((n - 1) / WAVES_PER_ZONE) % ZONE_MAPS.length; }
-function zoneCycleForWave(n) { return Math.floor((n - 1) / WAVES_PER_ZONE); } // 난이도 스케일링용으로는 계속 증가 (30웨이브마다 한단계씩)
+function zoneCycleForWave(n) { return n < KING_WAVE ? 0 : Math.floor((n - KING_WAVE) / WAVES_PER_ZONE); } // v27-39 버그수정: 90웨이브 이전에도 30웨이브마다 증가하고 있었음 - wave44에서 이미 물량이 248마리로 계산되던 진짜 원인 (요청4 - "한번에 너무 많이 나온다"는 반복 지적)
 
 // 웨이브 진행도에 따라 열리는 적 티어 (기존 20웨이브 손수 작성 대신 공식으로 생성 - 튜닝 비용 최소화)
 const ENEMY_TIERS = {
@@ -64,7 +64,7 @@ function generateWave(n) {
   }
 
   // 웨이브가 진행될수록 더 많이, 더 빽빽하게 스폰 (계속 돌면서 잡는 느낌). cycle이 늘수록(90웨이브 이후 반복) 한번 더 강화
-  let enemyCount = Math.round(26 + n * 4.6 + cycle * 20);
+  let enemyCount = Math.round(20 + n * 1.3 + cycle * 20); // v27-39: 선형계수 4.6→1.3 대폭 하향 (요청4 - wave44에 이미 228마리로 계산되어 단일 웨이브가 필드상한을 넘어서던 근본 문제)
   if (window.app?.engine?._runTrait?.key === 'swarm') enemyCount = Math.round(enemyCount * 1.25);
   const baseInterval = Math.max(0.26, 0.85 - n * 0.014);
   const streams = 1 + Math.min(4, Math.floor(n / 6));
