@@ -466,7 +466,7 @@ class Enemy {
           this.burning = duration;
           this.burnDamage = factor || 10;
           const total = duration * this.burnDamage;
-          const radius = 55;
+          const radius = 42; // v27-40: 55→42px로 축소 (밀집 클러스터에서 화상 폭발 누적효과 완화)
           if (this.engine) {
             let hitAny = false;
             for (const e of this.engine.enemies) {
@@ -496,7 +496,7 @@ class Enemy {
           this.poisoned = duration;
           this.poisonDamage = factor || 8;
           const total = duration * this.poisonDamage;
-          const SPREAD_RANGE = 90, MAX_TARGETS = 4;
+          const SPREAD_RANGE = 65, MAX_TARGETS = 4; // v27-40: 90→65px로 축소 (밀집한 풀타입 클러스터에서 전파범위가 넓어 누적효과가 컸음)
           let targets = [this];
           if (this.engine) {
             const nearby = this.engine.enemies
