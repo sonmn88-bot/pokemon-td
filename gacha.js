@@ -191,8 +191,8 @@ const GachaTowerDefs = {
   },
   charmeleon: {
     id:'charmeleon', name:'리자드', emoji:'🔥', grade:'rare', type:'fire', pokemonId:'charmander',
-    damage:22, range:195, fireRate:2.5, desc:'관통 화염',
-    fire(t,e){ e.projectiles.push(new Projectile(t.x,t.y,t.target,{engine:e,speed:520,damage:t.damage,color:'#ff7043',size:6,dmgType:'special',emoji:'🔥',piercing:true,pierceWidth:28,status:{type:'burn',duration:2.5,factor:7.5}})); }
+    damage:22, range:195, fireRate:1.7, desc:'관통 화염', // v27-41: 발사속도 2.5→1.7 (요청: 리자드가 클러스터에서 너무 빠르게 연쇄점화시킴)
+    fire(t,e){ e.projectiles.push(new Projectile(t.x,t.y,t.target,{engine:e,speed:520,damage:t.damage,color:'#ff7043',size:6,dmgType:'special',emoji:'🔥',piercing:true,pierceWidth:20,status:{type:'burn',duration:2.5,factor:7.5}})); }
   },
   wartortle: {
     id:'wartortle', name:'어니부기', emoji:'💧', grade:'rare', type:'water', pokemonId:'squirtle',
@@ -275,9 +275,9 @@ const GachaTowerDefs = {
   },
   charizard: {
     id:'charizard', name:'리자몽', emoji:'🐉', grade:'epic', type:'fire', pokemonId:'charmander',
-    damage:50, range:240, fireRate:3.5, desc:'관통+폭발 25%',
+    damage:50, range:240, fireRate:2.5, desc:'관통+폭발 25%', // v27-41: 발사속도 3.5→2.5 (리자드와 동일한 이유)
     fire(t,e){
-      e.projectiles.push(new Projectile(t.x,t.y,t.target,{engine:e,speed:520,damage:t.damage,color:'#ff7043',size:6,dmgType:'special',emoji:'🔥',piercing:true,pierceWidth:28,status:{type:'burn',duration:3,factor:10.5},
+      e.projectiles.push(new Projectile(t.x,t.y,t.target,{engine:e,speed:520,damage:t.damage,color:'#ff7043',size:6,dmgType:'special',emoji:'🔥',piercing:true,pierceWidth:20,status:{type:'burn',duration:3,factor:10.5},
         onHit:(en)=>{ if(Math.random()<0.25){ for(const e2 of e.enemies) if(e2!==en && !e2.dead && !e2.reachedEnd && Math.hypot(e2.x-en.x,e2.y-en.y)<70) e2.takeDamage(t.damage*0.6,'special'); e.particles.push(new AoeBurst(en.x,en.y,70,'#ff6f00')); }}}));
     }
   },
