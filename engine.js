@@ -298,8 +298,8 @@ class GameEngine {
     // v27-4: 점수 공식 (item 13,19) - 생존이 지배적, 킬은 보너스 수준
     // 일반킬 1-3(엘리트는 조금 더), 미니보스 25, 일반보스 80, 왕 120
     let killScore = 1;
-    if (enemy._isKing) killScore = 120;
-    else if (enemy.isBoss) killScore = 80;
+    if (enemy._isKing) killScore = 200; // v27-42: 스킵 대비 정면승부 보상 강화 (120→200)
+    else if (enemy.isBoss) killScore = 150; // 80→150
     else if (enemy._elite) killScore = enemy._elite === 'gold' ? 5 : 3;
     else killScore = enemy.def?.special ? 2 : 1; // 기믹 있는 몹은 조금 더
     this.killScore = (this.killScore || 0) + killScore;

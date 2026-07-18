@@ -21,13 +21,13 @@ const BOSS_POOL = ['lugia', 'mewtwo'];
 // v27-3: 보스 난이도 추가 상향 - 기본 배율을 더 키우고, 소환 시점 웨이브에 비례해서도 더 강해지게
 // (10라운드째에도 5단계까지 다 잡히던 문제 - 고정배율만으론 후반에 상대적으로 계속 약해지므로 웨이브연동 필수)
 const BOSS_TIERS = [
-  { tier: 1, type: 'gyarados', label: '갸라도스',   hpMul: 18, rewardMul: 10,  minWave: 1  },
-  { tier: 2, type: 'dragonite', label: '망나뇽',    hpMul: 28, rewardMul: 18, minWave: 15 },
-  { tier: 3, type: 'lugia',    label: '루기아',      hpMul: 42, rewardMul: 28, minWave: 35 },
-  { tier: 4, type: 'mewtwo',   label: '뮤츠',        hpMul: 60, rewardMul: 42, minWave: 55 },
-  { tier: 5, type: 'mewtwo',   label: '뮤츠(각성)',  hpMul: 95, rewardMul: 62, minWave: 75 },
+  { tier: 1, type: 'gyarados', label: '갸라도스',   hpMul: 18, rewardMul: 30,  minWave: 1  }, // v27-42: 보상 3배 (쿨다운도 3배로 늘렸으니 한번 잡을때 확실하게)
+  { tier: 2, type: 'dragonite', label: '망나뇽',    hpMul: 28, rewardMul: 54, minWave: 15 },
+  { tier: 3, type: 'lugia',    label: '루기아',      hpMul: 42, rewardMul: 84, minWave: 35 },
+  { tier: 4, type: 'mewtwo',   label: '뮤츠',        hpMul: 60, rewardMul: 126, minWave: 55 },
+  { tier: 5, type: 'mewtwo',   label: '뮤츠(각성)',  hpMul: 95, rewardMul: 186, minWave: 75 },
 ];
-const BOSS_SUMMON_COOLDOWN = 60;
+const BOSS_SUMMON_COOLDOWN = 180; // v27-42: 60→180(3배) - 스킵 대비 정면승부 보상을 늘리기 위해 쿨다운도 늘림
 function bossWaveScaleMul(wave) { return 1 + Math.max(0, wave) * 0.22; } // v27-28: 최소웨이브 제한 추가와 함께 계수도 재차 상향 (요청: 여전히 너무 쉬움)
 
 // v27-4: 존별 적 타입 편향 (item17) - 존마다 특정 타입이 더 자주 나와서 전략적 예측/대응 여지를 줌
@@ -304,7 +304,13 @@ class App {
   async _showGlobalRanking() {
     const overlay = document.createElement('div');
     overlay.className = 'skin-picker';
-    overlay.innerHTML = `<div class="skin-picker-title">🌍 전체 랭킹</div><div id="rank-list-body" style="color:#888;padding:20px;">불러오는 중...</div>`;
+    overlay.innerHTML = `
+      <div class="skin-picker-title">🌍 전체 랭킹</div>
+      <div style="display:flex;gap:6px;margin-bottom:6px;">
+        <button id="rank-admin-btn" style="font-size:10px;padding:4px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:transparent;color:#888;cursor:pointer;">🔐 관리자</button>
+        <button id="rank-clear-btn" style="display:none;font-size:10px;padding:4px 8px;border-radius:6px;border:1px solid rgba(255,80,80,0.4);background:transparent;color:#ff6b6b;cursor:pointer;">🗑️ 전체 초기화</button>
+      </div>
+      <div id="rank-list-body" style="color:#888;padding:20px;">불러오는 중...</div>`;
     const closeBtn = document.createElement('button');
     closeBtn.className = 'skin-picker-close';
     closeBtn.textContent = '닫기';
@@ -312,25 +318,64 @@ class App {
     overlay.appendChild(closeBtn);
     document.body.appendChild(overlay);
 
+    let isAdmin = false;
+    const ADMIN_PASSWORD = window.ADMIN_PASSWORD || 'pokemontd2026'; // v27-42: firebase-config.js 등에서 재정의 가능
+
+    const renderRows = async () => {
+      const body = overlay.querySelector('#rank-list-body');
+      if (!body) return;
+      const rows = await window.Leaderboard.fetchTop(20);
+      if (!overlay.isConnected) return;
+      if (!rows.length) { body.textContent = '아직 등록된 기록이 없습니다.'; return; }
+      body.style.cssText = 'max-width:380px;max-height:50vh;overflow-y:auto;color:#ddd;font-size:12px;';
+      body.innerHTML = rows.map((r, i) => `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:rgba(255,255,255,0.05);border-radius:8px;margin-bottom:6px;">
+          <span>#${i+1} ${r.name}</span>
+          <span style="color:#ffd60a">🏅${(r.score||0).toLocaleString()}</span>
+          <span style="color:#4fc3f7">Wave ${r.wave}</span>
+          ${isAdmin ? `<button data-rank-del="${r.id}" style="font-size:10px;padding:2px 6px;border-radius:5px;border:none;background:#ff6b6b;color:#fff;cursor:pointer;">삭제</button>` : ''}
+        </div>`).join('');
+      if (isAdmin) {
+        body.querySelectorAll('[data-rank-del]').forEach(btn => {
+          btn.addEventListener('click', async () => {
+            btn.textContent = '...';
+            await window.Leaderboard.deleteEntry(btn.dataset.rankDel);
+            renderRows();
+          });
+        });
+      }
+    };
+
+    const adminBtn = overlay.querySelector('#rank-admin-btn');
+    const clearBtn = overlay.querySelector('#rank-clear-btn');
+    adminBtn.addEventListener('click', () => {
+      if (isAdmin) return;
+      const pw = prompt('관리자 비밀번호를 입력하세요');
+      if (pw === ADMIN_PASSWORD) {
+        isAdmin = true;
+        adminBtn.textContent = '🔓 관리자 모드';
+        adminBtn.style.color = '#06d6a0';
+        clearBtn.style.display = 'inline-block';
+        renderRows();
+      } else if (pw !== null) {
+        alert('비밀번호가 틀렸습니다.');
+      }
+    });
+    clearBtn.addEventListener('click', async () => {
+      if (!confirm('전체 랭킹을 정말 초기화하시겠습니까? 되돌릴 수 없습니다.')) return;
+      clearBtn.textContent = '초기화 중...';
+      const res = await window.Leaderboard.clearAll();
+      clearBtn.textContent = '🗑️ 전체 초기화';
+      renderRows();
+      if (res.ok) alert(`${res.count}개 기록이 삭제되었습니다.`);
+    });
+
     if (!window.Leaderboard || !window.Leaderboard.isEnabled()) {
       overlay.querySelector('#rank-list-body').innerHTML =
         '<div style="text-align:center;color:#888;max-width:280px;">랭킹 서버가 아직 설정되지 않았습니다.<br>(firebase-config.js 설정 필요)</div>';
       return;
     }
-    const rows = await window.Leaderboard.fetchTop(20);
-    // v27-26: 조회 중(비동기 대기) 사용자가 창을 닫아버리면, 이미 DOM에서 떨어져나간 요소를
-    // 계속 건드리려던 문제 - isConnected로 확인 후 안전하게 중단 (요청: 안정성 바로 조치)
-    if (!overlay.isConnected) return;
-    const body = overlay.querySelector('#rank-list-body');
-    if (!body) return;
-    if (!rows.length) { body.textContent = '아직 등록된 기록이 없습니다.'; return; }
-    body.style.cssText = 'max-width:380px;max-height:50vh;overflow-y:auto;color:#ddd;font-size:12px;';
-    body.innerHTML = rows.map((r, i) => `
-      <div style="display:flex;justify-content:space-between;padding:8px 12px;background:rgba(255,255,255,0.05);border-radius:8px;margin-bottom:6px;">
-        <span>#${i+1} ${r.name}</span>
-        <span style="color:#ffd60a">🏅${(r.score||0).toLocaleString()}</span>
-        <span style="color:#4fc3f7">Wave ${r.wave}</span>
-      </div>`).join('');
+    await renderRows();
   }
 
   _showKingHallOfFame() {

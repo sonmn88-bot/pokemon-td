@@ -44,17 +44,32 @@ const ShopItems = [
     desc: '트랙 안쪽에 빈 배치슬롯 1개 즉시 추가 (살수록 비싸짐)',
     buy(engine) {
       const w = engine.width, h = engine.height;
-      // v27-36: 5단 지그재그 맵 좌표에 맞춰 탐색범위 재조정 (요청5 - 가끔 실패해서 돈만 나가던 문제,
-      // 맵을 지그재그로 바꾸면서 예전 좌표 기준 탐색범위가 새 트랙과 안 맞았을 가능성)
+      // v27-36: 5단 지그재그 맵 좌표에 맞춰 탐색범위 재조정
       const mx = w*0.15, my = h*0.20, innerGap = w*0.30;
       const top = my + h*0.03, bot = h - my - h*0.03;
+      const xMin = mx+innerGap+w*0.03, xMax = w-mx-w*0.05;
       let best = null, bestMinDist = -1;
       for (let tries=0; tries<60; tries++) {
-        const x = (mx+innerGap+w*0.03) + Math.random()*(w-mx-w*0.05-(mx+innerGap+w*0.03));
+        const x = xMin + Math.random()*(xMax-xMin);
         const y = top + Math.random()*(bot-top);
         let minDist = Infinity;
         for (const s of engine.towerSlots) minDist = Math.min(minDist, Math.hypot(s.x-x, s.y-y));
         if (minDist > bestMinDist) { bestMinDist = minDist; best = {x,y}; }
+      }
+      // v27-42 버그수정: 순수 랜덤 60번 시도가 가끔 전부 나쁜 자리만 뽑혀서 실패하고 있었음
+      // (요청1 - "공간 없다고 뜨는데 나중엔 또 된다"는 게 바로 이 랜덤운 문제였음). 랜덤이 실패하면
+      // 격자를 촘촘히 훑는 체계적 탐색으로 한 번 더 확인해서, 진짜 공간이 없을 때만 실패하도록 함.
+      if (!best || bestMinDist <= 55) {
+        const GRID = 14;
+        for (let gx = 0; gx <= GRID; gx++) {
+          for (let gy = 0; gy <= GRID; gy++) {
+            const x = xMin + (xMax-xMin) * (gx/GRID);
+            const y = top + (bot-top) * (gy/GRID);
+            let minDist = Infinity;
+            for (const s of engine.towerSlots) minDist = Math.min(minDist, Math.hypot(s.x-x, s.y-y));
+            if (minDist > bestMinDist) { bestMinDist = minDist; best = {x,y}; }
+          }
+        }
       }
       if (best && bestMinDist > 55) {
         engine.towerSlots.push({ x: best.x, y: best.y, occupied: false, tower: null });

@@ -248,11 +248,11 @@ const GachaTowerDefs = {
   },
   pidgeot: {
     id:'pidgeot', name:'피죤투', emoji:'🐦', grade:'epic', type:'normal', pokemonId:'pidgey',
-    damage:36, range:265, fireRate:2.6, desc:'비행형 적에게 데미지 +120%, 관통',
+    damage:36, range:265, fireRate:2.6, desc:'비행형 적에게 데미지 +120%',
     fire(t,e){
       if(!t.target) return;
       const dmg = t.target?.def?.special === 'flying' ? t.damage * 2.2 : t.damage;
-      e.projectiles.push(new Projectile(t.x,t.y,t.target,{engine:e,speed:620,damage:dmg,color:'#bcaaa4',size:6,dmgType:'special',emoji:'🪶',piercing:true,pierceWidth:24}));
+      e.projectiles.push(new Projectile(t.x,t.y,t.target,{engine:e,speed:620,damage:dmg,color:'#bcaaa4',size:6,dmgType:'special',emoji:'🪶'}));
     }
   },
   vileplume: {
@@ -313,13 +313,13 @@ const GachaTowerDefs = {
   },
   aerodactyl: {
     id:'aerodactyl', name:'프테라', emoji:'🦅', grade:'epic', type:'grass', pokemonId:'aerodactyl',
-    damage:42, range:260, fireRate:1.8, desc:'고속 관통타',
-    fire(t,e){ e.projectiles.push(new Projectile(t.x,t.y,t.target,{engine:e,speed:620,damage:t.damage,color:'#78909c',size:6,dmgType:'physical',emoji:'🪨',piercing:true,pierceWidth:30,status:{type:'stun',duration:0.5}})); }
+    damage:42, range:260, fireRate:1.8, desc:'고속타+기절',
+    fire(t,e){ e.projectiles.push(new Projectile(t.x,t.y,t.target,{engine:e,speed:620,damage:t.damage,color:'#78909c',size:6,dmgType:'physical',emoji:'🪨',status:{type:'stun',duration:0.5}})); }
   },
   dragonair: {
     id:'dragonair', name:'신뇽', emoji:'🐲', grade:'epic', type:'water', pokemonId:'dragonair',
-    damage:52, range:250, fireRate:1.5, desc:'용의파동 관통+슬로우',
-    fire(t,e){ e.projectiles.push(new Projectile(t.x,t.y,t.target,{engine:e,speed:500,damage:t.damage,color:'#4dd0e1',size:6,dmgType:'special',emoji:'🌊',piercing:true,pierceWidth:26,status:{type:'slow',duration:2.2,factor:0.45}})); }
+    damage:52, range:250, fireRate:1.5, desc:'용의파동+슬로우',
+    fire(t,e){ e.projectiles.push(new Projectile(t.x,t.y,t.target,{engine:e,speed:500,damage:t.damage,color:'#4dd0e1',size:6,dmgType:'special',emoji:'🌊',status:{type:'slow',duration:2.2,factor:0.45}})); }
   },
 
   // ===== 레전드 (3종) =====
@@ -352,9 +352,9 @@ const GachaTowerDefs = {
   },
   dragonite: {
     id:'dragonite', name:'망나뇽', emoji:'🐉', grade:'legend', type:'water', pokemonId:'dragonite',
-    damage:80, range:300, fireRate:1.8, desc:'용의분노 관통+광역폭발',
+    damage:80, range:300, fireRate:1.8, desc:'용의분노+광역폭발',
     fire(t,e){
-      e.projectiles.push(new Projectile(t.x,t.y,t.target,{engine:e,speed:560,damage:t.damage,color:'#fb8c00',size:7,dmgType:'special',emoji:'🐉',piercing:true,pierceWidth:32,
+      e.projectiles.push(new Projectile(t.x,t.y,t.target,{engine:e,speed:560,damage:t.damage,color:'#fb8c00',size:7,dmgType:'special',emoji:'🐉',
         onHit:(en)=>{ e.particles.push(new AoeBurst(en.x,en.y,70,'#fb8c00')); for(const e2 of e.enemies) if(e2!==en&&!e2.dead&&!e2.reachedEnd&&Math.hypot(e2.x-en.x,e2.y-en.y)<70) e2.takeDamage(t.damage*0.35,'special'); }}));
     }
   },

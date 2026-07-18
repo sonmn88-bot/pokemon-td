@@ -44,7 +44,7 @@ window.Leaderboard = (function () {
     }
   }
 
-  // 상위 N개 조회
+  // 상위 N개 조회 (v27-42: 관리자 삭제기능을 위해 문서 id도 같이 반환)
   async function fetchTop(n = 20) {
     if (!enabled) return [];
     try {
@@ -52,13 +52,40 @@ window.Leaderboard = (function () {
         .orderBy('score', 'desc')
         .limit(n)
         .get();
-      return snap.docs.map(d => d.data());
+      return snap.docs.map(d => ({ id: d.id, ...d.data() }));
     } catch (e) {
       console.warn('[랭킹] 조회 실패:', e);
       return [];
     }
   }
 
+  // v27-42: 관리자 기능 (요청2) - 항목 하나 삭제
+  async function deleteEntry(id) {
+    if (!enabled) return { ok: false };
+    try {
+      await db.collection('pokemontd_leaderboard').doc(id).delete();
+      return { ok: true };
+    } catch (e) {
+      console.warn('[랭킹] 삭제 실패:', e);
+      return { ok: false, reason: e.message };
+    }
+  }
+
+  // v27-42: 관리자 기능 - 전체 초기화 (최대 500개씩 배치 삭제, 안전을 위해 최근 500개까지만)
+  async function clearAll() {
+    if (!enabled) return { ok: false };
+    try {
+      const snap = await db.collection('pokemontd_leaderboard').limit(500).get();
+      const batch = db.batch();
+      snap.docs.forEach(d => batch.delete(d.ref));
+      await batch.commit();
+      return { ok: true, count: snap.docs.length };
+    } catch (e) {
+      console.warn('[랭킹] 전체 초기화 실패:', e);
+      return { ok: false, reason: e.message };
+    }
+  }
+
   init();
-  return { submitScore, fetchTop, isEnabled: () => enabled };
+  return { submitScore, fetchTop, deleteEntry, clearAll, isEnabled: () => enabled };
 })();
