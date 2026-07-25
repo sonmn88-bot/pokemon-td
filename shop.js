@@ -59,7 +59,11 @@ const ShopItems = [
       // v27-42 버그수정: 순수 랜덤 60번 시도가 가끔 전부 나쁜 자리만 뽑혀서 실패하고 있었음
       // (요청1 - "공간 없다고 뜨는데 나중엔 또 된다"는 게 바로 이 랜덤운 문제였음). 랜덤이 실패하면
       // 격자를 촘촘히 훑는 체계적 탐색으로 한 번 더 확인해서, 진짜 공간이 없을 때만 실패하도록 함.
-      if (!best || bestMinDist <= 55) {
+      // v27-43 버그수정: 최소거리 임계값이 고정 55px이었는데, 좁은 모바일 화면(탐색범위 자체가 몇백px밖에
+      // 안 됨)에서는 슬롯 1~2개만 추가해도 이 조건을 만족하는 자리가 금방 없어져서 "1~2개밖에 안했는데
+      // 벌써 안된다"는 문제가 있었음 (요청1). 화면폭에 비례하는 값으로 변경 (탭 안전거리 38px는 유지).
+      const MIN_DIST = Math.max(38, Math.min(55, w * 0.09));
+      if (!best || bestMinDist <= MIN_DIST) {
         const GRID = 14;
         for (let gx = 0; gx <= GRID; gx++) {
           for (let gy = 0; gy <= GRID; gy++) {
@@ -71,7 +75,7 @@ const ShopItems = [
           }
         }
       }
-      if (best && bestMinDist > 55) {
+      if (best && bestMinDist > MIN_DIST) {
         engine.towerSlots.push({ x: best.x, y: best.y, occupied: false, tower: null });
         engine.spawnFloatingText('🏗️ 새 슬롯 확보!', best.x, best.y, '#06d6a0');
       } else {

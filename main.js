@@ -1362,26 +1362,16 @@ class App {
   // ===== 타워 패널 (가챠 전용) =====
   // v27-4: 시너지 조합표/미션판/타워바 등 UI 빌드 메서드는 ui-builders.js로 분리됨
 
+  // v27-43: 웨이브 대기시간 완전 제거 (요청2 - 스킵해도 또 기다려야하고, 대기중에도 또 눌러야해서
+  // 사실상 두 번 눌러야 하던 문제). 이제 웨이브가 끝나면 카운트다운 없이 바로 다음 웨이브 시작.
   _startAutoWaveCountdown(nextWave) {
-    if (this._autoWaveTimer) clearInterval(this._autoWaveTimer);
-    // v27-5: 초반 페이스 압축 (요청E) - 웨이브10까지는 대기시간을 짧게 (지루함 방지)
-    let remaining = nextWave <= 10 ? 4 : 10;
-    this.els.btnWave.textContent = `▶ Wave ${nextWave} (${remaining}초)`;
-    this._showWavePreview(nextWave); // v27-6: 다음웨이브 타입 미리보기 (요청6)
-    this._autoWaveTimer = setInterval(() => {
-      remaining--;
-      if (!this.engine || this.engine.state !== 'idle') {
-        clearInterval(this._autoWaveTimer);
-        return;
-      }
-      if (remaining <= 0) {
-        clearInterval(this._autoWaveTimer);
-        this.els.btnWave.textContent = `▶ Wave ${nextWave}`;
-        this.sendWave();
-      } else {
-        this.els.btnWave.textContent = `▶ Wave ${nextWave} (${remaining}초)`;
-      }
-    }, 1000);
+    if (this._autoWaveTimer) clearTimeout(this._autoWaveTimer);
+    this._showWavePreview(nextWave);
+    this.els.btnWave.textContent = `▶ Wave ${nextWave}`;
+    this._autoWaveTimer = setTimeout(() => {
+      if (!this.engine || this.engine.state !== 'idle') return;
+      this.sendWave();
+    }, 150); // 최소한의 시각적 여유(0.15초)만 두고 즉시 진행
   }
 
   // v27-6: 다음 웨이브 등장 타입 미리보기 UI (요청6 - 전략적 타입강화 타이밍 고민 유도)
@@ -1462,7 +1452,7 @@ class App {
   _tryTapHero(x, y) {
     if (!this.engine) return false;
     for (const hero of this.engine.heroes) {
-      if (Math.hypot(hero.x - x, hero.y - y) < 32) {
+      if (Math.hypot(hero.x - x, hero.y - y) < 38) { // v27-43: 32→38
         this._showHeroPanel(hero);
         return true;
       }
@@ -1788,7 +1778,7 @@ class App {
   }
 
   backToMapSelect() {
-    if (this._autoWaveTimer) { clearInterval(this._autoWaveTimer); this._autoWaveTimer = null; }
+    if (this._autoWaveTimer) { clearTimeout(this._autoWaveTimer); this._autoWaveTimer = null; }
     if (this._resizeDebounceTimer) { clearTimeout(this._resizeDebounceTimer); this._resizeDebounceTimer = null; } // v27-26: 안 쓰는 타이머 정리
     this.BGM.stop();
     if (this.engine) { this.engine.stop(); this.engine = null; }

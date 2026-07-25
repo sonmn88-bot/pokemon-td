@@ -158,12 +158,13 @@ class GameEngine {
       if (slot.tower) { slot.tower.x = slot.x; slot.tower.y = slot.y; }
       return slot;
     });
-    // v27-8 버그수정: 상점 "확장 부지"로 기본 격자 밖에 추가한 슬롯이 존 전환시 통째로 사라져서
-    // 그 위에 배치된 타워가 선택/업그레이드 불가능(클릭 안 먹힘) 상태로 남던 치명적 버그.
-    // 기본 격자 범위를 벗어난 기존 슬롯 중 사용중인 것만 그대로 이어받음.
+    // v27-43 버그수정: 확장부지로 만든 슬롯이 "타워가 이미 놓여있을 때만"(occupied) 보존되고 있었음.
+    // 슬롯을 사왔는데 아직 타워를 안 놓은 상태로 존이 바뀌면(30/60/90웨이브) 그 슬롯 자체가 사라지고
+    // 있었음 (요청1 - "슬롯 추가했는데 존 바뀌면 없어진다"는 문제의 진짜 원인). occupied 여부와 무관하게
+    // 기본격자 밖의 슬롯은 전부 보존하도록 수정.
     if (prevSlots && prevSlots.length > rawSlots.length) {
       for (let i = rawSlots.length; i < prevSlots.length; i++) {
-        if (prevSlots[i] && prevSlots[i].occupied) this.towerSlots.push(prevSlots[i]);
+        if (prevSlots[i]) this.towerSlots.push(prevSlots[i]);
       }
     }
   }
@@ -821,7 +822,7 @@ class GameEngine {
 
   // ===== INPUT =====
   handleTap(x, y) {
-    const slotIdx = this.nearestSlot(x, y, 42);
+    const slotIdx = this.nearestSlot(x, y, 50); // v27-43: 42→50 (요청3: 모바일 터치 정밀도)
     if (slotIdx !== null) {
       if (this.towerSlots[slotIdx].occupied) {
         this.selectedTower = this.towerSlots[slotIdx].tower;

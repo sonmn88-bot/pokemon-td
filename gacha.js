@@ -461,7 +461,7 @@ const PULL_TABLES = {
   gamble:   [{grade:'rare',weight:52},{grade:'epic',weight:41.5},{grade:'legend',weight:6.3},{grade:'unique',weight:0.2}], // 2~5성, 4성 극악 5성 극극극극극악
   ten_base: [{grade:'normal',weight:100}], // 10연뽑 = 일반뽑기 10번 묶음(동일확률, 개당만 할인)
 };
-const PULL_COSTS = { normal:100, premium:260, gamble:3000, ten:900 }; // v27-28: 요청대로 전체 2배 인상
+const PULL_COSTS = { normal:100, premium:260, gamble:2000, ten:900 }; // v27-43: 도박뽑기 3000→2000 (요청5)
 
 const GRADE_POOLS = {
   normal:  ['bulbasaur','charmander','squirtle','pidgey','rattata','clefairy','oddish','diglett','psyduck','growlithe','abra','magnemite'],

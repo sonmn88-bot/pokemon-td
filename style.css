@@ -471,7 +471,6 @@ html, body {
   background:rgba(0,0,0,0.8);
   display:flex; flex-direction:column; align-items:center; justify-content:center;
   z-index:200; gap:22px;
-  backdrop-filter:blur(4px);
 }
 .end-title {
   font-family:var(--font-px);
@@ -722,7 +721,6 @@ html, body {
   display:flex; flex-direction:column;
   align-items:center; justify-content:center;
   gap:18px; padding:20px;
-  backdrop-filter:blur(6px);
 }
 .tenpull-grid {
   display:grid;
@@ -781,7 +779,6 @@ html, body {
   display:flex; flex-direction:column;
   align-items:center; justify-content:flex-start;
   gap:12px; padding:24px 16px; overflow-y:auto;
-  backdrop-filter:blur(4px);
 }
 .mission-list {
   display:flex; flex-direction:column; gap:7px;

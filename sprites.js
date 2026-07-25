@@ -218,14 +218,22 @@ function computeSpriteBounds(img, path) {
     const data = cctx.getImageData(0, 0, cw, ch).data;
     let minX = cw, minY = ch, maxX = 0, maxY = 0, found = false;
     const ALPHA_THRESHOLD = 10;
-    const WHITE_THRESHOLD = 225; // v27-13: 완전 순백색이 아니라 약간 크림/오프화이트인 배경도 잡히도록 완화
-    // 성능을 위해 2px 간격으로 샘플링 (충분히 정확하면서 빠름)
+    // v27-43: 흰색뿐 아니라 임의의 단색 배경(크림색, 연회색 등)도 잡히도록 개선 (요청6 - 리자드/꼬렛/가디가
+    // 여전히 작게 나옴). 네 모서리 픽셀을 배경색 후보로 샘플링해서, 그 색과 비슷한 픽셀도 배경으로 취급.
+    const corners = [[0,0],[cw-1,0],[0,ch-1],[cw-1,ch-1]];
+    const bgColors = corners.map(([cx,cy]) => {
+      const i = (cy*cw+cx)*4;
+      return [data[i], data[i+1], data[i+2], data[i+3]];
+    });
+    const colorDist = (r,g,b,br,bg,bb) => Math.abs(r-br)+Math.abs(g-bg)+Math.abs(b-bb);
     for (let y = 0; y < ch; y += 2) {
       for (let x = 0; x < cw; x += 2) {
         const i = (y * cw + x) * 4;
         const a = data[i+3];
-        const isWhiteBg = a > 200 && data[i] > WHITE_THRESHOLD && data[i+1] > WHITE_THRESHOLD && data[i+2] > WHITE_THRESHOLD;
-        if (a > ALPHA_THRESHOLD && !isWhiteBg) {
+        if (a <= ALPHA_THRESHOLD) continue; // 투명 배경
+        const isBgColor = bgColors.some(([br,bg,bb,ba]) =>
+          ba > 200 && colorDist(data[i],data[i+1],data[i+2],br,bg,bb) < 36);
+        if (!isBgColor) {
           found = true;
           if (x < minX) minX = x;
           if (x > maxX) maxX = x;
