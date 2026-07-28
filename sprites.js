@@ -232,7 +232,7 @@ function computeSpriteBounds(img, path) {
         const a = data[i+3];
         if (a <= ALPHA_THRESHOLD) continue; // 투명 배경
         const isBgColor = bgColors.some(([br,bg,bb,ba]) =>
-          ba > 200 && colorDist(data[i],data[i+1],data[i+2],br,bg,bb) < 36);
+          ba > 200 && colorDist(data[i],data[i+1],data[i+2],br,bg,bb) < 55); // v27-48: 36→55로 완화 (경계 안티앨리어싱 대응)
         if (!isBgColor) {
           found = true;
           if (x < minX) minX = x;
@@ -250,7 +250,11 @@ function computeSpriteBounds(img, path) {
         w: Math.min(cw, maxX - minX + padX * 2), h: Math.min(ch, maxY - minY + padY * 2),
       };
     }
-  } catch (e) { /* 캔버스 보안오류 등은 무시하고 원본 그대로 사용 */ }
+  } catch (e) {
+    // v27-48: 크롭 실패 원인 진단용 로그 추가 (요청4 - 신규 이미지들만 배경 크롭이 안 되는 문제)
+    // 브라우저 콘솔(F12)에 이 로그가 뜨면 원인을 바로 알 수 있음 - 캔버스 보안오류(CORS)일 가능성이 높음
+    console.warn('[스프라이트 크롭 실패]', path, e.name, e.message);
+  }
 }
 window.SpriteBoundsCache = SpriteBoundsCache;
 

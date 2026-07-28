@@ -1371,7 +1371,10 @@ class App {
 
           const skinId = this.selectedHeroSkins[this.placingHero];
           // 이미 배치된 영웅이면 위치만 이동
-          const existing = this.engine.heroes.find(h => h.id === this.placingHero);
+          // v27-48 버그수정: 영웅이 2마리로 늘어나는 문제 방어 - id 매칭에 실패하는 경우가 있어도
+          // 이 게임은 영웅이 항상 1명뿐이므로, 이미 영웅이 하나라도 있으면 무조건 "이동"으로 처리
+          // (새로 생성하지 않음)해서 중복 생성 자체를 원천 차단.
+          const existing = this.engine.heroes[0];
           if (existing) {
             existing.x = px; existing.y = py;
           } else {
@@ -1561,7 +1564,7 @@ class App {
     let gestureStart = null;   // {x,y} 화면좌표, 탭인지 드래그인지 구분용
     let didPan = false;
     let pinchStartDist = null, pinchStartZoom = 1;
-    const PAN_THRESHOLD = 10; // 이 이상 움직이면 탭이 아니라 팬으로 간주
+    const PAN_THRESHOLD = 24; // v27-48: 10→24px로 완화 (요청3 - 자연스러운 탭 손떨림도 팬으로 오인되어 탭이 씹히던 문제)
 
     let lastTouchTapTime = 0;
     canvas.addEventListener('touchstart', e => {
