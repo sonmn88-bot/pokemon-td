@@ -38,7 +38,7 @@ class GameEngine {
     // v27-47: 카메라 팬/줌 시스템 (요청A) - 월드는 화면(viewport)보다 넓고, 카메라가 그 안을 비춤
     this.camera = { x: 0, y: 0, zoom: 1 }; // x,y = 화면 중앙에 보이는 월드 좌표
     this.worldWidth = 0; this.worldHeight = 0;
-    this.minZoom = 0.6; this.maxZoom = 2.2;
+    this.minZoom = 0.8; this.maxZoom = 2.2; // v27-49: 0.6→0.8 (요청3 - 너무 축소하면 슬롯이 작아져서 탭이 잘 안 찍히는 문제)
 
     // 스폰
     this.spawnQueue = [];
@@ -518,7 +518,13 @@ class GameEngine {
   }
 
   // ===== GOLD / LIVES =====
-  addGold(n) { this.gold = Math.round(this.gold + n); this.onGoldChange && this.onGoldChange(this.gold); } // v27-27: 부동소수점 오차 누적 방지 (요청: 833.300000000001 표시버그)
+  addGold(n) {
+    // v27-49 버그수정: 토게피의 골드보너스가 설정만 되고 실제 골드 계산에 전혀 반영이 안 되고
+    // 있었음(요청4 - 영웅 밸런스 재검토 중 발견). 여기서 실제로 곱해지도록 연결.
+    const mul = this._togepiGoldMul || 1;
+    this.gold = Math.round(this.gold + n * mul);
+    this.onGoldChange && this.onGoldChange(this.gold);
+  } // v27-27: 부동소수점 오차 누적 방지 (요청: 833.300000000001 표시버그)
   spendGold(n) { if (this.gold < n) return false; this.gold = Math.round(this.gold - n); this.onGoldChange && this.onGoldChange(this.gold); return true; }
   loseLife(n=1) {
     this.lives = Math.max(0, this.lives - n);
@@ -748,6 +754,7 @@ class GameEngine {
       if (s.occupied) continue;
       const isHL = this.selectedTowerType !== null;
       const isHov = this.selectedSlotIdx === i;
+      const isMouseHover = this.hoveredSlotIdx === i && !isHov; // v27-49: 데스크탑 마우스 호버 표시 (배치모드 하이라이트와 안 겹치게)
 
       ctx.save();
       // 바닥 그림자
@@ -760,6 +767,9 @@ class GameEngine {
         g.addColorStop(0,'rgba(76,201,240,0.6)'); g.addColorStop(1,'rgba(76,201,240,0.1)');
         ctx.fillStyle=g; ctx.strokeStyle='#4cc9f0'; ctx.lineWidth=2.5;
         ctx.shadowColor='#4cc9f0'; ctx.shadowBlur=16;
+      } else if (isMouseHover) {
+        // v27-49: 요청 - "마우스 갖다대면 눌러도 되는걸 느낄 수 있게" 파란 테두리로 표시
+        ctx.fillStyle='rgba(76,201,240,0.22)'; ctx.strokeStyle='rgba(76,201,240,0.75)'; ctx.lineWidth=2;
       } else if (isHL) {
         ctx.fillStyle='rgba(255,255,255,0.10)'; ctx.strokeStyle='rgba(255,255,255,0.40)'; ctx.lineWidth=1;
       } else {
@@ -884,8 +894,11 @@ class GameEngine {
     this.selectedTower = null; this.selectedSlotIdx = null;
   }
   handleHover(sx, sy) {
-    if (!this.selectedTowerType) return;
     const { x, y } = this.screenToWorld(sx, sy);
+    // v27-49: 배치모드와 무관하게 항상 호버 슬롯을 갱신 (요청: 데스크탑에서 마우스 갖다대면
+    // 클릭 가능한 걸 파랗게 알 수 있으면 좋겠다는 요청)
+    this.hoveredSlotIdx = this.nearestSlot(x, y, 50 / this.camera.zoom);
+    if (!this.selectedTowerType) return;
     this.selectedSlotIdx = this.nearestSlot(x, y, 65 / this.camera.zoom);
   }
   nearestSlot(x, y, radius) {

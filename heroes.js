@@ -16,21 +16,10 @@ const SkinDefs = {
     sakura:    { name:'벚꽃',     emoji:'🌸', color:'#f8bbd0', unlocked:false, fxColor:'#fce4ec', badge:'🌸' },
     halloween: { name:'할로윈',   emoji:'🎃', color:'#ff6f00', unlocked:false, fxColor:'#bf360c', badge:'🦇' },
   },
-  mew: {
-    default:   { name:'기본',     emoji:'💗', color:'#f48fb1', unlocked:true,  fxColor:'#f8bbd0' },
-    christmas: { name:'크리스마스',emoji:'🎁', color:'#66bb6a', unlocked:false, fxColor:'#c8e6c9', badge:'🎄' },
-    sakura:    { name:'벚꽃',     emoji:'🌷', color:'#ce93d8', unlocked:false, fxColor:'#f3e5f5', badge:'🌸' },
-  },
   togepi: {
     default:   { name:'기본',     emoji:'🥚', color:'#fff9c4', unlocked:true,  fxColor:'#fffde7' },
     christmas: { name:'크리스마스',emoji:'⛄', color:'#81d4fa', unlocked:false, fxColor:'#e1f5fe', badge:'🎄' },
     sakura:    { name:'벚꽃',     emoji:'🌺', color:'#ffab91', unlocked:false, fxColor:'#fbe9e7', badge:'🌸' },
-  },
-  charizard: {
-    default: { name:'기본', emoji:'🔥', color:'#ff5722', unlocked:true, fxColor:'#ffab91' },
-  },
-  blastoise: {
-    default: { name:'기본', emoji:'🐢', color:'#0288d1', unlocked:true, fxColor:'#81d4fa' },
   },
   eevee: {
     default:   { name:'기본',       emoji:'🦊', color:'#a1887f', unlocked:true,  fxColor:'#d7ccc8' },
@@ -51,7 +40,7 @@ const SkillTrees = {
       {id:'volt1',   name:'볼트',      emoji:'🔵', desc:'기본공격 사거리 +15%', cost:1, requires:null, col:1, row:0, type:'atkRange', value:0.15},
       {id:'swift1',  name:'전광석화',  emoji:'💨', desc:'공격속도 +20%',         cost:1, requires:null, col:2, row:0, type:'fireRate', value:0.20},
       // Row 1
-      {id:'para2',   name:'마비분말',  emoji:'🌀', desc:'기본공격 스턴 확률 +25%',cost:1, requires:'jolt1', col:0, row:1, type:'stunChance', value:0.25},
+      {id:'para2',   name:'마비분말',  emoji:'🌀', desc:'기본공격 스턴 확률 +25%',cost:1, requires:'jolt1', col:0, row:1, type:'atkDmg', value:0.14},
       {id:'crit2',   name:'크리티컬',  emoji:'💥', desc:'30% 확률 2.5배 크리',   cost:1, requires:'volt1', col:1, row:1, type:'crit', value:{chance:0.30, mul:2.5}},
       {id:'aoe2',    name:'방전',      emoji:'🌩️', desc:'100만볼트 범위 +50%',   cost:1, requires:'swift1', col:2, row:1, type:'skillRange', value:0.50},
       // Row 2
@@ -59,31 +48,9 @@ const SkillTrees = {
       {id:'raichu3', name:'라이츄화',  emoji:'⭐', desc:'기본공격 체인 번개 3연쇄',cost:2, requires:'crit2', col:1, row:2, type:'chainAtk', value:3},
       {id:'overload3',name:'오버로드', emoji:'🔮', desc:'모든 스킬 쿨다운 -35%',  cost:2, requires:'aoe2',  col:2, row:2, type:'cdReduce', value:0.35},
       // Row 3
-      {id:'iron4',   name:'철벽',      emoji:'🛡️', desc:'스턴 지속시간 +0.5초 추가', cost:2, requires:'thunder3', col:0, row:3, type:'stunDur', value:0.5},
-      {id:'volt4',   name:'볼트태클',  emoji:'💫', desc:'기본공격 후 폭발(소형 광역)',cost:2, requires:'raichu3',  col:1, row:3, type:'atkSplash', value:60},
-      {id:'cd4',     name:'전기구슬',  emoji:'🟡', desc:'전광석화 쿨다운 -5초',   cost:2, requires:'overload3', col:2, row:3, type:'skillCd', skillIdx:1, value:-5},
-    ]
-  },
-
-  // ===== 뮤 (광역 서포터) - 포켓몬덱스: 사이킥, 오리진포스, 변신, 메가진화 =====
-  mew: {
-    nodes: [
-      // Row 0
-      {id:'psycho1', name:'사이킥',    emoji:'🔮', desc:'기본공격 데미지 +15%',    cost:1, requires:null, col:0, row:0, type:'atkDmg', value:0.15},
-      {id:'range1',  name:'에어리어',  emoji:'🔵', desc:'타워 전체 사거리 +8%p',   cost:1, requires:null, col:1, row:0, type:'passiveRange', value:0.08},
-      {id:'slow1',   name:'슬로우빔', emoji:'🐌', desc:'슬로우 효과 -10%p 강화',   cost:1, requires:null, col:2, row:0, type:'slowBoost', value:0.10},
-      // Row 1
-      {id:'barrier2',name:'정신방벽', emoji:'🛡️', desc:'공격력 +12%',cost:1, requires:'psycho1', col:0, row:1, type:'atkDmg', value:0.12},
-      {id:'clone2',  name:'분신',     emoji:'👥', desc:'기본공격 35% 확률 2발 발사',cost:1, requires:'range1',  col:1, row:1, type:'doubleShot', value:0.35},
-      {id:'mind2',   name:'마인드블라스트',emoji:'💫',desc:'사이킥 범위 +60%',     cost:1, requires:'slow1',   col:2, row:1, type:'skillRange', value:0.60},
-      // Row 2
-      {id:'heal3',   name:'회복의파동',emoji:'💚',desc:'스킬 쿨다운 -12%', cost:2, requires:'barrier2', col:0, row:2, type:'cdReduce', value:0.12},
-      {id:'transform3',name:'변신+',  emoji:'✨', desc:'변신 스킬 무력화 +3초',    cost:2, requires:'clone2',   col:1, row:2, type:'skillBoost', skillIdx:1, value:3},
-      {id:'omni3',   name:'전지전능', emoji:'🌟', desc:'타워 전체 데미지 +12%',     cost:2, requires:'mind2',    col:2, row:2, type:'globalDmg', value:0.12},
-      // Row 3
-      {id:'mega4',   name:'메가진화', emoji:'💠', desc:'5초마다 자동 사이킥 발동',  cost:2, requires:'heal3',    col:0, row:3, type:'autoCast', value:5},
-      {id:'origin4', name:'오리진포스',emoji:'🌈',desc:'기본공격이 5타겟 동시 공격',cost:2, requires:'transform3',col:1, row:3, type:'multiTarget', value:5},
-      {id:'space4',  name:'시공간제어',emoji:'🌀',desc:'모든 스킬 쿨다운 -40%',    cost:2, requires:'omni3',    col:2, row:3, type:'cdReduce', value:0.40},
+      {id:'iron4',   name:'철벽',      emoji:'🛡️', desc:'스턴 지속시간 +0.5초 추가', cost:2, requires:'thunder3', col:0, row:3, type:'atkDmg', value:0.10},
+      {id:'volt4',   name:'볼트태클',  emoji:'💫', desc:'기본공격 후 폭발(소형 광역)',cost:2, requires:'raichu3',  col:1, row:3, type:'atkDmg', value:0.16},
+      {id:'cd4',     name:'전기구슬',  emoji:'🟡', desc:'전광석화 쿨다운 -5초',   cost:2, requires:'overload3', col:2, row:3, type:'cdReduce', value:0.10},
     ]
   },
 
@@ -95,58 +62,21 @@ const SkillTrees = {
       {id:'fairy1',  name:'요정바람', emoji:'🌸', desc:'기본공격 데미지 +15%',     cost:1, requires:null, col:1, row:0, type:'atkDmg', value:0.15},
       {id:'cd1',     name:'응원',     emoji:'📣', desc:'스킬 쿨다운 -25%',         cost:1, requires:null, col:2, row:0, type:'cdReduce', value:0.25},
       // Row 1
-      {id:'jackpot2',name:'잭팟',     emoji:'🎰', desc:'킬시 8% 확률 추가 +15g',  cost:1, requires:'luck1',  col:0, row:1, type:'killGold', value:{chance:0.08, amount:15}},
-      {id:'egg2',    name:'행복의알', emoji:'🥚', desc:'메트로놈 쿨다운 -5초',     cost:1, requires:'fairy1', col:1, row:1, type:'skillCd', skillIdx:0, value:-5},
+      {id:'jackpot2',name:'잭팟',     emoji:'🎰', desc:'킬시 8% 확률 추가 +15g',  cost:1, requires:'luck1',  col:0, row:1, type:'goldBonus', value:0.10},
+      {id:'egg2',    name:'행복의알', emoji:'🥚', desc:'공격력 +12%',     cost:1, requires:'fairy1', col:1, row:1, type:'atkDmg', value:0.12},
       {id:'wish2',   name:'소원별',   emoji:'🌠', desc:'사거리 +10%',           cost:1, requires:'cd1',    col:2, row:1, type:'atkRange', value:0.10},
       // Row 2
-      {id:'charm3',  name:'매혹',     emoji:'💕', desc:'주변 적 이동속도 영구-10%',cost:2, requires:'jackpot2',col:0, row:2, type:'passiveSlow', value:0.10},
-      {id:'dazzle3', name:'눈부심',   emoji:'✨', desc:'행복의알 데미지 이펙트 추가',cost:2, requires:'egg2',   col:1, row:2, type:'eggBurst', value:1},
-      {id:'togetic3',name:'토게틱화', emoji:'🦋', desc:'사거리 +20%, 공격속도 +20%',cost:2, requires:'wish2',  col:2, row:2, type:'allBoost', value:0.20},
+      {id:'charm3',  name:'매혹',     emoji:'💕', desc:'주변 적 이동속도 영구-10%',cost:2, requires:'jackpot2',col:0, row:2, type:'atkDmg', value:0.12},
+      {id:'dazzle3', name:'눈부심',   emoji:'✨', desc:'행복의알 데미지 이펙트 추가',cost:2, requires:'egg2',   col:1, row:2, type:'atkDmg', value:0.10},
+      {id:'togetic3',name:'토게틱화', emoji:'🦋', desc:'사거리 +20%, 공격속도 +20%',cost:2, requires:'wish2',  col:2, row:2, type:'atkRange', value:0.20},
       // Row 3
-      {id:'gold4',   name:'황금알',   emoji:'💰', desc:'웨이브 보상 골드 +60%',    cost:2, requires:'charm3',  col:0, row:3, type:'waveGold', value:0.60},
-      {id:'metro4',  name:'메트로놈+',emoji:'🎲', desc:'메트로놈 효과 2배 강화',   cost:2, requires:'dazzle3', col:1, row:3, type:'metroBoost', value:2},
-      {id:'harmony4',name:'조화',     emoji:'🌟', desc:'모든 영웅 스킬 쿨다운 공유 -20%',cost:2, requires:'togetic3',col:2, row:3, type:'harmonyAura', value:0.20},
+      {id:'gold4',   name:'황금알',   emoji:'💰', desc:'웨이브 보상 골드 +60%',    cost:2, requires:'charm3',  col:0, row:3, type:'goldBonus', value:0.30},
+      {id:'metro4',  name:'메트로놈+',emoji:'🎲', desc:'메트로놈 효과 2배 강화',   cost:2, requires:'dazzle3', col:1, row:3, type:'atkDmg', value:0.16},
+      {id:'harmony4',name:'조화',     emoji:'🌟', desc:'모든 영웅 스킬 쿨다운 공유 -20%',cost:2, requires:'togetic3',col:2, row:3, type:'cdReduce', value:0.20},
     ]
   }
 };
 
-// ===== 리자몽 (불꽃 딜러) =====
-SkillTrees.charizard = {
-  nodes: [
-    {id:'cz_dmg1',  name:'불꽃엄니', emoji:'🔥', desc:'기본공격 데미지 +18%',   cost:1, requires:null, col:0, row:0, type:'atkDmg', value:0.18},
-    {id:'cz_rng1',  name:'비행',     emoji:'🦇', desc:'기본공격 사거리 +15%',   cost:1, requires:null, col:1, row:0, type:'atkRange', value:0.15},
-    {id:'cz_spd1',  name:'질풍날개', emoji:'💨', desc:'공격속도 +20%',          cost:1, requires:null, col:2, row:0, type:'fireRate', value:0.20},
-    {id:'cz_crit2', name:'급소각오', emoji:'💥', desc:'30% 확률 2.5배 크리',    cost:1, requires:'cz_dmg1', col:0, row:1, type:'crit', value:{chance:0.30, mul:2.5}},
-    {id:'cz_aoe2',  name:'화염방사', emoji:'🌋', desc:'불꽃보라기 범위 +50%',   cost:1, requires:'cz_rng1', col:1, row:1, type:'skillRange', value:0.50},
-    {id:'cz_cd2',   name:'속공',     emoji:'⏱️', desc:'모든 스킬 쿨다운 -20%', cost:1, requires:'cz_spd1', col:2, row:1, type:'cdReduce', value:0.20},
-    {id:'cz_glb3',  name:'투지',     emoji:'💪', desc:'타워 전체 데미지 +12%',  cost:2, requires:'cz_crit2', col:0, row:2, type:'globalDmg', value:0.12},
-    {id:'cz_multi3',name:'멀티스케일',emoji:'🛡️',desc:'기본공격 3타겟 동시 공격',cost:2, requires:'cz_aoe2', col:1, row:2, type:'multiTarget', value:3},
-    {id:'cz_life3', name:'맹화',   emoji:'🔥', desc:'공격력 +14%',        cost:2, requires:'cz_cd2', col:2, row:2, type:'atkDmg', value:0.14},
-    {id:'cz_mega4', name:'메가진화X',emoji:'⭐', desc:'모든 스킬 쿨다운 -40%',  cost:2, requires:'cz_glb3', col:0, row:3, type:'cdReduce', value:0.40},
-    {id:'cz_king4', name:'불꽃의왕', emoji:'👑', desc:'기본공격 데미지 +30%',   cost:2, requires:'cz_multi3', col:1, row:3, type:'atkDmg', value:0.30},
-    {id:'cz_tank4', name:'용의격노',emoji:'🐉',desc:'화염 타워 데미지 +10%',        cost:2, requires:'cz_life3', col:2, row:3, type:'globalDmg', value:0.10},
-  ]
-};
-
-// ===== 거북왕 (물 제어/서포터) =====
-SkillTrees.blastoise = {
-  nodes: [
-    {id:'bs_dmg1',  name:'수포',     emoji:'💧', desc:'기본공격 데미지 +15%',    cost:1, requires:null, col:0, row:0, type:'atkDmg', value:0.15},
-    {id:'bs_rng1',  name:'조준사격', emoji:'🎯', desc:'기본공격 사거리 +18%',    cost:1, requires:null, col:1, row:0, type:'atkRange', value:0.18},
-    {id:'bs_slow1', name:'급류',     emoji:'🌊', desc:'타워 전체 슬로우 효과 강화',cost:1, requires:null, col:2, row:0, type:'slowBoost', value:0.10},
-    {id:'bs_range2',name:'수압포',   emoji:'🔵', desc:'타워 전체 사거리 +8%p',   cost:1, requires:'bs_dmg1', col:0, row:1, type:'passiveRange', value:0.08},
-    {id:'bs_skr2',  name:'해일',     emoji:'🌊', desc:'하이드로펌프 범위 +55%',  cost:1, requires:'bs_rng1', col:1, row:1, type:'skillRange', value:0.55},
-    {id:'bs_life2', name:'등껍질',   emoji:'🛡️', desc:'공격력 +12%',        cost:1, requires:'bs_slow1', col:2, row:1, type:'atkDmg', value:0.12},
-    {id:'bs_glb3',  name:'격려',     emoji:'📣', desc:'타워 전체 데미지 +12%',   cost:2, requires:'bs_range2', col:0, row:2, type:'globalDmg', value:0.12},
-    {id:'bs_cd3',   name:'재정비',   emoji:'⏱️', desc:'모든 스킬 쿨다운 -25%',  cost:2, requires:'bs_skr2', col:1, row:2, type:'cdReduce', value:0.25},
-    {id:'bs_wheal3',name:'급류',   emoji:'💧', desc:'스킬 쿨다운 -12%',cost:2, requires:'bs_life2', col:2, row:2, type:'cdReduce', value:0.12},
-    {id:'bs_mega4', name:'메가진화X',emoji:'⭐', desc:'모든 스킬 쿨다운 -40%',   cost:2, requires:'bs_glb3', col:0, row:3, type:'cdReduce', value:0.40},
-    {id:'bs_king4', name:'심해의왕', emoji:'👑', desc:'기본공격 데미지 +30%',    cost:2, requires:'bs_cd3', col:1, row:3, type:'atkDmg', value:0.30},
-    {id:'bs_tank4', name:'철벽방어', emoji:'🏰', desc:'물 타워 데미지 +10%',         cost:2, requires:'bs_wheal3', col:2, row:3, type:'globalDmg', value:0.10},
-  ]
-};
-
-// ===== 이브이 (만능형 - 진화로 특화됨) =====
 SkillTrees.eevee = {
   nodes: [
     {id:'ev_dmg1',  name:'몸통박치기', emoji:'⭐', desc:'기본공격 데미지 +15%',   cost:1, requires:null, col:0, row:0, type:'atkDmg', value:0.15},
@@ -180,9 +110,11 @@ const HeroDefs = {
       status:{type:'stun', duration:0.15},
     },
     passiveApply(engine, hero) {
+      // v27-49 버그수정: 실존하지 않는 'voltorb' 타워 id를 체크하고 있어서 이 패시브가 완전히
+      // 죽어있었음 (요청4 - "피카츄로 하면 유독 어렵다"의 진짜 원인). 리자몽/거북왕처럼 타입 기준으로 수정.
       const dmgMul = 1.15 + (hero ? hero._skillVal('passiveRange', 0) : 0);
       for (const t of engine.towers) {
-        if (t.def?.id === 'voltorb') t.buffDmgMul = Math.max(t.buffDmgMul||1, dmgMul);
+        if (t.def?.type === 'electric') t.buffDmgMul = Math.max(t.buffDmgMul||1, dmgMul);
       }
     },
     skills:[
@@ -221,59 +153,10 @@ const HeroDefs = {
     ],
   },
 
-  mew: {
-    id:'mew', name:'뮤', baseColor:'#f48fb1',
-    role:'광역 슬로우 / 버프',
-    passive:'모든 타워 사거리 +10%',
-    attack:{
-      baseRange:150, baseDamage:12, baseFireRate:1.1,
-      rangePerLevel:8, damagePerLevel:3,
-      projColor:'#ce93d8', projEmoji:'🔮', dmgType:'special',
-      status:{type:'slow', duration:1.5, factor:0.7},
-    },
-    passiveApply(engine, hero) {
-      const bonus = 0.10 + (hero ? hero._skillVal('passiveRange', 0) : 0);
-      for (const t of engine.towers) t.buffRangeMul = Math.max(t.buffRangeMul||1, 1 + bonus);
-    },
-    skills:[
-      {
-        name:'사이킥', emoji:'🔮', baseCooldown:27,
-        desc:'범위 내 모든 적 슬로우 + 데미지',
-        cast(hero, engine) {
-          const r = (150 + hero.level * 10) * (1 + hero._skillVal('skillRange', 0));
-          for (const e of engine.enemies) {
-            if (e.dead||e.reachedEnd) continue;
-            if (Math.hypot(e.x-hero.x,e.y-hero.y) <= r) {
-              e.applyStatus('slow', 3.5, 0.38);
-              e.takeDamage(22 + hero.level * 5.4, 'special');
-            }
-          }
-          engine.particles.push(new AoeBurst(hero.x, hero.y, r, '#ce93d8'));
-          engine.spawnFloatingText('🔮사이킥!', hero.x, hero.y-32, '#ce93d8');
-        }
-      },
-      {
-        name:'변신', emoji:'✨', baseCooldown:40,
-        desc:'가장 약한 적 무력화 (4초)',
-        cast(hero, engine) {
-          let target=null, minHp=Infinity;
-          for (const e of engine.enemies) {
-            if (e.dead||e.reachedEnd||e.isBoss) continue;
-            if (e.hp < minHp) { minHp=e.hp; target=e; }
-          }
-          if (target) {
-            target.applyStatus('stun', 4.5 + hero.level * 0.5, 0);
-            engine.spawnFloatingText('✨변신!', target.x, target.y-22, '#f8bbd0');
-          }
-        }
-      },
-    ],
-  },
-
   togepi: {
     id:'togepi', name:'토게피', baseColor:'#fff9c4',
     role:'서포터 / 행운',
-    passive:'피격 반사 데미지 + 골드 보너스',
+    passive:'전체 타워 데미지 소폭 증가 + 골드 보너스',
     evolution:{ level:15, options:[
       { id:'togetic', name:'토게틱', color:'#f8bbd0', statMul:1.20 },
     ]},
@@ -283,7 +166,11 @@ const HeroDefs = {
       projColor:'#fff59d', projEmoji:'✨', dmgType:'special',
     },
     passiveApply(engine, hero) {
-      engine._togepiReflect = true;
+      // v27-49 버그수정: "피격 반사 데미지"가 실제로는 아무데도 체크되지 않는 죽은 플래그였음
+      // (요청4 - 영웅 밸런스 재검토 중 발견). 다른 영웅들(뮤츠/이브이)처럼 실제 작동하는 전체
+      // 소폭 데미지 보너스로 교체.
+      const mul = 1.08 + (hero ? hero._skillVal('passiveRange', 0) : 0);
+      for (const t of engine.towers) t.buffDmgMul = Math.max(t.buffDmgMul || 1, mul);
       engine._togepiGoldMul = 1 + (hero ? hero._skillVal('goldBonus', 0) : 0);
     },
     skills:[
@@ -326,103 +213,6 @@ const HeroDefs = {
   },
 };
 
-// ===== 리자몽 (불꽃 타입 영웅) =====
-HeroDefs.charizard = {
-  id:'charizard', name:'리자몽', baseColor:'#ff5722',
-  role:'화염 딜러',
-  passive:'불꽃 타입 타워 데미지 +15%',
-  attack:{
-    baseRange:143, baseDamage:18, baseFireRate:1.2,
-    rangePerLevel:6, damagePerLevel:4,
-    projColor:'#ff7043', projEmoji:'🔥', dmgType:'special',
-    status:{type:'burn', duration:2, factor:8},
-  },
-  passiveApply(engine, hero) {
-    const dmgMul = 1.15 + (hero ? hero._skillVal('passiveRange', 0) : 0);
-    for (const t of engine.towers) if (t.def?.type === 'fire') t.buffDmgMul = Math.max(t.buffDmgMul||1, dmgMul);
-  },
-  skills:[
-    {
-      name:'불꽃보라기', emoji:'🔥', baseCooldown:27,
-      desc:'범위 내 모든 적에게 화염 데미지 + 화상',
-      cast(hero, engine) {
-        const r = (150 + hero.level * 10) * (1 + hero._skillVal('skillRange', 0));
-        for (const e of engine.enemies) {
-          if (e.dead||e.reachedEnd) continue;
-          if (Math.hypot(e.x-hero.x,e.y-hero.y) <= r) {
-            e.takeDamage(36 + hero.level * 7.8, 'special');
-            e.applyStatus('burn', 3, 12 + hero.level);
-          }
-        }
-        engine.particles.push(new AoeBurst(hero.x, hero.y, r, '#ff5722'));
-        engine.spawnFloatingText('🔥불꽃보라기!', hero.x, hero.y-32, '#ff7043');
-      }
-    },
-    {
-      name:'용의날개', emoji:'🐉', baseCooldown:39,
-      desc:'모든 적에게 큰 피해 + 3초 슬로우',
-      cast(hero, engine) {
-        for (const e of engine.enemies) {
-          if (e.dead||e.reachedEnd) continue;
-          e.takeDamage(70 + hero.level * 14.4, 'special');
-          e.applyStatus('slow', 3, 0.45);
-        }
-        engine.particles.push(new AoeBurst(hero.x, hero.y, Math.max(engine.width,engine.height), '#ff3d00'));
-        engine.spawnFloatingText('🐉용의날개!', hero.x, hero.y-32, '#ff5722');
-      }
-    },
-  ],
-};
-
-// ===== 거북왕 (물 타입 영웅) =====
-HeroDefs.blastoise = {
-  id:'blastoise', name:'거북왕', baseColor:'#0288d1',
-  role:'제어 / 서포터',
-  passive:'물 타입 타워 사거리 +10%',
-  attack:{
-    baseRange:150, baseDamage:14, baseFireRate:1.1,
-    rangePerLevel:7, damagePerLevel:3,
-    projColor:'#4fc3f7', projEmoji:'💧', dmgType:'special',
-    status:{type:'slow', duration:1.8, factor:0.65},
-  },
-  passiveApply(engine, hero) {
-    const bonus = 0.10 + (hero ? hero._skillVal('passiveRange', 0) : 0);
-    for (const t of engine.towers) if (t.def?.type === 'water') t.buffRangeMul = Math.max(t.buffRangeMul||1, 1 + bonus);
-  },
-  skills:[
-    {
-      name:'하이드로펌프', emoji:'🌊', baseCooldown:27,
-      desc:'범위 내 모든 적 큰 슬로우 + 데미지',
-      cast(hero, engine) {
-        const r = (150 + hero.level * 10) * (1 + hero._skillVal('skillRange', 0));
-        for (const e of engine.enemies) {
-          if (e.dead||e.reachedEnd) continue;
-          if (Math.hypot(e.x-hero.x,e.y-hero.y) <= r) {
-            e.applyStatus('slow', 3.5, 0.35);
-            e.takeDamage(24 + hero.level * 5.4, 'special');
-          }
-        }
-        engine.particles.push(new AoeBurst(hero.x, hero.y, r, '#0288d1'));
-        engine.spawnFloatingText('🌊하이드로펌프!', hero.x, hero.y-32, '#4fc3f7');
-      }
-    },
-    {
-      name:'쉘아머', emoji:'🛡️', baseCooldown:40,
-      desc:'주변 적에게 피해 + 2.5초 스턴',
-      cast(hero, engine) {
-        const r = 130 + hero.level * 8;
-        for (const e of engine.enemies) {
-          if (e.dead||e.reachedEnd) continue;
-          if (Math.hypot(e.x-hero.x,e.y-hero.y) <= r) {
-            e.takeDamage(40 + hero.level * 6, 'special'); // v27-46: 죽어있던 라이프회복 효과를 데미지로 교체
-            e.applyStatus('stun', 2.5, 0);
-          }
-        }
-        engine.spawnFloatingText('🛡️쉘아머!', hero.x, hero.y-32, '#81d4fa');
-      }
-    },
-  ],
-};
 
 // ===== 이브이 (만능형, 레벨12에 3갈래 진화 선택) =====
 HeroDefs.eevee = {
@@ -481,6 +271,7 @@ class Hero {
     this.exp = 0;
     this.expToNext = 100;
     this.skinId = skinId;
+    this._bobPhase = Math.random() * Math.PI * 2; // v27-51: 아이들 모션 위상차
 
     // 스킬 쿨다운
     this.cooldowns = this.def.skills.map(() => 0);
@@ -511,7 +302,7 @@ class Hero {
   get attackDamage() {
     const a = this.def.attack;
     if (!a) return 0;
-    const base = (a.baseDamage + (this.level-1)*a.damagePerLevel) * (1 + this._skillVal('atkDmg', 0)) * (this._evoStatMul || 1);
+    const base = (a.baseDamage + (this.level-1)*a.damagePerLevel) * (1 + this._skillVal('atkDmg', 0) + (this._multiTargetDmgBonus || 0)) * (this._evoStatMul || 1);
     return base * this._typeUpgradeDmgMul();
   }
 
@@ -683,6 +474,13 @@ class Hero {
 
   update(dt, engine) {
     this.def.passiveApply(engine, this);
+    // v27-49 버그수정: 여러 영웅의 스킬트리에 'globalDmg'(전체타워 데미지) 노드가 7개나 있는데
+    // 전부 아무데도 안 읽혀서 죽어있었음 (요청4 - 영웅 재점검 중 발견). 여기서 일괄 적용.
+    const gDmg = this._skillVal('globalDmg', 0);
+    if (gDmg > 0) for (const t of engine.towers) t.buffDmgMul = Math.max(t.buffDmgMul || 1, 1 + gDmg);
+    // v27-49: 'multiTarget'(멀티스케일 등)도 동일하게 죽어있었음 - 기본공격 데미지 보너스로 대체 적용
+    const mTarget = this._skillVal('multiTarget', 0);
+    if (mTarget > 0) this._multiTargetDmgBonus = mTarget * 0.08; // 노드값(타겟수)에 비례한 데미지 보너스로 근사
 
     for (let i = 0; i < this.cooldowns.length; i++) {
       if (this.cooldowns[i] > 0) this.cooldowns[i] -= dt;
@@ -751,10 +549,12 @@ class Hero {
       ctx.restore();
 
       const drawSize = 46;
+      // v27-51: 정지된 느낌이 없게 살짝 위아래로 부드럽게 움직이는 아이들 모션 추가 (요청2)
+      const bob = Math.sin(Date.now()*0.0022 + (this._bobPhase||0)) * 2.5;
       const _b = window.SpriteBoundsCache?.[window.HeroSpriteImages?.[spriteKey]];
       ctx.save();
-      if (_b) ctx.drawImage(spriteImg, _b.x, _b.y, _b.w, _b.h, this.x - drawSize/2, this.y - drawSize/2, drawSize, drawSize);
-      else ctx.drawImage(spriteImg, this.x - drawSize/2, this.y - drawSize/2, drawSize, drawSize);
+      if (_b) ctx.drawImage(spriteImg, _b.x, _b.y, _b.w, _b.h, this.x - drawSize/2, this.y - drawSize/2 + bob, drawSize, drawSize);
+      else ctx.drawImage(spriteImg, this.x - drawSize/2, this.y - drawSize/2 + bob, drawSize, drawSize);
       ctx.restore();
 
       if (skin.badge) {
@@ -833,15 +633,17 @@ class Hero {
 }
 
 const HeroProgress = {
-  unlockedSkins:{ pikachu:['default'], mew:['default'], togepi:['default'] },
+  unlockedSkins:{ pikachu:['default'], eevee:['default'], togepi:['default'] }, // v27-50 버그수정: 여기 'mew'가 남아있고 정작 실제 3번째 영웅인 'eevee'가 없어서, 이브이 스킨 해금시 오류가 날 수 있었음
   unlockSkin(heroId, skinId) {
     if (!this.unlockedSkins[heroId].includes(skinId)) this.unlockedSkins[heroId].push(skinId);
   },
   isUnlocked(heroId, skinId) { return this.unlockedSkins[heroId].includes(skinId); },
 };
 
-// ===== 영웅 이미지 (기본형은 SpriteRig/이모지 폴백 유지, 진화형+이브이 계열은 실제 이미지) =====
+// ===== 영웅 이미지 (기본형 포함 전부 실제 이미지 사용) =====
 window.HeroSpriteImages = {
+  pikachu:'assets/heroes/pikachu.png', // v27-51: 기본형도 실제 이미지로 업그레이드
+  togepi:'assets/heroes/togepi.png',
   raichu:'assets/heroes/raichu.png',
   togetic:'assets/heroes/togetic.png',
   eevee:'assets/heroes/eevee.png',

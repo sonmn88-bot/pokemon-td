@@ -311,9 +311,8 @@ class App {
     const overlay = document.createElement('div');
     overlay.className = 'skin-picker';
     overlay.innerHTML = `
-      <div class="skin-picker-title">🌍 전체 랭킹</div>
+      <div class="skin-picker-title" id="rank-title" style="cursor:default;user-select:none;">🌍 전체 랭킹</div>
       <div style="display:flex;gap:6px;margin-bottom:6px;">
-        <button id="rank-admin-btn" style="font-size:10px;padding:4px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:transparent;color:#888;cursor:pointer;">🔐 관리자</button>
         <button id="rank-clear-btn" style="display:none;font-size:10px;padding:4px 8px;border-radius:6px;border:1px solid rgba(255,80,80,0.4);background:transparent;color:#ff6b6b;cursor:pointer;">🗑️ 전체 초기화</button>
       </div>
       <div id="rank-list-body" style="color:#888;padding:20px;">불러오는 중...</div>`;
@@ -352,15 +351,20 @@ class App {
       }
     };
 
-    const adminBtn = overlay.querySelector('#rank-admin-btn');
+    const rankTitle = overlay.querySelector('#rank-title');
     const clearBtn = overlay.querySelector('#rank-clear-btn');
-    adminBtn.addEventListener('click', () => {
+    // v27-49: 눈에 띄는 관리자 버튼 대신, 제목을 5번 빠르게 연속 탭하면 진입 (요청5 - 잘 안 보이는 곳에)
+    let tapCount = 0, tapTimer = null;
+    rankTitle.addEventListener('click', () => {
       if (isAdmin) return;
+      tapCount++;
+      clearTimeout(tapTimer);
+      tapTimer = setTimeout(() => { tapCount = 0; }, 1500);
+      if (tapCount < 5) return;
+      tapCount = 0;
       const pw = prompt('관리자 비밀번호를 입력하세요');
       if (pw === ADMIN_PASSWORD) {
         isAdmin = true;
-        adminBtn.textContent = '🔓 관리자 모드';
-        adminBtn.style.color = '#06d6a0';
         clearBtn.style.display = 'inline-block';
         renderRows();
       } else if (pw !== null) {
@@ -536,6 +540,9 @@ class App {
       btn.addEventListener('click', () => {
         this.starterHero = btn.dataset.hero;
         document.querySelectorAll('#starter-hero-select .diff-btn').forEach(b => b.classList.toggle('active', b === btn));
+        // v27-50: 이상해씨/파이리/꼬부기 선택처럼 영웅도 특징을 간략히 보여줌 (요청3)
+        const descEl = document.getElementById('starter-hero-desc');
+        if (descEl) descEl.textContent = `${btn.textContent.split(' ')[0]} ${btn.title}`;
       });
     });
   }
@@ -1516,10 +1523,25 @@ class App {
     const heroType = window.HERO_TYPE_MAP?.[hero.evolved || hero.id];
     const typeInfo = heroType ? window.TYPES?.[heroType] : null;
     const typeTag = typeInfo ? `<span style="color:${typeInfo.color}">${typeInfo.emoji} ${typeInfo.name}속성</span>` : '';
+    // v27-50: 타워 패널처럼 영웅도 데미지 breakdown 표시 (요청4 - "영웅은 타워처럼 공식이 안 뜬다")
+    const a = hero.def.attack;
+    const baseLv = a ? Math.round(a.baseDamage + (hero.level-1)*a.damagePerLevel) : 0;
+    const skillBonus = hero._skillVal('atkDmg', 0) + (hero._multiTargetDmgBonus || 0);
+    const evoMul = hero._evoStatMul || 1;
+    const typeMul = hero._typeUpgradeDmgMul ? hero._typeUpgradeDmgMul() : 1;
+    const breakdown = `
+      <div style="font-size:9.5px;color:#999;margin:4px 0;line-height:1.5;border-top:1px dashed rgba(255,255,255,0.1);padding-top:3px;">
+        📐 데미지 breakdown: 기본${baseLv}(Lv${hero.level})
+        × 스킬${(1+skillBonus).toFixed(2)}
+        ${evoMul!==1?`× 진화${evoMul.toFixed(2)}`:''}
+        × 타입강화${typeMul.toFixed(2)}
+        = <span style="color:#ffd60a">${Math.round(hero.attackDamage)}</span>
+      </div>`;
     panel.innerHTML = `
       <div class="tower-panel-name">${hero.skin.emoji} ${hero.name} Lv${hero.level} ${typeTag}</div>
       <div class="tower-panel-stats">⚔️${Math.round(hero.attackDamage)} · 📏${Math.round(hero.attackRange)} · ✨EXP ${expPct}%</div>
       <div style="font-size:10px;color:#aaa;margin:2px 0">${hero.def.passive || ''}</div>
+      ${breakdown}
       <div class="tower-panel-btns">
         <button class="tp-btn" data-action="skin">🎨 스킨 변경</button>
         <button class="tp-btn" data-action="close">닫기</button>
@@ -1570,7 +1592,8 @@ class App {
     canvas.addEventListener('touchstart', e => {
       e.preventDefault();
       if (e.touches.length >= 2) {
-        pinchStartDist = touchDist(e);
+        const d = touchDist(e);
+        pinchStartDist = (d && d > 5) ? d : null; // v27-49: 거리가 너무 작으면(손가락 거의 겹침) 나누기 안전장치
         pinchStartZoom = this.engine.camera.zoom;
         return;
       }

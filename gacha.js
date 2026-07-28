@@ -743,12 +743,14 @@ function applyTowerSynergies(towers) {
 
 // ===== 타입 업그레이드 (6종, v27: 3단계 -> 5단계 확장 + 가격 상향) =====
 const TypeUpgrades = {
-  fire:     [{cost:220,label:'불꽃 강화 1',buff:'dmg',val:0.14},{cost:480,label:'불꽃 강화 2',buff:'dmg',val:0.16},{cost:900,label:'불꽃 강화 3',buff:'dmg',val:0.18},{cost:1500,label:'불꽃 강화 4',buff:'dmg',val:0.20},{cost:2400,label:'대화염',buff:'dmg',val:0.28}],
-  water:    [{cost:220,label:'물 강화 1',buff:'range',val:0.12},{cost:480,label:'물 강화 2',buff:'slow',val:0.08},{cost:900,label:'물 강화 3',buff:'range',val:0.15},{cost:1500,label:'물 강화 4',buff:'slow',val:0.10},{cost:2400,label:'대해일',buff:'range',val:0.22}],
-  electric: [{cost:220,label:'전기 강화 1',buff:'speed',val:0.13},{cost:480,label:'전기 강화 2',buff:'chain',val:1},{cost:900,label:'전기 강화 3',buff:'speed',val:0.15},{cost:1500,label:'전기 강화 4',buff:'chain',val:1},{cost:2400,label:'초전도',buff:'speed',val:0.22}],
-  grass:    [{cost:220,label:'풀 강화 1',buff:'poison',val:0.13},{cost:480,label:'풀 강화 2',buff:'range',val:0.13},{cost:900,label:'풀 강화 3',buff:'poison',val:0.15},{cost:1500,label:'풀 강화 4',buff:'range',val:0.13},{cost:2400,label:'대자연',buff:'dmg',val:0.22}],
-  psychic:  [{cost:220,label:'에스퍼 강화 1',buff:'target',val:1},{cost:480,label:'에스퍼 강화 2',buff:'dmg',val:0.16},{cost:900,label:'에스퍼 강화 3',buff:'target',val:1},{cost:1500,label:'에스퍼 강화 4',buff:'dmg',val:0.18},{cost:2400,label:'초능력',buff:'target',val:2}],
-  normal:   [{cost:180,label:'노말 강화 1',buff:'speed',val:0.09},{cost:360,label:'노말 강화 2',buff:'dmg',val:0.09},{cost:700,label:'노말 강화 3',buff:'speed',val:0.11},{cost:1200,label:'노말 강화 4',buff:'dmg',val:0.11},{cost:2000,label:'만능',buff:'all',val:0.09}],
+  // v27-51: "슬로우/연쇄/독/타겟수" 라벨이 실제로는 효과가 없이 그냥 데미지만 오르고 있었음
+  // (이름표만 잘못 붙어있던 문제) - 실제 효과 구현 대신 이름을 실제 효과(데미지)에 맞게 통일 (요청1)
+  fire:     [{cost:220,label:'불꽃 강화 1',buff:'dmg',val:0.21},{cost:480,label:'불꽃 강화 2',buff:'dmg',val:0.24},{cost:900,label:'불꽃 강화 3',buff:'dmg',val:0.27},{cost:1500,label:'불꽃 강화 4',buff:'dmg',val:0.3},{cost:2400,label:'대화염',buff:'dmg',val:0.42}],
+  water:    [{cost:220,label:'물 강화 1',buff:'range',val:0.18},{cost:480,label:'물 강화 2',buff:'dmg',val:0.20},{cost:900,label:'물 강화 3',buff:'range',val:0.225},{cost:1500,label:'물 강화 4',buff:'dmg',val:0.25},{cost:2400,label:'대해일',buff:'range',val:0.33}],
+  electric: [{cost:220,label:'전기 강화 1',buff:'speed',val:0.195},{cost:480,label:'전기 강화 2',buff:'dmg',val:0.25},{cost:900,label:'전기 강화 3',buff:'speed',val:0.225},{cost:1500,label:'전기 강화 4',buff:'dmg',val:0.25},{cost:2400,label:'초전도',buff:'speed',val:0.33}],
+  grass:    [{cost:220,label:'풀 강화 1',buff:'dmg',val:0.20},{cost:480,label:'풀 강화 2',buff:'range',val:0.195},{cost:900,label:'풀 강화 3',buff:'dmg',val:0.23},{cost:1500,label:'풀 강화 4',buff:'range',val:0.195},{cost:2400,label:'대자연',buff:'dmg',val:0.33}],
+  psychic:  [{cost:220,label:'에스퍼 강화 1',buff:'dmg',val:0.20},{cost:480,label:'에스퍼 강화 2',buff:'dmg',val:0.24},{cost:900,label:'에스퍼 강화 3',buff:'dmg',val:0.24},{cost:1500,label:'에스퍼 강화 4',buff:'dmg',val:0.27},{cost:2400,label:'초능력',buff:'dmg',val:0.40}],
+  normal:   [{cost:180,label:'노말 강화 1',buff:'speed',val:0.135},{cost:360,label:'노말 강화 2',buff:'dmg',val:0.135},{cost:700,label:'노말 강화 3',buff:'speed',val:0.165},{cost:1200,label:'노말 강화 4',buff:'dmg',val:0.165},{cost:2000,label:'만능',buff:'all',val:0.135}],
 };
 // 타입별 업그레이드 레벨 추적
 const TypeUpgradeLevels = {};
