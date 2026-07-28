@@ -637,6 +637,53 @@ class GameEngine {
     if (this.activeBoss) this._drawBossBar(ctx);
   }
 
+  // v27-58: 타일 텍스처(잔디/흙/용암/벽돌) 여러 장을 하나의 모자이크 캔버스로 합쳐서
+  // CanvasPattern으로 반복시키는 헬퍼. 변종 이미지를 섞고 일부는 반전시켜서
+  // 눈에 띄는 반복(타일링 티)을 최대한 줄인다. 로딩 전에는 null 반환(호출부가 폴백 처리).
+  _getMosaicPattern(ctx, key, urls, worldTileSize) {
+    if (!this._texCache) this._texCache = {};
+    const cacheKey = key + '_' + worldTileSize;
+    let entry = this._texCache[cacheKey];
+    if (!entry) {
+      entry = { images: [], loadedCount: 0, ready: false, pattern: null };
+      urls.forEach((u, i) => {
+        const im = new Image();
+        im.onload = () => {
+          entry.loadedCount++;
+          if (entry.loadedCount === urls.length) { entry.ready = true; this._bgDirty = true; }
+        };
+        im.src = u;
+        entry.images[i] = im;
+      });
+      this._texCache[cacheKey] = entry;
+    }
+    if (!entry.ready) return null;
+    if (!entry.pattern) {
+      const s = entry.images[0].naturalWidth || 512;
+      const cols = entry.images.length >= 2 ? 2 : 1;
+      const rows = Math.ceil(entry.images.length / cols);
+      const mc = document.createElement('canvas');
+      mc.width = s * cols; mc.height = s * rows;
+      const mctx = mc.getContext('2d');
+      entry.images.forEach((im, i) => {
+        const cx = (i % cols) * s, cy = Math.floor(i / cols) * s;
+        const flipX = (i * 7) % 3 === 0, flipY = (i * 11) % 4 === 0;
+        mctx.save();
+        mctx.translate(cx + (flipX ? s : 0), cy + (flipY ? s : 0));
+        mctx.scale(flipX ? -1 : 1, flipY ? -1 : 1);
+        mctx.drawImage(im, 0, 0, s, s);
+        mctx.restore();
+      });
+      const pat = ctx.createPattern(mc, 'repeat');
+      if (pat && pat.setTransform) {
+        const scale = worldTileSize / s;
+        try { pat.setTransform(new DOMMatrix().scale(scale)); } catch (e) {}
+      }
+      entry.pattern = pat;
+    }
+    return entry.pattern;
+  }
+
   _drawBgCached(ctx) {
     // v27-36: 배경이 까매지는 문제 방어 (요청3) - width/height가 비정상(0 이하 등)이면 배경 재생성을
     // 건너뛰고 기존 캐시를 그대로 사용 (레이아웃 과도기에 순간적으로 크기가 이상해지는 경우 대비)
@@ -651,8 +698,20 @@ class GameEngine {
       const bctx = bc.getContext('2d');
       const map = this.currentMap;
 
-      // 배경 이미지 있으면 사용, 없으면 단색
-      if (map.bgImage) {
+      // v27-58: 반복 타일 텍스처(잔디/용암 등) 우선 사용 - 자연스러운 배경을 위해 모자이크 패턴으로 채움
+      if (map.bgTextures) {
+        const pat = this._getMosaicPattern(bctx, map.name + '_bg', map.bgTextures, map.bgTileSize || 300);
+        if (pat) {
+          bctx.fillStyle = pat;
+          bctx.fillRect(0, 0, this.worldWidth, this.worldHeight);
+        } else {
+          bctx.fillStyle = map.bgColor;
+          bctx.fillRect(0, 0, this.worldWidth, this.worldHeight);
+        }
+        // 어두운 오버레이로 게임 톤(다크)과 어우러지게
+        bctx.fillStyle = 'rgba(0,0,0,0.30)';
+        bctx.fillRect(0, 0, this.worldWidth, this.worldHeight);
+      } else if (map.bgImage) {
         if (!this._bgImg || this._bgImg._src !== map.bgImage) {
           const im = new Image();
           im._src = map.bgImage;
@@ -707,8 +766,13 @@ class GameEngine {
       for (let i=1;i<path.length;i++) ctx.lineTo(path[i].x,path[i].y);
       ctx.stroke(); ctx.restore();
 
-      // 경로 본체
-      ctx.save(); ctx.strokeStyle=map.pathColor;
+      // 경로 본체 - v27-58: 텍스처(흙/벽돌) 있으면 패턴으로, 없으면 기존 단색
+      let pathFill = map.pathColor;
+      if (map.pathTextures) {
+        const ppat = this._getMosaicPattern(ctx, map.name + '_path', map.pathTextures, map.pathTileSize || 40);
+        if (ppat) pathFill = ppat;
+      }
+      ctx.save(); ctx.strokeStyle=pathFill;
       ctx.lineWidth=pw; ctx.lineCap='round'; ctx.lineJoin='round';
       ctx.beginPath(); ctx.moveTo(path[0].x,path[0].y);
       for (let i=1;i<path.length;i++) ctx.lineTo(path[i].x,path[i].y);

@@ -5,9 +5,14 @@ const MapDefs = {
   // ===== 1. 태초마을 숲 =====
   forest: {
     name:'태초마을 숲',
-    bgColor:'#2a5418', bgImage:'assets/bg_forest.jpg',
+    bgColor:'#2a5418',
+    // v27-58: 실사 잔디/흙길 텍스처 (Cethiel, CC0 - opengameart.org)
+    bgTextures:['assets/textures/grass_01.jpg','assets/textures/grass_02.jpg','assets/textures/grass_03.jpg','assets/textures/grass_04.jpg'],
+    bgTileSize:280,
+    pathTextures:['assets/textures/dirt_02.jpg','assets/textures/dirt_03.jpg'],
+    pathTileSize:44,
     pathColor:'#c8a44a', pathColorDark:'#7a5510',
-    pathHighlight:'rgba(255,235,160,0.22)',
+    pathHighlight:'rgba(255,235,160,0.16)',
     pathArrow:'rgba(255,210,80,0.32)', pathWidth:20,
 
     // 순환 트랙 (스타 랜덤디펜스 스타일): 적이 사각 트랙을 계속 돌며,
@@ -66,10 +71,8 @@ const MapDefs = {
     },
 
     drawBg(ctx, w, h) {
-      const g = ctx.createLinearGradient(0,0,0,h);
-      g.addColorStop(0,'#1a4010'); g.addColorStop(0.5,'#2d5c1a'); g.addColorStop(1,'#1a3a0e');
-      ctx.fillStyle=g; ctx.fillRect(0,0,w,h);
-      // 풀밭 패치
+      // v27-58: 바닥은 이제 실사 잔디 텍스처(bgTextures)가 채움. 여기선 음영 패치/장식만 추가.
+      // 풀밭 패치 (짙은 그림자로 질감에 입체감 추가)
       for(let i=0;i<50;i++){
         const rx=(Math.sin(i*137.5)*0.5+0.5)*w, ry=(Math.sin(i*97.3)*0.5+0.5)*h;
         const r=25+Math.sin(i*43.7)*15;
@@ -101,9 +104,14 @@ const MapDefs = {
   // ===== 2. 홍련체육관 도시 =====
   city: {
     name:'홍련체육관 도시',
-    bgColor:'#180600', bgImage:'assets/bg_city.jpg',
+    bgColor:'#180600',
+    // v27-58: 실사 용암/벽돌 텍스처 (CC0 - opengameart.org)
+    bgTextures:['assets/textures/lava_01.jpg','assets/textures/lava_02.jpg'],
+    bgTileSize:420,
+    pathTextures:['assets/textures/brick_02.jpg','assets/textures/brick_03.jpg'],
+    pathTileSize:46,
     pathColor:'#6b4428', pathColorDark:'#3a1a08',
-    pathHighlight:'rgba(255,120,40,0.18)',
+    pathHighlight:'rgba(255,120,40,0.14)',
     pathArrow:'rgba(255,140,60,0.32)', pathWidth:20,
 
     // v27-3: 존 전환해도 타워 위치가 깨지지 않도록 3맵 모두 동일한 트랙/슬롯 좌표 사용 (숲맵 기준 통일)
@@ -158,10 +166,7 @@ const MapDefs = {
     },
 
     drawBg(ctx, w, h) {
-      const g=ctx.createLinearGradient(0,0,0,h);
-      g.addColorStop(0,'#0f0400'); g.addColorStop(0.5,'#200800'); g.addColorStop(1,'#100300');
-      ctx.fillStyle=g; ctx.fillRect(0,0,w,h);
-      // 용암 웅덩이
+      // v27-58: 바닥은 이제 실사 용암 텍스처(bgTextures)가 채움. 여기선 밝은 글로우 웅덩이만 덧그려서 포인트를 줌.
       const pools=[[0.10,0.32,55,28],[0.38,0.55,70,32],[0.60,0.30,60,26],[0.80,0.62,65,30],[0.22,0.78,50,24]];
       for(const [rx,ry,rw,rh] of pools){
         const lg=ctx.createRadialGradient(rx*w,ry*h,2,rx*w,ry*h,rw);
@@ -184,9 +189,13 @@ const MapDefs = {
   // ===== 3. 라벤더 동굴 =====
   cave: {
     name:'라벤더 동굴',
-    bgColor:'#050210', bgImage:'assets/bg_cave.jpg',
+    bgColor:'#050210',
+    // v27-58: 실사 동굴 배경(커버 방식) + 돌길 텍스처 (CC0 - opengameart.org)
+    bgImage:'assets/textures/cave_bg.jpg',
+    pathTextures:['assets/textures/ground_01.jpg','assets/textures/ground_02.jpg'],
+    pathTileSize:48,
     pathColor:'#3e2860', pathColorDark:'#1e1030',
-    pathHighlight:'rgba(180,120,255,0.18)',
+    pathHighlight:'rgba(180,120,255,0.16)',
     pathArrow:'rgba(160,120,255,0.28)', pathWidth:20,
     ghostBonus:0.30,
 
@@ -242,9 +251,9 @@ const MapDefs = {
     },
 
     drawBg(ctx, w, h) {
-      const g=ctx.createRadialGradient(w*0.5,h*0.5,0,w*0.5,h*0.5,w*0.9);
-      g.addColorStop(0,'#0d0528'); g.addColorStop(0.6,'#07021a'); g.addColorStop(1,'#020108');
-      ctx.fillStyle=g; ctx.fillRect(0,0,w,h);
+      // v27-58: 바닥/배경은 이제 실사 동굴 사진(bgImage)이 채움. 불투명 그라디언트는 제거하고
+      // 살짝 어두운 톤만 얹어서(반투명) 사진 위에 별/성운을 자연스럽게 겹침.
+      ctx.fillStyle='rgba(5,2,16,0.28)'; ctx.fillRect(0,0,w,h);
       // 별
       ctx.save();
       for(let i=0;i<120;i++){
