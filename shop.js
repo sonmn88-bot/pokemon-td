@@ -4,7 +4,7 @@
 function shopItemCost(item, engine) {
   if (!item.scaling) return item.cost;
   const n = (engine._shopBuyCount && engine._shopBuyCount[item.key]) || 0;
-  return Math.round(item.cost * Math.pow(1.4, n));
+  return Math.round(item.cost * Math.pow(1.28, n)); // v27-46: 1.4→1.28 (요청8: 슬롯 늘려서 합체 수월하게)
 }
 
 const ShopItems = [
@@ -20,30 +20,30 @@ const ShopItems = [
         engine.addGold(target.reward);
         engine.spawnFloatingText('⚪ 포획!', target.x, target.y - 20, '#fff');
       } else {
-        engine.spawnFloatingText('대상 없음', engine.width/2, engine.height/2, '#aaa');
+        engine.spawnFloatingText('대상 없음', engine.camera.x, engine.camera.y, '#aaa');
       }
     }
   },
   {
-    key: 'blizzard', name: '블리자드', emoji: '❄️', cost: 110,
-    desc: '필드의 모든 적 3초간 50% 슬로우 (엔드리스 필드누적 대응용)',
+    key: 'evacuate', name: '대피시키기', emoji: '🌀', cost: 140,
+    desc: '필드에서 체력이 가장 낮은 적 20%를 즉시 처치 (필드 정리용)',
     buy(engine) {
-      let n = 0;
-      for (const e of engine.enemies) {
-        if (e.dead || e.reachedEnd) continue;
-        if (e.applyStatus) e.applyStatus('slow', 3, 0.5);
-        else { e.slowed = 3; e.slowFactor = 0.5; }
-        n++;
-      }
-      if (window.AoeBurst) engine.particles.push(new AoeBurst(engine.width/2, engine.height/2, Math.max(engine.width, engine.height), '#80deea'));
-      engine.spawnFloatingText(`❄️ 블리자드! 적 ${n}마리 슬로우`, engine.width/2, 80, '#80deea');
+      // v27-46: 거의 안 쓰이던 블리자드(슬로우) 대체 - 이 게임의 핵심 압박인 "필드 누적"에
+      // 직접 대응하는 아이템으로 교체 (요청10 - 쓸만한 상점 아이템 브레인스토밍)
+      const alive = engine.enemies.filter(e => !e.dead && !e.reachedEnd && !e.isBoss);
+      if (!alive.length) { engine.spawnFloatingText('대피시킬 적이 없습니다', engine.camera.x, engine.camera.y - (engine.height/2 - 80)/engine.camera.zoom, '#888'); return; }
+      alive.sort((a, b) => (a.hp / a.maxHp) - (b.hp / b.maxHp)); // 체력비율 낮은 순
+      const n = Math.max(1, Math.round(alive.length * 0.2));
+      for (let i = 0; i < n; i++) alive[i].takeDamage(alive[i].maxHp * 10, 'special');
+      if (window.AoeBurst) engine.particles.push(new AoeBurst(engine.camera.x, engine.camera.y, Math.max(engine.width, engine.height)*0.6/engine.camera.zoom, '#9575cd'));
+      engine.spawnFloatingText(`🌀 대피 완료! ${n}마리 정리`, engine.camera.x, engine.camera.y - (engine.height/2 - 80)/engine.camera.zoom, '#9575cd');
     }
   },
   {
     key: 'revive', name: '확장 부지', emoji: '🏗️', cost: 450, scaling: true,
     desc: '트랙 안쪽에 빈 배치슬롯 1개 즉시 추가 (살수록 비싸짐)',
     buy(engine) {
-      const w = engine.width, h = engine.height;
+      const w = engine.worldWidth, h = engine.worldHeight; // v27-47: 카메라 시스템 도입으로 월드 크기 기준
       // v27-36: 5단 지그재그 맵 좌표에 맞춰 탐색범위 재조정
       const mx = w*0.15, my = h*0.20, innerGap = w*0.30;
       const top = my + h*0.03, bot = h - my - h*0.03;
@@ -79,7 +79,7 @@ const ShopItems = [
         engine.towerSlots.push({ x: best.x, y: best.y, occupied: false, tower: null });
         engine.spawnFloatingText('🏗️ 새 슬롯 확보!', best.x, best.y, '#06d6a0');
       } else {
-        engine.spawnFloatingText('공간이 부족합니다', engine.width/2, 80, '#ff6b6b');
+        engine.spawnFloatingText('공간이 부족합니다', engine.camera.x, engine.camera.y - (engine.height/2 - 80)/engine.camera.zoom, '#ff6b6b');
         return false; // v27-8 버그수정: 실패해도 return false가 없어서 골드가 환불 안 되고 그냥 나갔던 문제
       }
     }
@@ -91,7 +91,7 @@ const ShopItems = [
       // v27 fix: 아무 등급이나 무한정 되던 걸 3성(epic) 한정 + 1회용으로 변경 (안 그러면 도배해서 다 5성 만들어버림)
       const gachaSlots = engine.towerSlots.filter(s => s.occupied && s.tower?._gachaId && s.tower.def?.grade === 'epic');
       if (!gachaSlots.length) {
-        engine.spawnFloatingText('3성(에픽) 타워가 없습니다', engine.width/2, 80, '#aaa');
+        engine.spawnFloatingText('3성(에픽) 타워가 없습니다', engine.camera.x, engine.camera.y - (engine.height/2 - 80)/engine.camera.zoom, '#aaa');
         return false; // 구매 취소 (골드 안 깎임, 1회 소모 안 함)
       }
       const slot = gachaSlots[Math.floor(Math.random() * gachaSlots.length)];
@@ -117,33 +117,36 @@ const ShopItems = [
 
 // ===== 글로벌 스펠 =====
 const GlobalSpells = {
-  pokecenter: {
-    name: '포켓몬센터', emoji: '🏥', cooldown: 150,
-    desc: '모든 타워 6초간 데미지 +18%',
+  // v27-46: 포켓몬센터(데미지버프)는 영웅스킬 "행복의알"과 정확히 겹치는 효과라 의미가 옅었음.
+  // "훈련소"로 교체 - 공속을 올려서 데미지 버프와는 다른 결의 효과, 여전히 영웅스킬과 안 겹침.
+  trainingCamp: {
+    name: '훈련소', emoji: '🏋️', cooldown: 150,
+    desc: '모든 타워 6초간 공격속도 +25%',
     cast(engine) {
-      // v27: 라이프 회복 제거 (필드누적 게임오버로 바뀌어 라이프가 의미없어짐)
-      // v27-29 버그수정: buffDmgMul(타입강화용 영구필드)에 직접 곱해서 재사용할 때마다 데미지가
-      // 영구누적되고 있었음 - 전용 임시배율 필드로 교체해서 6초 후 확실히 원상복귀되도록 함
       for (const t of engine.towers) {
-        t._tempDmgMul = 1.18;
-        t._pokecenterTimer = 6;
+        t._tempSpeedMul = 1.25;
+        t._pokecenterTimer = 6; // 기존 만료처리 로직 재사용 (이름은 유지, 내용은 공용 타이머)
       }
-      engine.spawnFloatingText('🏥 포켓몬센터! 전체 데미지+18%', engine.width/2, 80, '#06d6a0');
+      engine.spawnFloatingText('🏋️ 훈련소! 전체 공속+25%', engine.camera.x, engine.camera.y - (engine.height/2 - 80)/engine.camera.zoom, '#06d6a0');
     }
   },
-  masterball: {
-    name: '마스터볼', emoji: '🟣', cooldown: 100,
-    desc: '전체 적 즉시 피해 + 3초 슬로우',
+  // v27-46: 마스터볼(전체 즉발피해+슬로우)은 영웅 궁극기들과 데미지 성격이 겹쳤음.
+  // "그물망 함정"으로 교체 - 데미지 없이 강력한 스턴만 걸어서, 그 사이 타워들이 자유롭게 몰아치게
+  // 해주는 순수 유틸 스킬로 차별화.
+  netTrap: {
+    name: '그물망 함정', emoji: '🕸️', cooldown: 100,
+    desc: '전체 적 2.5초 확정 스턴 (데미지 없음)',
     cast(engine) {
+      let n = 0;
       for (const e of engine.enemies) {
-        if (e.dead || e.reachedEnd) continue;
-        e.takeDamage(48, 'special');
-        e.applyStatus('slow', 3, 0.4);
+        if (e.dead || e.reachedEnd || e.isBoss) continue; // 보스는 스턴 면역(밸런스)
+        e.applyStatus('stun', 2.5, 0);
+        n++;
       }
       if (window.AoeBurst)
-        engine.particles.push(new AoeBurst(engine.width/2, engine.height/2,
-          Math.max(engine.width, engine.height), '#7c4dff'));
-      engine.spawnFloatingText('🟣 마스터볼! 전체 피해+슬로우', engine.width/2, 80, '#7c4dff');
+        engine.particles.push(new AoeBurst(engine.camera.x, engine.camera.y,
+          Math.max(engine.width, engine.height)/engine.camera.zoom, '#7c4dff'));
+      engine.spawnFloatingText(`🕸️ 그물망 함정! ${n}마리 스턴`, engine.camera.x, engine.camera.y - (engine.height/2 - 80)/engine.camera.zoom, '#7c4dff');
     }
   },
 };

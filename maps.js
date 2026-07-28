@@ -20,7 +20,7 @@ const MapDefs = {
     getPaths(w, h) {
       const mx = w*0.15, my = h*0.20;
       const innerGap = w*0.30; // 지그재그가 왼쪽에서 멈추는 지점 (왼쪽 가장자리는 복귀 통로로 남김)
-      const FOLDS = 4; // 내부 왕복 횟수 (밴드는 FOLDS+1개 생김)
+      const FOLDS = 6; // v27-47: 카메라로 넓게 볼 수 있게 되어 4→6단으로 확장 (요청A - 월드가 커진 만큼 더 꼬불꼬불하게)
       const pts = [{x:mx, y:my}, {x:w-mx, y:my}];
       let curX = w-mx;
       for (let i = 1; i <= FOLDS; i++) {
@@ -42,7 +42,7 @@ const MapDefs = {
       const slots = [];
       const mx = w*0.15, my = h*0.20;
       const innerGap = w*0.30;
-      const FOLDS = 4; // getPaths와 동일해야 밴드가 맞물림
+      const FOLDS = 6; // v27-47: getPaths와 동일해야 밴드가 맞물림 (4→6단 확장)
       // 밴드 경계 y좌표들 (getPaths의 꺾이는 지점과 동일하게 계산)
       const bounds = [my];
       for (let i = 1; i <= FOLDS; i++) bounds.push(my + (h - 2*my) * (i / (FOLDS + 1)));
@@ -112,7 +112,7 @@ const MapDefs = {
     getPaths(w, h) {
       const mx = w*0.15, my = h*0.20;
       const innerGap = w*0.30; // 지그재그가 왼쪽에서 멈추는 지점 (왼쪽 가장자리는 복귀 통로로 남김)
-      const FOLDS = 4; // 내부 왕복 횟수 (밴드는 FOLDS+1개 생김)
+      const FOLDS = 6; // v27-47: 카메라로 넓게 볼 수 있게 되어 4→6단으로 확장 (요청A - 월드가 커진 만큼 더 꼬불꼬불하게)
       const pts = [{x:mx, y:my}, {x:w-mx, y:my}];
       let curX = w-mx;
       for (let i = 1; i <= FOLDS; i++) {
@@ -134,7 +134,7 @@ const MapDefs = {
       const slots = [];
       const mx = w*0.15, my = h*0.20;
       const innerGap = w*0.30;
-      const FOLDS = 4; // getPaths와 동일해야 밴드가 맞물림
+      const FOLDS = 6; // v27-47: getPaths와 동일해야 밴드가 맞물림 (4→6단 확장)
       // 밴드 경계 y좌표들 (getPaths의 꺾이는 지점과 동일하게 계산)
       const bounds = [my];
       for (let i = 1; i <= FOLDS; i++) bounds.push(my + (h - 2*my) * (i / (FOLDS + 1)));
@@ -196,7 +196,7 @@ const MapDefs = {
     getPaths(w, h) {
       const mx = w*0.15, my = h*0.20;
       const innerGap = w*0.30; // 지그재그가 왼쪽에서 멈추는 지점 (왼쪽 가장자리는 복귀 통로로 남김)
-      const FOLDS = 4; // 내부 왕복 횟수 (밴드는 FOLDS+1개 생김)
+      const FOLDS = 6; // v27-47: 카메라로 넓게 볼 수 있게 되어 4→6단으로 확장 (요청A - 월드가 커진 만큼 더 꼬불꼬불하게)
       const pts = [{x:mx, y:my}, {x:w-mx, y:my}];
       let curX = w-mx;
       for (let i = 1; i <= FOLDS; i++) {
@@ -218,7 +218,7 @@ const MapDefs = {
       const slots = [];
       const mx = w*0.15, my = h*0.20;
       const innerGap = w*0.30;
-      const FOLDS = 4; // getPaths와 동일해야 밴드가 맞물림
+      const FOLDS = 6; // v27-47: getPaths와 동일해야 밴드가 맞물림 (4→6단 확장)
       // 밴드 경계 y좌표들 (getPaths의 꺾이는 지점과 동일하게 계산)
       const bounds = [my];
       for (let i = 1; i <= FOLDS; i++) bounds.push(my + (h - 2*my) * (i / (FOLDS + 1)));

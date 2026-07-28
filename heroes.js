@@ -73,11 +73,11 @@ const SkillTrees = {
       {id:'range1',  name:'에어리어',  emoji:'🔵', desc:'타워 전체 사거리 +8%p',   cost:1, requires:null, col:1, row:0, type:'passiveRange', value:0.08},
       {id:'slow1',   name:'슬로우빔', emoji:'🐌', desc:'슬로우 효과 -10%p 강화',   cost:1, requires:null, col:2, row:0, type:'slowBoost', value:0.10},
       // Row 1
-      {id:'barrier2',name:'배리어',   emoji:'🛡️', desc:'라이프 손실 20% 확률 무효',cost:1, requires:'psycho1', col:0, row:1, type:'barrier', value:0.20},
+      {id:'barrier2',name:'정신방벽', emoji:'🛡️', desc:'공격력 +12%',cost:1, requires:'psycho1', col:0, row:1, type:'atkDmg', value:0.12},
       {id:'clone2',  name:'분신',     emoji:'👥', desc:'기본공격 35% 확률 2발 발사',cost:1, requires:'range1',  col:1, row:1, type:'doubleShot', value:0.35},
       {id:'mind2',   name:'마인드블라스트',emoji:'💫',desc:'사이킥 범위 +60%',     cost:1, requires:'slow1',   col:2, row:1, type:'skillRange', value:0.60},
       // Row 2
-      {id:'heal3',   name:'힐링웨이브',emoji:'💚',desc:'웨이브 클리어시 라이프 +2', cost:2, requires:'barrier2', col:0, row:2, type:'waveHeal', value:2},
+      {id:'heal3',   name:'회복의파동',emoji:'💚',desc:'스킬 쿨다운 -12%', cost:2, requires:'barrier2', col:0, row:2, type:'cdReduce', value:0.12},
       {id:'transform3',name:'변신+',  emoji:'✨', desc:'변신 스킬 무력화 +3초',    cost:2, requires:'clone2',   col:1, row:2, type:'skillBoost', skillIdx:1, value:3},
       {id:'omni3',   name:'전지전능', emoji:'🌟', desc:'타워 전체 데미지 +12%',     cost:2, requires:'mind2',    col:2, row:2, type:'globalDmg', value:0.12},
       // Row 3
@@ -97,7 +97,7 @@ const SkillTrees = {
       // Row 1
       {id:'jackpot2',name:'잭팟',     emoji:'🎰', desc:'킬시 8% 확률 추가 +15g',  cost:1, requires:'luck1',  col:0, row:1, type:'killGold', value:{chance:0.08, amount:15}},
       {id:'egg2',    name:'행복의알', emoji:'🥚', desc:'메트로놈 쿨다운 -5초',     cost:1, requires:'fairy1', col:1, row:1, type:'skillCd', skillIdx:0, value:-5},
-      {id:'wish2',   name:'소원별',   emoji:'🌠', desc:'라이프 최대 +5',           cost:1, requires:'cd1',    col:2, row:1, type:'maxLives', value:5},
+      {id:'wish2',   name:'소원별',   emoji:'🌠', desc:'사거리 +10%',           cost:1, requires:'cd1',    col:2, row:1, type:'atkRange', value:0.10},
       // Row 2
       {id:'charm3',  name:'매혹',     emoji:'💕', desc:'주변 적 이동속도 영구-10%',cost:2, requires:'jackpot2',col:0, row:2, type:'passiveSlow', value:0.10},
       {id:'dazzle3', name:'눈부심',   emoji:'✨', desc:'행복의알 데미지 이펙트 추가',cost:2, requires:'egg2',   col:1, row:2, type:'eggBurst', value:1},
@@ -121,10 +121,10 @@ SkillTrees.charizard = {
     {id:'cz_cd2',   name:'속공',     emoji:'⏱️', desc:'모든 스킬 쿨다운 -20%', cost:1, requires:'cz_spd1', col:2, row:1, type:'cdReduce', value:0.20},
     {id:'cz_glb3',  name:'투지',     emoji:'💪', desc:'타워 전체 데미지 +12%',  cost:2, requires:'cz_crit2', col:0, row:2, type:'globalDmg', value:0.12},
     {id:'cz_multi3',name:'멀티스케일',emoji:'🛡️',desc:'기본공격 3타겟 동시 공격',cost:2, requires:'cz_aoe2', col:1, row:2, type:'multiTarget', value:3},
-    {id:'cz_life3', name:'생명력',   emoji:'❤️', desc:'라이프 최대 +5',        cost:2, requires:'cz_cd2', col:2, row:2, type:'maxLives', value:5},
+    {id:'cz_life3', name:'맹화',   emoji:'🔥', desc:'공격력 +14%',        cost:2, requires:'cz_cd2', col:2, row:2, type:'atkDmg', value:0.14},
     {id:'cz_mega4', name:'메가진화X',emoji:'⭐', desc:'모든 스킬 쿨다운 -40%',  cost:2, requires:'cz_glb3', col:0, row:3, type:'cdReduce', value:0.40},
     {id:'cz_king4', name:'불꽃의왕', emoji:'👑', desc:'기본공격 데미지 +30%',   cost:2, requires:'cz_multi3', col:1, row:3, type:'atkDmg', value:0.30},
-    {id:'cz_tank4', name:'용의보호막',emoji:'🐉',desc:'라이프 최대 +8',        cost:2, requires:'cz_life3', col:2, row:3, type:'maxLives', value:8},
+    {id:'cz_tank4', name:'용의격노',emoji:'🐉',desc:'화염 타워 데미지 +10%',        cost:2, requires:'cz_life3', col:2, row:3, type:'globalDmg', value:0.10},
   ]
 };
 
@@ -136,13 +136,13 @@ SkillTrees.blastoise = {
     {id:'bs_slow1', name:'급류',     emoji:'🌊', desc:'타워 전체 슬로우 효과 강화',cost:1, requires:null, col:2, row:0, type:'slowBoost', value:0.10},
     {id:'bs_range2',name:'수압포',   emoji:'🔵', desc:'타워 전체 사거리 +8%p',   cost:1, requires:'bs_dmg1', col:0, row:1, type:'passiveRange', value:0.08},
     {id:'bs_skr2',  name:'해일',     emoji:'🌊', desc:'하이드로펌프 범위 +55%',  cost:1, requires:'bs_rng1', col:1, row:1, type:'skillRange', value:0.55},
-    {id:'bs_life2', name:'등껍질',   emoji:'🛡️', desc:'라이프 최대 +5',        cost:1, requires:'bs_slow1', col:2, row:1, type:'maxLives', value:5},
+    {id:'bs_life2', name:'등껍질',   emoji:'🛡️', desc:'공격력 +12%',        cost:1, requires:'bs_slow1', col:2, row:1, type:'atkDmg', value:0.12},
     {id:'bs_glb3',  name:'격려',     emoji:'📣', desc:'타워 전체 데미지 +12%',   cost:2, requires:'bs_range2', col:0, row:2, type:'globalDmg', value:0.12},
     {id:'bs_cd3',   name:'재정비',   emoji:'⏱️', desc:'모든 스킬 쿨다운 -25%',  cost:2, requires:'bs_skr2', col:1, row:2, type:'cdReduce', value:0.25},
-    {id:'bs_wheal3',name:'치유의물', emoji:'💚', desc:'웨이브 클리어시 라이프 +2',cost:2, requires:'bs_life2', col:2, row:2, type:'waveHeal', value:2},
+    {id:'bs_wheal3',name:'급류',   emoji:'💧', desc:'스킬 쿨다운 -12%',cost:2, requires:'bs_life2', col:2, row:2, type:'cdReduce', value:0.12},
     {id:'bs_mega4', name:'메가진화X',emoji:'⭐', desc:'모든 스킬 쿨다운 -40%',   cost:2, requires:'bs_glb3', col:0, row:3, type:'cdReduce', value:0.40},
     {id:'bs_king4', name:'심해의왕', emoji:'👑', desc:'기본공격 데미지 +30%',    cost:2, requires:'bs_cd3', col:1, row:3, type:'atkDmg', value:0.30},
-    {id:'bs_tank4', name:'철벽방어', emoji:'🏰', desc:'라이프 최대 +8',         cost:2, requires:'bs_wheal3', col:2, row:3, type:'maxLives', value:8},
+    {id:'bs_tank4', name:'철벽방어', emoji:'🏰', desc:'물 타워 데미지 +10%',         cost:2, requires:'bs_wheal3', col:2, row:3, type:'globalDmg', value:0.10},
   ]
 };
 
@@ -157,10 +157,10 @@ SkillTrees.eevee = {
     {id:'ev_cd2',   name:'순응',     emoji:'⏱️', desc:'모든 스킬 쿨다운 -20%',   cost:1, requires:'ev_spd1', col:2, row:1, type:'cdReduce', value:0.20},
     {id:'ev_glb3',  name:'유대',     emoji:'💗', desc:'타워 전체 데미지 +10%',    cost:2, requires:'ev_crit2', col:0, row:2, type:'globalDmg', value:0.10},
     {id:'ev_multi3',name:'다재다능', emoji:'🌈', desc:'기본공격 2타겟 동시 공격', cost:2, requires:'ev_skr2', col:1, row:2, type:'multiTarget', value:2},
-    {id:'ev_life3', name:'생명력',   emoji:'❤️', desc:'라이프 최대 +5',          cost:2, requires:'ev_cd2', col:2, row:2, type:'maxLives', value:5},
+    {id:'ev_life3', name:'적응력',   emoji:'🌈', desc:'공격력 +14%',          cost:2, requires:'ev_cd2', col:2, row:2, type:'atkDmg', value:0.14},
     {id:'ev_final4',name:'진화의빛', emoji:'✨', desc:'모든 스킬 쿨다운 -35%',    cost:2, requires:'ev_glb3', col:0, row:3, type:'cdReduce', value:0.35},
     {id:'ev_king4', name:'베테랑',   emoji:'👑', desc:'기본공격 데미지 +25%',     cost:2, requires:'ev_multi3', col:1, row:3, type:'atkDmg', value:0.25},
-    {id:'ev_tank4', name:'수호본능', emoji:'🛡️', desc:'라이프 최대 +8',          cost:2, requires:'ev_life3', col:2, row:3, type:'maxLives', value:8},
+    {id:'ev_tank4', name:'수호본능', emoji:'🛡️', desc:'전체 타워 데미지 +8%',          cost:2, requires:'ev_life3', col:2, row:3, type:'globalDmg', value:0.08},
   ]
 };
 
@@ -278,8 +278,8 @@ const HeroDefs = {
       { id:'togetic', name:'토게틱', color:'#f8bbd0', statMul:1.20 },
     ]},
     attack:{
-      baseRange:112, baseDamage:7, baseFireRate:1.0,
-      rangePerLevel:6, damagePerLevel:2,
+      baseRange:112, baseDamage:9, baseFireRate:1.0,
+      rangePerLevel:6, damagePerLevel:4, // v27-46: damagePerLevel 2→4 (요청5: 성장이 너무 약했음)
       projColor:'#fff59d', projEmoji:'✨', dmgType:'special',
     },
     passiveApply(engine, hero) {
@@ -408,16 +408,17 @@ HeroDefs.blastoise = {
     },
     {
       name:'쉘아머', emoji:'🛡️', baseCooldown:40,
-      desc:'라이프 +4 회복 + 주변 적 2.5초 스턴',
+      desc:'주변 적에게 피해 + 2.5초 스턴',
       cast(hero, engine) {
-        engine.lives = Math.min(engine.lives + 4, 99);
-        engine.onLivesChange && engine.onLivesChange(engine.lives);
         const r = 130 + hero.level * 8;
         for (const e of engine.enemies) {
           if (e.dead||e.reachedEnd) continue;
-          if (Math.hypot(e.x-hero.x,e.y-hero.y) <= r) e.applyStatus('stun', 2.5, 0);
+          if (Math.hypot(e.x-hero.x,e.y-hero.y) <= r) {
+            e.takeDamage(40 + hero.level * 6, 'special'); // v27-46: 죽어있던 라이프회복 효과를 데미지로 교체
+            e.applyStatus('stun', 2.5, 0);
+          }
         }
-        engine.spawnFloatingText('🛡️쉘아머! 라이프+4', hero.x, hero.y-32, '#81d4fa');
+        engine.spawnFloatingText('🛡️쉘아머!', hero.x, hero.y-32, '#81d4fa');
       }
     },
   ],

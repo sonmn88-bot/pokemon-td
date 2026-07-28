@@ -38,6 +38,21 @@ Object.assign(App.prototype, {
       scroll.appendChild(btn);
     }
 
+    // v27-45: 합체 후보 힌트 (요청1) - 현재 2개 보유중인 타워가 있으면 표시해서 "한 개 더 뽑으면 합체"를 미리 알림
+    if (this.engine) {
+      const counts = {};
+      for (const s of this.engine.towerSlots) {
+        if (s.occupied && s.tower?._gachaId) counts[s.tower._gachaId] = (counts[s.tower._gachaId] || 0) + 1;
+      }
+      const closeToMerge = Object.entries(counts).filter(([id, c]) => c === 2).map(([id]) => window.GachaTowerDefs?.[id]?.name).filter(Boolean);
+      if (closeToMerge.length > 0) {
+        const hint = document.createElement('div');
+        hint.style.cssText = 'display:flex;align-items:center;padding:0 8px;font-size:10px;color:#06d6a0;white-space:nowrap;flex-shrink:0;';
+        hint.textContent = `🔗 ${closeToMerge.slice(0,3).join(', ')} 1개 더 뽑으면 합체!`;
+        scroll.appendChild(hint);
+      }
+    }
+
     // 구분선
     const sep = document.createElement('div');
     sep.style.cssText = 'width:1px;background:rgba(255,255,255,0.1);margin:4px 2px;flex-shrink:0';
@@ -352,7 +367,9 @@ Object.assign(App.prototype, {
         <span style="font-size:8px;color:#ffd60a">💰${nextUpg.cost}</span>
         <span style="font-size:7px;color:#888">${dotsStr}</span>
       `;
-      btn.title = (showBadge && typeKey === topType ? '👑 가장 많이 투자한 속성\n' : '') + `${nextUpg.label}: ${nextUpg.cost}g`;
+      const buffLabel = {dmg:'데미지', range:'사거리', speed:'공속', slow:'슬로우', poison:'독', chain:'연쇄', target:'타겟수', all:'전체'}[nextUpg.buff] || nextUpg.buff;
+      const valStr = typeof nextUpg.val === 'number' && nextUpg.val < 1 ? `+${Math.round(nextUpg.val*100)}%` : `+${nextUpg.val}`;
+      btn.title = (showBadge && typeKey === topType ? '👑 가장 많이 투자한 속성\n' : '') + `${nextUpg.label}: 💰${nextUpg.cost} (${buffLabel} ${valStr})`;
       btn.addEventListener('click', () => {
         if (!this.engine) return;
         if (window.applyTypeUpgrade(typeKey, this.engine)) {

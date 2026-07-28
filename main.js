@@ -21,14 +21,17 @@ const BOSS_POOL = ['lugia', 'mewtwo'];
 // v27-3: 보스 난이도 추가 상향 - 기본 배율을 더 키우고, 소환 시점 웨이브에 비례해서도 더 강해지게
 // (10라운드째에도 5단계까지 다 잡히던 문제 - 고정배율만으론 후반에 상대적으로 계속 약해지므로 웨이브연동 필수)
 const BOSS_TIERS = [
-  { tier: 1, type: 'gyarados', label: '갸라도스',   hpMul: 18, rewardMul: 30,  minWave: 1  }, // v27-42: 보상 3배 (쿨다운도 3배로 늘렸으니 한번 잡을때 확실하게)
-  { tier: 2, type: 'dragonite', label: '망나뇽',    hpMul: 28, rewardMul: 54, minWave: 15 },
-  { tier: 3, type: 'lugia',    label: '루기아',      hpMul: 42, rewardMul: 84, minWave: 35 },
-  { tier: 4, type: 'mewtwo',   label: '뮤츠',        hpMul: 60, rewardMul: 126, minWave: 55 },
-  { tier: 5, type: 'mewtwo',   label: '뮤츠(각성)',  hpMul: 95, rewardMul: 186, minWave: 75 },
+  { tier: 1, type: 'gyarados', label: '갸라도스',   hpMul: 1.4, rewardMul: 42,  minWave: 1  }, // v27-46: 잡기 어려워진 만큼 보상 추가 인상
+  { tier: 2, type: 'dragonite', label: '망나뇽',    hpMul: 2.0, rewardMul: 75, minWave: 15 },
+  { tier: 3, type: 'lugia',    label: '루기아',      hpMul: 2.8, rewardMul: 115, minWave: 35 },
+  { tier: 4, type: 'mewtwo',   label: '뮤츠',        hpMul: 3.8, rewardMul: 170, minWave: 55 },
+  { tier: 5, type: 'mewtwo',   label: '뮤츠(각성)',  hpMul: 5.2, rewardMul: 250, minWave: 75 },
 ];
 const BOSS_SUMMON_COOLDOWN = 180; // v27-42: 60→180(3배) - 스킵 대비 정면승부 보상을 늘리기 위해 쿨다운도 늘림
-function bossWaveScaleMul(wave) { return 1 + Math.max(0, wave) * 0.22; } // v27-28: 최소웨이브 제한 추가와 함께 계수도 재차 상향 (요청: 여전히 너무 쉬움)
+// v27-46 버그수정: 이전엔 (티어배율)×(웨이브배율) 형태로 곱연산되어 있어서 지수적으로 폭주하고 있었음
+// (예: 루기아가 웨이브35에 도달 가능한 시점에 이미 체력 90만+ 였음 - "루기아부터 거의 못 잡는다"는
+// 지적의 원인). 곱연산 대신 통제된 덧셈식 공식으로 전면 재설계.
+function bossWaveScaleMul(wave) { return 3 + Math.max(0, wave) * 0.15; }
 
 // v27-4: 존별 적 타입 편향 (item17) - 존마다 특정 타입이 더 자주 나와서 전략적 예측/대응 여지를 줌
 const ZONE_TYPE_BIAS = ['grass', 'psychic', 'fire']; // 숲=풀 위주 / 동굴=에스퍼 위주 / 도시=불 위주
@@ -88,9 +91,9 @@ function generateWave(n) {
   } else if (n % 30 === 0) {
     // v27-32 버그수정: 존보스가 소환보스와 달리 별도 체력배율이 전혀 없어서 일반몹 수준(예: 갸라도스
     // 기본체력 489)으로 취급되고 있었음 - "초반 보스가 너무 빨리 죽는다"는 문제의 진짜 원인이었을 가능성 높음
-    arr.push({ type: BOSS_POOL[Math.floor(Math.random() * BOSS_POOL.length)], delay: lastDelay + 4, bossTier: true, hpMul: 12 + n * 0.4, rewardMul: 4 }); // v27-33: 3초컷 문제로 대폭 재상향
+    arr.push({ type: BOSS_POOL[Math.floor(Math.random() * BOSS_POOL.length)], delay: lastDelay + 4, bossTier: true, hpMul: 12 + n * 0.4, rewardMul: 6 }); // v27-46: 보상 추가 인상
   } else if (n % 10 === 0) {
-    arr.push({ type: MINIBOSS_POOL[Math.floor(Math.random() * MINIBOSS_POOL.length)], delay: lastDelay + 4, bossTier: true, hpMul: 8 + n * 0.3, rewardMul: 2.5 }); // v27-33: 3초컷 문제로 대폭 재상향
+    arr.push({ type: MINIBOSS_POOL[Math.floor(Math.random() * MINIBOSS_POOL.length)], delay: lastDelay + 4, bossTier: true, hpMul: 8 + n * 0.3, rewardMul: 3.5 }); // v27-46: 보상 추가 인상
   }
 
   return arr;
@@ -149,7 +152,9 @@ class App {
           };
           const cfg = configs[type] || configs.hit;
           o.type = cfg.type;
-          const freqs = cfg.freq;
+          // v27-44: 자주 반복되는 타격음(폭발 등)에 살짝 랜덤 피치를 줘서 계속 들어도 덜 지치게 함 (요청4)
+          const pitchVariance = (type === 'hit' || type === 'shoot') ? (0.9 + Math.random() * 0.2) : 1;
+          const freqs = cfg.freq.map(f => f * pitchVariance);
           const stepDur = cfg.dur / freqs.length;
           const t0 = ctx.currentTime;
           o.frequency.setValueAtTime(freqs[0], t0);
@@ -253,6 +258,7 @@ class App {
       waveTotal: document.getElementById('wave-total'),
       btnWave: document.getElementById('btn-wave'),
       btnBack: document.getElementById('btn-back'),
+      btnRecenter: document.getElementById('btn-recenter'),
       btnMenu: document.getElementById('btn-menu'),
       towerBar: document.getElementById('tower-bar'),
     };
@@ -613,6 +619,16 @@ class App {
       }
     });
     this.els.btnMenu.addEventListener('click', () => this.togglePause());
+    if (this.els.btnRecenter) this.els.btnRecenter.addEventListener('click', () => {
+      // v27-47: 카메라를 월드 중앙(대략 첫번째 영웅 위치가 있으면 그쪽)으로 되돌림 (요청A)
+      if (!this.engine) return;
+      const hero = this.engine.heroes[0];
+      this.engine.camera.x = hero ? hero.x : this.engine.worldWidth / 2;
+      this.engine.camera.y = hero ? hero.y : this.engine.worldHeight / 2;
+      this.engine.camera.zoom = Math.max(this.engine.minZoom, Math.min(this.engine.maxZoom,
+        Math.min(this.engine.width / this.engine.worldWidth, this.engine.height / this.engine.worldHeight) * 1.15));
+      this.engine.clampCamera();
+    });
     const btnMission = document.getElementById('btn-mission');
     if (btnMission) btnMission.addEventListener('click', () => this.openMissionBoard());
     const btnSynergy = document.getElementById('btn-synergy');
@@ -663,7 +679,10 @@ class App {
   doPull(pullKey, btnEl) {
     if (!this.engine) return;
     const slotIdx = this.engine.selectedSlotIdx;
-    if (slotIdx === null || this.engine.towerSlots[slotIdx]?.occupied) {
+    // v27-44: 슬롯을 선택 안 했어도 뽑을 수 있게 허용 - 결과는 보관함으로 감 (요청2 - 먼저 뽑고 나중에 배치)
+    // 단, "점유된 슬롯을 선택한 채로" 뽑으려는 건 실수일 가능성이 높아서 계속 막음.
+    const noSlotSelected = slotIdx === null;
+    if (!noSlotSelected && this.engine.towerSlots[slotIdx]?.occupied) {
       this.showWaveAnnounce('빈 슬롯을 먼저 클릭하세요! 🎯', '#ffd60a');
       return;
     }
@@ -709,6 +728,14 @@ class App {
 
     // 단일 뽑기
     const towerDef = window.rollTower(pullKey);
+    if (noSlotSelected) {
+      // v27-44: 슬롯 없이 뽑았으면 보관함으로 (요청2)
+      if (!this._inventory) this._inventory = [];
+      this._inventory.push(towerDef);
+      this.showWaveAnnounce(`${towerDef.emoji} ${towerDef.name} 획득! (보관함에 저장됨)`, '#4fc3f7');
+      this._refreshInventoryBtn && this._refreshInventoryBtn();
+      return;
+    }
     this._placePulledTower(towerDef, slotIdx);
 
     // 뽑기 등급 팝업 + 효과음
@@ -1038,7 +1065,7 @@ class App {
     this.engine = new GameEngine(this.els.canvas);
     this.engine.heroes = [];
     this.engine.spellMgr = this.spellMgr;
-    this.spellMgr.cooldowns = { pokecenter: 0, masterball: 0 };
+    this.spellMgr.cooldowns = { trainingCamp: 0, netTrap: 0 }; // v27-46: 포켓몬센터/마스터볼→훈련소/그물망함정으로 개명
     // v27: 새 게임 시작시 타입강화 레벨 초기화 (이전 판 값이 남아있던 버그 방지)
     if (window.TypeUpgradeLevels) { for (const t in window.TypeUpgradeLevels) window.TypeUpgradeLevels[t] = 0; }
 
@@ -1243,16 +1270,25 @@ class App {
         this.engine._bossSummonCooldown -= this.engine.dt;
         this._updateBossSummonUI();
       }
-      // v27-28: window resize 이벤트가 안 뜨는 내부 CSS 레이아웃 변경(오버레이 열림/닫힘, 모바일 브라우저
-      // 주소창 접힘 등)으로도 캔버스 표시크기가 바뀔 수 있어서, 낮은 빈도로 직접 감시 (요청: "몬스터 안보이는데
-      // 필드엔 있다"는 문제가 리사이즈 이벤트 대응만으론 안 잡혔을 가능성)
+      // v27-46: 논리 해상도를 고정하는 방식으로 바뀌면서, 이 감시는 "진짜 방향전환"(세로↔가로)일 때만
+      // 필요함 - 단순 창 크기 조절은 이제 게임 로직에 영향을 주지 않아야 하므로 의도적으로 무시함.
       this._dimCheckTimer = (this._dimCheckTimer || 0) + this.engine.dt;
       if (this._dimCheckTimer >= 1) {
         this._dimCheckTimer = 0;
         const cw = this.engine.canvas.clientWidth, ch = this.engine.canvas.clientHeight;
-        if (cw > 0 && ch > 0 && (Math.abs(cw - this.engine.width) > 2 || Math.abs(ch - this.engine.height) > 2)) {
+        const isPortraitNow = ch > cw;
+        const wasPortrait = (this.engine._logicalHeight || 0) > (this.engine._logicalWidth || 1);
+        if (cw > 0 && ch > 0 && isPortraitNow !== wasPortrait) {
+          this.engine._logicalWidth = null; // 강제로 재결정하도록 초기화
           this._realignAfterResize();
         }
+      }
+      // v27-45: 스킵 버튼에 현재 밀린(대기중) 몹 수를 실시간 표시 (요청3 - 스킵 판단에 도움)
+      if (this.engine.state === 'wave' && this.els.btnWave) {
+        const backlog = this.engine.spawnQueue ? this.engine.spawnQueue.length : 0;
+        this.els.btnWave.textContent = backlog > 0
+          ? `⏭ 스킵 (미처리 ${backlog}마리 밀림)`
+          : '⏭ 스킵 (남은 적 놔두고 진행)';
       }
       // v27-6: 필드 위험 비네트 (요청2, 절제된 연출)
       if (this.engine.endless) {
@@ -1312,11 +1348,13 @@ class App {
     };
 
     const origTap = this.engine.handleTap.bind(this.engine);
-    this.engine.handleTap = (x, y) => {
+    this.engine.handleTap = (sx, sy) => {
       if (this.placingHero) {
-        // 슬롯이든 빈 곳이든 어디든 배치 가능
-        const HUD = 52, BAR = 82;
-        if (y > HUD && y < this.engine.height - BAR) {
+        // v27-47: 카메라 시스템 대응 - 화면좌표를 월드좌표로 변환 (기존엔 화면좌표를 그대로
+        // 월드좌표처럼 써서, 카메라가 이동/줌 된 상태에서 엉뚱한 곳에 영웅이 배치되고 있었음)
+        const { x, y } = this.engine.screenToWorld(sx, sy);
+        // 슬롯이든 빈 곳이든 어디든 배치 가능 (월드 범위 안이면)
+        {
           // v27-9 버그수정: 영웅을 타워 슬롯 바로 위/근처에 놓으면 탭 판정이 겹쳐서
           // 이후로 그 자리를 탭해도 아무 반응이 없어지던 문제 - 슬롯과 45px 이내면 밀어냄
           let px = x, py = y;
@@ -1328,8 +1366,8 @@ class App {
               py = s.y + Math.sin(angle) * 61;
             }
           }
-          px = Math.max(20, Math.min(this.engine.width - 20, px));
-          py = Math.max(HUD + 20, Math.min(this.engine.height - BAR - 20, py));
+          px = Math.max(20, Math.min(this.engine.worldWidth - 20, px));
+          py = Math.max(20, Math.min(this.engine.worldHeight - 20, py));
 
           const skinId = this.selectedHeroSkins[this.placingHero];
           // 이미 배치된 영웅이면 위치만 이동
@@ -1347,7 +1385,7 @@ class App {
         }
         return;
       }
-      origTap(x, y);
+      origTap(sx, sy);
       const selIdx = this.engine.selectedSlotIdx;
       if (selIdx !== null && !this.engine.towerSlots[selIdx].occupied) {
         document.querySelectorAll('.gacha-btn').forEach(b => b.classList.add('slot-ready'));
@@ -1449,10 +1487,13 @@ class App {
   }
 
   // v27: 영웅 탭 감지 - 타워처럼 공격력/사거리/레벨 패널 표시 (요청7)
-  _tryTapHero(x, y) {
+  _tryTapHero(sx, sy) {
     if (!this.engine) return false;
+    // v27-47: 화면좌표를 월드좌표로 변환 (요청A - 카메라 팬/줌 대응)
+    const { x, y } = this.engine.screenToWorld(sx, sy);
+    const radius = 38 / this.engine.camera.zoom;
     for (const hero of this.engine.heroes) {
-      if (Math.hypot(hero.x - x, hero.y - y) < 38) { // v27-43: 32→38
+      if (Math.hypot(hero.x - x, hero.y - y) < radius) {
         this._showHeroPanel(hero);
         return true;
       }
@@ -1509,21 +1550,67 @@ class App {
         y: t.clientY - rect.top,
       };
     };
+    const touchDist = (e) => {
+      if (e.touches.length < 2) return null;
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      return Math.hypot(dx, dy);
+    };
+
+    // v27-47: 팬(드래그)/줌(핀치) 제스처 상태 (요청A - 카메라 시스템)
+    let gestureStart = null;   // {x,y} 화면좌표, 탭인지 드래그인지 구분용
+    let didPan = false;
+    let pinchStartDist = null, pinchStartZoom = 1;
+    const PAN_THRESHOLD = 10; // 이 이상 움직이면 탭이 아니라 팬으로 간주
 
     let lastTouchTapTime = 0;
     canvas.addEventListener('touchstart', e => {
       e.preventDefault();
+      if (e.touches.length >= 2) {
+        pinchStartDist = touchDist(e);
+        pinchStartZoom = this.engine.camera.zoom;
+        return;
+      }
       lastTouchTapTime = Date.now(); // v27-21: 터치 직후 합성 click이 중복 발동되는 것 방지용 (요청11)
       const pos = getPos(e);
-      if (this._tryTapHero(pos.x, pos.y)) return;
-      this.engine.handleTap(pos.x, pos.y);
+      gestureStart = pos; didPan = false;
     }, { passive: false });
 
     canvas.addEventListener('touchmove', e => {
       e.preventDefault();
+      if (e.touches.length >= 2 && pinchStartDist) {
+        // 핀치 줌
+        const d = touchDist(e);
+        if (d) {
+          const cam = this.engine.camera;
+          cam.zoom = Math.max(this.engine.minZoom, Math.min(this.engine.maxZoom, pinchStartZoom * (d / pinchStartDist)));
+          this.engine.clampCamera();
+        }
+        return;
+      }
       const pos = getPos(e);
+      if (gestureStart) {
+        const dx = pos.x - gestureStart.x, dy = pos.y - gestureStart.y;
+        if (didPan || Math.hypot(dx, dy) > PAN_THRESHOLD) {
+          didPan = true;
+          const cam = this.engine.camera;
+          cam.x -= dx / cam.zoom; cam.y -= dy / cam.zoom;
+          this.engine.clampCamera();
+          gestureStart = pos;
+          return;
+        }
+      }
       this.engine.handleHover(pos.x, pos.y);
     }, { passive: false });
+
+    canvas.addEventListener('touchend', e => {
+      if (pinchStartDist && e.touches.length < 2) pinchStartDist = null;
+      if (!didPan && gestureStart) {
+        if (this._tryTapHero(gestureStart.x, gestureStart.y)) { gestureStart = null; return; }
+        this.engine.handleTap(gestureStart.x, gestureStart.y);
+      }
+      gestureStart = null;
+    });
 
     canvas.addEventListener('click', e => {
       // v27-21 버그수정: 터치 직후에는 브라우저가 합성 click을 한 번 더 쏴서 탭 하나에 handleTap이
@@ -1534,20 +1621,57 @@ class App {
       this.engine.handleTap(pos.x, pos.y);
     });
 
+    // v27-47: 데스크탑 마우스 드래그로도 팬 가능하게
+    let mouseDown = false, mouseDidPan = false, mouseStart = null;
+    canvas.addEventListener('mousedown', e => {
+      mouseDown = true; mouseDidPan = false; mouseStart = getPos(e);
+    });
     canvas.addEventListener('mousemove', e => {
       const pos = getPos(e);
+      if (mouseDown && mouseStart) {
+        const dx = pos.x - mouseStart.x, dy = pos.y - mouseStart.y;
+        if (mouseDidPan || Math.hypot(dx, dy) > PAN_THRESHOLD) {
+          mouseDidPan = true;
+          const cam = this.engine.camera;
+          cam.x -= dx / cam.zoom; cam.y -= dy / cam.zoom;
+          this.engine.clampCamera();
+          mouseStart = pos;
+          return;
+        }
+      }
       this.engine.handleHover(pos.x, pos.y);
     });
+    canvas.addEventListener('mouseup', e => {
+      if (!mouseDidPan) {
+        const pos = getPos(e);
+        if (!this._tryTapHero(pos.x, pos.y)) this.engine.handleTap(pos.x, pos.y);
+      }
+      mouseDown = false; mouseStart = null;
+    });
+    // v27-47: 마우스 휠로 줌 (데스크탑)
+    canvas.addEventListener('wheel', e => {
+      e.preventDefault();
+      const cam = this.engine.camera;
+      const factor = e.deltaY < 0 ? 1.1 : 0.9;
+      cam.zoom = Math.max(this.engine.minZoom, Math.min(this.engine.maxZoom, cam.zoom * factor));
+      this.engine.clampCamera();
+    }, { passive: false });
 
     this._resizeDebounceTimer = null;
     window.addEventListener('resize', () => {
-      // v27-24 버그수정: 모바일에서 스크롤/키보드/방향전환 때마다 resize가 연속으로 여러 번 발생하는데,
-      // 그때마다 경로/슬롯을 통째로 재생성하고 있었음. 게다가 이미 스폰된 적들은 예전 경로 참조를 그대로
-      // 들고 있어서 화면 비율이 바뀌면 위치가 트랙과 어긋나 화면 밖으로 사라지는데 카운트(필드누적)에는
-      // 그대로 남아있는 심각한 버그였음 (요청4 - "몬스터 안보이는데 100+마리 있다고 게임오버"의 원인 추정).
-      // 1) 디바운스로 과도한 재생성 방지 2) 재생성시 기존 적들을 새 경로 위 같은 진행률 지점으로 재정렬.
+      // v27-46: 논리 해상도 고정 방식으로 바뀌면서, 단순 창 크기 조절은 이제 무시해야 함(게임 로직에
+      // 영향 주면 안 됨). 진짜 방향전환(세로↔가로)일 때만 논리 해상도를 재결정함.
       clearTimeout(this._resizeDebounceTimer);
-      this._resizeDebounceTimer = setTimeout(() => this._realignAfterResize(), 300);
+      this._resizeDebounceTimer = setTimeout(() => {
+        if (!this.engine) return;
+        const cw = this.engine.canvas.clientWidth, ch = this.engine.canvas.clientHeight;
+        const isPortraitNow = ch > cw;
+        const wasPortrait = (this.engine._logicalHeight || 0) > (this.engine._logicalWidth || 1);
+        if (cw > 0 && ch > 0 && isPortraitNow !== wasPortrait) {
+          this.engine._logicalWidth = null;
+          this._realignAfterResize();
+        }
+      }, 300);
     });
   }
 
@@ -1556,7 +1680,7 @@ class App {
   // 변경만으로 캔버스 표시크기가 바뀌는 경우까지 잡기 위해 매 프레임 감시도 추가함)
   _realignAfterResize() {
     if (!this.engine) return;
-    const oldW = this.engine.width || 1, oldH = this.engine.height || 1;
+    const oldW = this.engine.worldWidth || 1, oldH = this.engine.worldHeight || 1;
     const oldEnemyRatios = this.engine.enemies.map(en => ({
       en, ratio: en.totalLen ? (en.distTraveled / en.totalLen) : 0,
     }));
@@ -1565,6 +1689,7 @@ class App {
     this.engine.buildPaths();
     this.engine.buildTowerSlots();
     this.engine._bgDirty = true;
+    this.engine.clampCamera(); // v27-47: 새 월드 크기에 맞게 카메라도 재조정
     const newPath = this.engine.paths && this.engine.paths[0];
     if (newPath) {
       const newLen = typeof totalPathLength === 'function' ? totalPathLength(newPath) : 0;
@@ -1576,8 +1701,8 @@ class App {
       }
     }
     for (const { h, rx, ry } of oldHeroRatios) {
-      h.x = rx * this.engine.width;
-      h.y = ry * this.engine.height;
+      h.x = rx * this.engine.worldWidth;
+      h.y = ry * this.engine.worldHeight;
     }
   }
 
@@ -1767,6 +1892,17 @@ class App {
         overlay.appendChild(unlockMsg);
       }
     }
+
+    const retryBtn = document.createElement('button');
+    retryBtn.className = 'end-btn';
+    retryBtn.style.cssText = 'background:linear-gradient(135deg,#ff9800,#ff5722);margin-bottom:8px;';
+    retryBtn.textContent = '🔄 바로 다시 도전';
+    retryBtn.addEventListener('click', () => {
+      overlay.remove();
+      this.backToMapSelect();
+      this.startGame(); // v27-44: 화면 두 번 안 거치고 바로 재시작 (요청1)
+    });
+    overlay.appendChild(retryBtn);
 
     const btn = document.createElement('button');
     btn.className = 'end-btn';

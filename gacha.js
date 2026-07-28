@@ -544,7 +544,7 @@ function _createGachaTower(def, x, y, engine) {
       const mul = window.typeEffectiveness ? window.typeEffectiveness(def.type, this.target && this.target.typeTag) : 1;
       return base * mul;
     },
-    get fireRate(){ return def.fireRate*Math.min(this._shopSpeedMul||1, BUFF_CAPS.speed); },
+    get fireRate(){ return def.fireRate*Math.min(this._shopSpeedMul||1, BUFF_CAPS.speed)*(this._tempSpeedMul||1); },
     upgradeCost(){ return null; },
     findTarget(enemies){
       if(this.target&&!this.target.dead&&!this.target.reachedEnd){
@@ -577,7 +577,7 @@ function _createGachaTower(def, x, y, engine) {
       // 영구적으로 곱연산 누적되고 있었음(핵심 버그) - 이제 타이머 소진시 정상적으로 원상복귀됨
       if(this._pokecenterTimer>0){
         this._pokecenterTimer-=dt;
-        if(this._pokecenterTimer<=0) this._tempDmgMul=1;
+        if(this._pokecenterTimer<=0){ this._tempDmgMul=1; this._tempSpeedMul=1; }
       }
       this._rotAngle+=dt*0.5;
       this.target=this.findTarget(enemies);
@@ -725,28 +725,20 @@ const SYNERGY_PAIRS = {
   'psychic|normal':{ bonus: 5, label:'염력지원' },
 };
 function applyTowerSynergies(towers) {
-  for(const t of towers) { t.synergyBonus=0; t._auraDmgMul=1; } // v27-29: 오라도 매번 새로 계산 (비누적)
+  // v27-46: 일반 타입 시너지(같은/유사 타입 근접 배치 보너스) 완전 제거함 (요청4 - "너무 랜덤이라
+  // 없애도 될 것 같다"). 피삐/픽시블 전용 오라는 그 타워 고유 능력이라 유지함.
+  for(const t of towers) { t.synergyBonus=0; t._auraDmgMul=1; }
   for(let i=0;i<towers.length;i++){
     for(let j=i+1;j<towers.length;j++){
       const a=towers[i],b=towers[j];
       if(!a.def||!b.def) continue;
-      // v27-29 버그수정: 피삐/픽시블의 "주변 데미지+" 오라가 발사할 때마다 영구 복리누적되고 있었음
-      // (노말등급이라 누구나 보유 - 이번 세션 내내 겪은 문제의 핵심 원인 추정). 여기서 매번 새로
-      // 계산되는 비누적 방식으로 처리 (여러 명이 중첩되면 가장 센 것 하나만 적용).
       const dist = Math.hypot(a.x-b.x,a.y-b.y);
       if(a.def.id==='clefairy' && dist<130) b._auraDmgMul=Math.max(b._auraDmgMul,1.10);
       if(b.def.id==='clefairy' && dist<130) a._auraDmgMul=Math.max(a._auraDmgMul,1.10);
       if(a.def.id==='clefable' && dist<150) b._auraDmgMul=Math.max(b._auraDmgMul,1.25);
       if(b.def.id==='clefable' && dist<150) a._auraDmgMul=Math.max(a._auraDmgMul,1.25);
-      if(dist>150) continue;
-      if(a.def.type===b.def.type){ a.synergyBonus+=8; b.synergyBonus+=8; continue; }
-      const key = [a.def.type,b.def.type].sort().join('|');
-      const pair = SYNERGY_PAIRS[key];
-      if(pair){ a.synergyBonus+=pair.bonus; b.synergyBonus+=pair.bonus; }
     }
   }
-  const SYNERGY_CAP = 40;
-  for(const t of towers) t.synergyBonus = Math.min(t.synergyBonus, SYNERGY_CAP);
 }
 
 // ===== 타입 업그레이드 (6종, v27: 3단계 -> 5단계 확장 + 가격 상향) =====
@@ -769,11 +761,14 @@ function getTypeUpgradeAt(type, level) {
   if (level < upgrades.length) return upgrades[level];
   const last = upgrades[upgrades.length - 1];
   const extra = level - upgrades.length + 1; // 1,2,3...
+  // v27-46 버그수정: 기존엔 효과값이 0.86^n로 계속 줄어드는데 비용은 1.55^n로 계속 올라서, 후반
+  // 투자가 갈수록 무의미해지고 있었음 (요청: "1500원쯤 되면 올리기 힘든데 그만큼 세지지도 않음").
+  // 효과값 감쇠를 없애서 비싸지는 만큼 확실히 강해지도록 함 (전략적 몰빵 투자가 실제로 유효해짐).
   return {
-    cost: Math.round(last.cost * Math.pow(1.55, extra)),
+    cost: Math.round(last.cost * Math.pow(1.5, extra)),
     label: `${TYPES[type].name} 초월강화 ${extra}`,
     buff: last.buff,
-    val: last.val * Math.pow(0.86, extra - 1),
+    val: last.val,
   };
 }
 
@@ -878,6 +873,13 @@ window.TowerSpriteImages = {
   dratini:'assets/towers/dratini.png', dragonair:'assets/towers/dragonair.png',
   dragonite:'assets/enemies/dragonite.png',
   mew:'assets/heroes/mew.png',
+  // v27-47: 신규 타워 이미지 11종 연결
+  pidgeotto:'assets/towers/pidgeotto.png', pidgeot:'assets/towers/pidgeot.png',
+  raticate:'assets/towers/raticate.png',   clefable:'assets/towers/clefable.png',
+  gloom:'assets/towers/gloom.png',         vileplume:'assets/towers/vileplume.png',
+  dugtrio:'assets/towers/dugtrio.png',     golduck:'assets/towers/golduck.png',
+  arcanine:'assets/towers/arcanine.png',   haunter:'assets/towers/haunter.png',
+  gengar:'assets/towers/gengar.png',
 };
 
 // ===== 전역 등록 =====

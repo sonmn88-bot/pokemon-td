@@ -35,6 +35,11 @@ class GameEngine {
     this.currentMap = null;
     this.paths = [];
 
+    // v27-47: 카메라 팬/줌 시스템 (요청A) - 월드는 화면(viewport)보다 넓고, 카메라가 그 안을 비춤
+    this.camera = { x: 0, y: 0, zoom: 1 }; // x,y = 화면 중앙에 보이는 월드 좌표
+    this.worldWidth = 0; this.worldHeight = 0;
+    this.minZoom = 0.6; this.maxZoom = 2.2;
+
     // 스폰
     this.spawnQueue = [];
     this.spawnTimer = 0;
@@ -120,41 +125,64 @@ class GameEngine {
   }
 
   resize() {
-    const w = this.canvas.clientWidth, h = this.canvas.clientHeight;
-    this.canvas.width = w;
-    this.canvas.height = h;
-    this.width = w; this.height = h;
+    // v27-46: 캔버스 "논리 해상도"를 최초 1회만 결정하고 이후로는 고정함 (요청1&6 - 데스크탑에서
+    // 브라우저 창을 늘렸다 줄였다 하면서 슬롯 간격/타워 사거리의 상대적 커버리지를 편법으로 바꿀 수
+    // 있었음. 창을 줄이면 같은 절대 픽셀 사거리가 상대적으로 더 넓어지는 식). 논리 좌표는 고정하고
+    // 캔버스는 CSS(width:100%;height:100%)로 화면에 맞게 시각적으로만 확대/축소되게 함 - 게임 로직
+    // 좌표는 전혀 안 바뀌므로 창 크기로 유불리를 만들 수 없음.
+    if (!this._logicalWidth) {
+      // 최초 1회: 실제 화면 비율 기반으로 논리 해상도 결정 (모바일/데스크탑 등 실제 기기 차이는 반영)
+      this._logicalWidth = this.canvas.clientWidth || 1200;
+      this._logicalHeight = this.canvas.clientHeight || 700;
+      this.canvas.width = this._logicalWidth;
+      this.canvas.height = this._logicalHeight;
+    }
+    this.width = this._logicalWidth;
+    this.height = this._logicalHeight;
+    // v27-47: 월드는 뷰포트보다 넓게 (요청A: 카메라로 팬/줌해서 보는 넓은 맵)
+    this.worldWidth = this.width * 1.7;
+    this.worldHeight = this.height * 1.7;
+    if (!this._cameraInited) {
+      this._cameraInited = true;
+      this.camera.x = this.worldWidth / 2;
+      this.camera.y = this.worldHeight / 2;
+      this.camera.zoom = Math.max(this.minZoom, Math.min(this.maxZoom,
+        Math.min(this.width / this.worldWidth, this.height / this.worldHeight) * 1.15));
+    }
     this._bgDirty = true;
   }
 
-  buildPaths() {
-    const HUD = 52, BAR = 82, PAD = 20;
-    const safeTop = HUD + PAD;
-    const safeBot = this.height - BAR - PAD;
-    const safeH = safeBot - safeTop;
+  // v27-47: 카메라가 월드 밖으로 안 나가게 고정 (요청A)
+  clampCamera() {
+    const viewW = this.width / this.camera.zoom, viewH = this.height / this.camera.zoom;
+    const halfW = viewW / 2, halfH = viewH / 2;
+    if (viewW >= this.worldWidth) this.camera.x = this.worldWidth / 2;
+    else this.camera.x = Math.max(halfW, Math.min(this.worldWidth - halfW, this.camera.x));
+    if (viewH >= this.worldHeight) this.camera.y = this.worldHeight / 2;
+    else this.camera.y = Math.max(halfH, Math.min(this.worldHeight - halfH, this.camera.y));
+  }
 
-    const rawPaths = this.currentMap.getPaths(this.width, this.height);
-    this.paths = rawPaths.map(path =>
-      path.map(pt => ({
-        x: pt.x,
-        y: safeTop + (pt.y / this.height) * safeH,
-      }))
-    );
+  // v27-47: 화면 좌표 → 월드 좌표 변환 (입력처리에서 사용)
+  screenToWorld(sx, sy) {
+    return {
+      x: this.camera.x + (sx - this.width / 2) / this.camera.zoom,
+      y: this.camera.y + (sy - this.height / 2) / this.camera.zoom,
+    };
+  }
+
+  buildPaths() {
+    // v27-47: 카메라 시스템 도입으로 월드 크기(worldWidth/Height) 기준으로 생성 (요청A).
+    // 기존의 HUD/BAR 여백 개념은 필요 없음 - UI는 화면에 고정되고 월드는 카메라로 자유롭게 움직이며 봄.
+    const rawPaths = this.currentMap.getPaths(this.worldWidth, this.worldHeight);
+    this.paths = rawPaths;
   }
   buildTowerSlots() {
-    const HUD = 52, BAR = 82, PAD = 20;
-    const safeTop = HUD + PAD;
-    const safeBot = this.height - BAR - PAD;
-    const safeH = safeBot - safeTop;
-
-    const rawSlots = this.currentMap.getSlots(this.width, this.height);
+    // v27-47: 카메라 시스템 도입으로 월드 크기 기준으로 생성 (요청A)
+    const rawSlots = this.currentMap.getSlots(this.worldWidth, this.worldHeight);
     const prevSlots = this.towerSlots;
     this.towerSlots = rawSlots.map((p, i) => {
-      const ratio = p.y / this.height;
-      const safeY = safeTop + ratio * safeH;
       const prev = prevSlots && prevSlots[i];
-      const slot = { x: p.x, y: safeY, occupied: !!(prev && prev.occupied), tower: (prev && prev.tower) || null };
-      // 기존에 배치된 타워가 있으면 새 좌표로 이동시켜서 트랙과 어긋나지 않게 함
+      const slot = { x: p.x, y: p.y, occupied: !!(prev && prev.occupied), tower: (prev && prev.tower) || null };
       if (slot.tower) { slot.tower.x = slot.x; slot.tower.y = slot.y; }
       return slot;
     });
@@ -478,7 +506,7 @@ class GameEngine {
     let riskBonus = 0;
     if ((this._peakFieldCount || 0) >= 120) {
       riskBonus = Math.round(bonus * 0.5);
-      this.spawnFloatingText(`🔥 위험 보너스! +${riskBonus}g`, this.width/2, 110, '#ff6b6b');
+      this.spawnFloatingText(`🔥 위험 보너스! +${riskBonus}g`, this.camera.x, this.camera.y - (this.height/2 - 110)/this.camera.zoom, '#ff6b6b');
     }
     this._peakFieldCount = 0;
     this.addGold(bonus + riskBonus);
@@ -543,7 +571,11 @@ class GameEngine {
     const slot = this.towerSlots[slotIdx];
     if (!slot || !slot.occupied) return;
     const t = slot.tower;
-    const refund = Math.floor(t.totalSpent * 0.7);
+    // v27-46 버그수정: totalSpent가 초기화만 되고 어디서도 증가하지 않아서 판매 환불이 항상 0골드였음
+    // (요청8 - "1성/2성 팔았을 때 돈이 너무 적게 들어오는지 체크해봐" → 사실은 0원이었음).
+    // 정확한 지출 이력 추적 대신, 신뢰성 있는 등급 기반 고정 판매가로 교체.
+    const SELL_VALUE = { normal: 60, rare: 180, epic: 500, legend: 1400, unique: 3500 };
+    const refund = SELL_VALUE[t.def?.grade] || 50;
     this.addGold(refund);
     this.spawnFloatingText(`+${refund}g`, slot.x, slot.y, '#06d6a0');
     this.towers = this.towers.filter(x=>x!==t);
@@ -560,11 +592,16 @@ class GameEngine {
   draw() {
     const ctx = this.ctx;
     ctx.save();
+    ctx.clearRect(0, 0, this.width, this.height);
+    // v27-47: 카메라 변환 (요청A) - 이 시점부터 그리는 모든 것은 "월드 좌표"로 취급되어
+    // 카메라 위치/줌에 따라 화면에 매핑됨. 개별 draw() 메서드들은 전혀 몰라도 됨.
+    ctx.translate(this.width / 2, this.height / 2);
+    ctx.scale(this.camera.zoom, this.camera.zoom);
+    ctx.translate(-this.camera.x, -this.camera.y);
     if (this.shakeTimer > 0) {
       const s = (this.shakeTimer/0.35)*this.shakeAmt;
       ctx.translate((Math.random()-0.5)*s, (Math.random()-0.5)*s);
     }
-    ctx.clearRect(-20,-20,this.width+40,this.height+40);
 
     this._drawBgCached(ctx);
     this.drawPaths(ctx);
@@ -578,28 +615,33 @@ class GameEngine {
     for (const e of sorted) e.draw(ctx);
 
     for (const p of this.projectiles) p.draw(ctx);
-    for (const p of this.particles) p.draw(ctx);
+    // v27-47: RedFlash(전체화면 빨간 비네트)는 스크린 좌표 기준이라 카메라 변환 밖에서 그려야 함
+    // (안에서 그리면 카메라 위치/줌에 따라 화면을 제대로 못 덮는 버그가 생김)
+    for (const p of this.particles) if (!(p instanceof RedFlash)) p.draw(ctx);
 
     if (this.selectedTower) this._drawRange(ctx, this.selectedTower);
     if (this.selectedSlotIdx !== null && this.selectedTowerType) this._drawPreview(ctx);
 
-    // 보스 HP바
-    if (this.activeBoss) this._drawBossBar(ctx);
-
     ctx.restore();
+
+    // 화면 고정 이펙트 (카메라 변환 영향 안 받음)
+    for (const p of this.particles) if (p instanceof RedFlash) p.draw(ctx);
+
+    // v27-47: 보스 HP바는 화면 상단 고정 UI라서 카메라 변환 밖(화면좌표)에서 그림
+    if (this.activeBoss) this._drawBossBar(ctx);
   }
 
   _drawBgCached(ctx) {
     // v27-36: 배경이 까매지는 문제 방어 (요청3) - width/height가 비정상(0 이하 등)이면 배경 재생성을
     // 건너뛰고 기존 캐시를 그대로 사용 (레이아웃 과도기에 순간적으로 크기가 이상해지는 경우 대비)
-    if (this.width <= 0 || this.height <= 0) {
+    if (this.worldWidth <= 0 || this.worldHeight <= 0) {
       if (this._bgCanvas) ctx.drawImage(this._bgCanvas, 0, 0);
       return;
     }
     if (this._bgDirty || !this._bgCanvas ||
-        this._bgCanvas.width !== this.width || this._bgCanvas.height !== this.height) {
+        this._bgCanvas.width !== this.worldWidth || this._bgCanvas.height !== this.worldHeight) {
       const bc = document.createElement('canvas');
-      bc.width = this.width; bc.height = this.height;
+      bc.width = this.worldWidth; bc.height = this.worldHeight; // v27-47: 배경도 월드 크기 전체로
       const bctx = bc.getContext('2d');
       const map = this.currentMap;
 
@@ -614,27 +656,27 @@ class GameEngine {
         if (this._bgImg.complete && this._bgImg.naturalWidth > 0) {
           // 커버 방식으로 그리기
           const ir = this._bgImg.naturalWidth / this._bgImg.naturalHeight;
-          const cr = this.width / this.height;
+          const cr = this.worldWidth / this.worldHeight;
           let sx=0,sy=0,sw=this._bgImg.naturalWidth,sh=this._bgImg.naturalHeight;
           if (ir > cr) { sw = sh*cr; sx=(this._bgImg.naturalWidth-sw)/2; }
           else { sh=sw/cr; sy=(this._bgImg.naturalHeight-sh)/2; }
-          bctx.drawImage(this._bgImg, sx,sy,sw,sh, 0,0,this.width,this.height);
+          bctx.drawImage(this._bgImg, sx,sy,sw,sh, 0,0,this.worldWidth,this.worldHeight);
           // 어두운 오버레이로 게임과 어우러지게
           bctx.fillStyle='rgba(0,0,0,0.22)';
-          bctx.fillRect(0,0,this.width,this.height);
+          bctx.fillRect(0,0,this.worldWidth,this.worldHeight);
         } else {
           // 로드 전: 단색 폴백, 로드 완료 후 캐시 무효화
           bctx.fillStyle = map.bgColor;
-          bctx.fillRect(0,0,this.width,this.height);
+          bctx.fillRect(0,0,this.worldWidth,this.worldHeight);
           this._bgImg.onload = () => { this._bgDirty = true; };
         }
       } else {
         bctx.fillStyle = map.bgColor;
-        bctx.fillRect(0,0,this.width,this.height);
+        bctx.fillRect(0,0,this.worldWidth,this.worldHeight);
       }
 
       // 맵별 이모지/장식 오버레이
-      if (map.drawBg) map.drawBg(bctx, this.width, this.height);
+      if (map.drawBg) map.drawBg(bctx, this.worldWidth, this.worldHeight);
       this._bgCanvas = bc; this._bgDirty = false;
     }
     ctx.drawImage(this._bgCanvas, 0, 0);
@@ -821,8 +863,11 @@ class GameEngine {
   }
 
   // ===== INPUT =====
-  handleTap(x, y) {
-    const slotIdx = this.nearestSlot(x, y, 50); // v27-43: 42→50 (요청3: 모바일 터치 정밀도)
+  handleTap(sx, sy) {
+    // v27-47: 화면좌표로 들어오는 입력을 월드좌표로 변환 (요청A - 카메라 팬/줌 대응)
+    const { x, y } = this.screenToWorld(sx, sy);
+    const radius = 50 / this.camera.zoom; // 줌과 무관하게 화면상 탭 관용범위가 일정하도록
+    const slotIdx = this.nearestSlot(x, y, radius);
     if (slotIdx !== null) {
       if (this.towerSlots[slotIdx].occupied) {
         this.selectedTower = this.towerSlots[slotIdx].tower;
@@ -838,9 +883,10 @@ class GameEngine {
     }
     this.selectedTower = null; this.selectedSlotIdx = null;
   }
-  handleHover(x, y) {
+  handleHover(sx, sy) {
     if (!this.selectedTowerType) return;
-    this.selectedSlotIdx = this.nearestSlot(x, y, 65);
+    const { x, y } = this.screenToWorld(sx, sy);
+    this.selectedSlotIdx = this.nearestSlot(x, y, 65 / this.camera.zoom);
   }
   nearestSlot(x, y, radius) {
     let best=null, bestD=radius;
