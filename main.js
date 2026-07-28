@@ -1268,7 +1268,9 @@ class App {
     this.engine.update = () => {
       origUpdate();
       if (this.engine.state === 'wave' || this.engine.state === 'idle') {
-        for (const h of this.engine.heroes) h.update(this.engine.dt, this.engine);
+        // v27-58 버그수정: engine.js의 원래 update()가 이미 this.heroes를 업데이트하고 있는데
+        // 여기서 또 한 번 돌려서 영웅 스킬/쿨다운/스탯이 실질적으로 2배 속도로 도는 버그였음
+        // (겉보기엔 "영웅이 2마리"처럼 보이는 원인 중 하나 - 아래 draw 이중호출과 합쳐져서 더 눈에 띔).
         this.spellMgr.update(this.engine.dt);
         this.updateSpellBarUI();
         this.updateHeroSkillBarUI();
@@ -1339,11 +1341,11 @@ class App {
       }
     };
 
-    const origDraw = this.engine.draw.bind(this.engine);
-    this.engine.draw = () => {
-      origDraw();
-      for (const h of this.engine.heroes) h.draw(this.engine.ctx);
-    };
+    // v27-58 버그수정: "영웅이 2마리로 보인다" 최종 원인 - engine.js의 draw()가 카메라 변환이 걸린
+    // 상태에서 이미 this.heroes를 정상적으로 그리는데, 여기서 origDraw() 이후(카메라 변환이 이미
+    // ctx.restore()로 풀린 시점)에 같은 영웅을 화면좌표 기준으로 또 그리고 있었음 - 그 결과 실제 영웅
+    // 옆에 (world 좌표를 화면 좌표로 착각해서 그려진) "유령 영웅"이 하나 더 보이던 것. 중복 draw 제거.
+    // engine.draw는 원본 그대로 사용(오버라이드 불필요).
 
     const origPlace = this.engine.placeTower.bind(this.engine);
     this.engine.placeTower = (TowerClass, slotIdx) => {
