@@ -535,7 +535,7 @@ function _createGachaTower(def, x, y, engine) {
   const t = {
     x, y, _gachaId:def.id, def,
     name:def.name, level:1, path:null, totalSpent:0,
-    cooldown:0, fireFlash:0, _rotAngle:0,
+    cooldown:0, fireFlash:0, _rotAngle:0, _bobPhase: Math.random()*Math.PI*2,
     synergyBonus:0, buffRangeMul:muls.range, buffDmgMul:muls.dmg, _shopSpeedMul:muls.speed, target:null, masteryMul,
     _tempDmgMul:1, _pokecenterTimer:0, _auraDmgMul:1, // v27-29: 임시버프+오라 전용 필드 (영구곱연산 버그 수정)
     get range(){ return (def.range+(this.synergyBonus*2))*Math.min(this.buffRangeMul, BUFF_CAPS.range); },
@@ -683,8 +683,11 @@ function _createGachaTower(def, x, y, engine) {
         const nw = b ? b.w : img.naturalWidth, nh = b ? b.h : img.naturalHeight;
         const asp=nw/nh;
         const dw=asp>=1?sz:sz*asp, dh=asp>=1?sz/asp:sz;
-        if (b) ctx.drawImage(img, b.x, b.y, b.w, b.h, this.x-dw/2, this.y-dh/2, dw, dh);
-        else ctx.drawImage(img,this.x-dw/2,this.y-dh/2,dw,dh);
+        // v27-58: 정적인 이미지가 밋밋해 보여서, 살짝 위아래로 숨쉬듯 흔들리는 아이들 애니메이션 추가
+        // (타워별로 위상차를 둬서 전부 같은 박자로 안 움직이게 함)
+        const bobY = Math.sin(this._rotAngle*2.2 + this._bobPhase) * 2.2;
+        if (b) ctx.drawImage(img, b.x, b.y, b.w, b.h, this.x-dw/2, this.y-dh/2+bobY, dw, dh);
+        else ctx.drawImage(img,this.x-dw/2,this.y-dh/2+bobY,dw,dh);
       } else {
         ctx.font=`${sz*0.8}px serif`; ctx.textAlign='center'; ctx.textBaseline='middle';
         ctx.fillText(def.emoji,this.x,this.y);
