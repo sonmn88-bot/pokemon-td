@@ -204,9 +204,28 @@ class GameEngine {
     if (!this.running) return;
     const raw = Math.min((ts - this.lastTime) / 1000, 0.05);
     this.lastTime = ts;
-    this.dt = raw * this.speedMul;
-    this.update();
-    this.draw();
+
+    // v27-62 최적화1 (3배속 끊김의 근본수정): 배속을 dt에 한번에 곱하면 한 프레임에 이동거리가
+    // 3배로 커져서 움직임이 뚝뚝 끊겨보이고, 충돌/상태이상 판정도 성겨짐. 시뮬레이션을 최대 1/50초
+    // 단위의 서브스텝으로 잘게 쪼개 여러 번 돌리면 물리 정확도가 배속과 무관하게 유지됨.
+    // (렌더링은 프레임당 1번만 - 비용이 큰 건 draw쪽이라 전체 비용 증가는 미미함)
+    const total = raw * this.speedMul;
+    const MAX_STEP = 1 / 50;
+    let remaining = total;
+    while (remaining > 0.0001) {
+      this.dt = Math.min(remaining, MAX_STEP);
+      this.update();
+      remaining -= this.dt;
+    }
+    this.dt = total; // draw쪽에서 dt를 참조하는 이펙트가 있어도 프레임 전체 시간 기준으로 동작하게
+
+    // v27-62 최적화2 (배터리): 완전 유휴상태(idle + 필드에 아무것도 없음)에서는 화면이 사실상
+    // 정지 상태이므로 렌더링을 절반(약 30fps)으로 낮춰 GPU 부하/배터리 소모를 줄임.
+    const isQuiet = this.state === 'idle' && this.enemies.length === 0 &&
+                    this.projectiles.length === 0 && this.particles.length === 0;
+    this._frameSkip = (this._frameSkip || 0) + 1;
+    if (!isQuiet || this._frameSkip % 2 === 0) this.draw();
+
     requestAnimationFrame(t=>this.loop(t));
   }
 
@@ -221,7 +240,13 @@ class GameEngine {
       this.deployPoints = Math.min(this.maxDeployPoints, this.deployPoints + this.deployRegenRate * this.dt);
       // 웨이브 제한시간 (시간 내 전멸 못 시키면 남은 적 수만큼 라이프 손실)
       this.waveTimeRemaining -= this.dt;
-      this.onWaveTimerChange && this.onWaveTimerChange(Math.max(0, this.waveTimeRemaining), this.waveTimeLimit);
+      // v27-62 최적화: 타이머 DOM 업데이트를 초당 4회로 제한 (매 서브스텝마다 DOM 건드리면
+      // 모바일에서 레이아웃/페인트 비용이 상당함 - 0.25초 정밀도면 표시용으론 충분)
+      this._timerUiAcc = (this._timerUiAcc || 0) + this.dt;
+      if (this._timerUiAcc >= 0.25) {
+        this._timerUiAcc = 0;
+        this.onWaveTimerChange && this.onWaveTimerChange(Math.max(0, this.waveTimeRemaining), this.waveTimeLimit);
+      }
       if (this.waveTimeRemaining <= 0) this.timeoutWave();
     }
 
@@ -622,20 +647,32 @@ class GameEngine {
     }
 
     this._drawBgCached(ctx);
-    this.drawPaths(ctx);
+    // v27-62 최적화3: drawPaths는 4중 스트로크(그림자/테두리/본체/하이라이트) + 화살표 수십 개를
+    // 매 프레임 그리고 있었음 - 경로는 월드좌표상 완전히 정적이므로 배경 캐시에 함께 구워버림
+    // (이제 _drawBgCached 생성시에만 1회 그려짐). 모바일 GPU 부하의 가장 큰 단일 절감 포인트.
     this.drawSlots(ctx);
 
-    for (const t of this.towers) t.draw(ctx);
+    // v27-62 최적화4: 뷰포트 컬링 - 카메라 화면 밖에 있는 개체는 그리지 않음.
+    // 모바일은 기본적으로 줌인 상태로 플레이해서 월드의 일부만 보이는데, 기존엔 화면 밖
+    // 개체들도 전부 그리고 있었음 (특히 후반 몬스터 100마리+ 상황에서 큰 낭비).
+    const cullMargin = 80; // 큰 보스/이펙트가 경계에서 잘려보이지 않게 여유
+    const viewHalfW = this.width / 2 / this.camera.zoom + cullMargin;
+    const viewHalfH = this.height / 2 / this.camera.zoom + cullMargin;
+    const cx = this.camera.x, cy = this.camera.y;
+    const inView = (o) => Math.abs(o.x - cx) <= viewHalfW && Math.abs(o.y - cy) <= viewHalfH;
+
+    for (const t of this.towers) if (inView(t)) t.draw(ctx);
     for (const h of this.heroes) h.draw(ctx);
 
-    // Y순 정렬
-    const sorted = [...this.enemies].sort((a,b)=>a.y-b.y);
-    for (const e of sorted) e.draw(ctx);
+    // Y순 정렬 - v27-62 최적화: 매 프레임 [...spread] 복사 제거, 제자리 정렬
+    // (enemies 배열 순서는 게임 로직에 영향 없고, 거의 정렬된 상태 유지라 sort 비용도 저렴)
+    this.enemies.sort((a,b)=>a.y-b.y);
+    for (const e of this.enemies) if (inView(e)) e.draw(ctx);
 
-    for (const p of this.projectiles) p.draw(ctx);
+    for (const p of this.projectiles) if (inView(p)) p.draw(ctx);
     // v27-47: RedFlash(전체화면 빨간 비네트)는 스크린 좌표 기준이라 카메라 변환 밖에서 그려야 함
     // (안에서 그리면 카메라 위치/줌에 따라 화면을 제대로 못 덮는 버그가 생김)
-    for (const p of this.particles) if (!(p instanceof RedFlash)) p.draw(ctx);
+    for (const p of this.particles) if (!(p instanceof RedFlash) && (p.x === undefined || inView(p))) p.draw(ctx);
 
     if (this.selectedTower) this._drawRange(ctx, this.selectedTower);
     if (this.selectedSlotIdx !== null && this.selectedTowerType) this._drawPreview(ctx);
@@ -754,6 +791,10 @@ class GameEngine {
 
       // 맵별 이모지/장식 오버레이
       if (map.drawBg) map.drawBg(bctx, this.worldWidth, this.worldHeight);
+      // v27-62 최적화3: 정적인 경로(4중 스트로크+화살표)를 배경 캐시에 함께 구움 - draw()에서 매
+      // 프레임 그리던 것을 제거하고 여기서 1회만. (경로 텍스처 패턴이 아직 로딩 전이면
+      // _getMosaicPattern이 로드 완료시 _bgDirty를 세워서 자동으로 재생성됨)
+      this.drawPaths(bctx);
       this._bgCanvas = bc; this._bgDirty = false;
     }
     ctx.drawImage(this._bgCanvas, 0, 0);
@@ -825,9 +866,14 @@ class GameEngine {
   }
 
   drawSlots(ctx) {
+    // v27-62 최적화: 화면 밖 슬롯 컬링 (그림자+원+테두리를 슬롯마다 매 프레임 그리므로)
+    const margin = 40;
+    const halfW = this.width / 2 / this.camera.zoom + margin;
+    const halfH = this.height / 2 / this.camera.zoom + margin;
     for (let i=0; i<this.towerSlots.length; i++) {
       const s = this.towerSlots[i];
       if (s.occupied) continue;
+      if (Math.abs(s.x - this.camera.x) > halfW || Math.abs(s.y - this.camera.y) > halfH) continue;
       const isHL = this.selectedTowerType !== null;
       const isHov = this.selectedSlotIdx === i;
       const isMouseHover = this.hoveredSlotIdx === i && !isHov; // v27-49: 데스크탑 마우스 호버 표시 (배치모드 하이라이트와 안 겹치게)

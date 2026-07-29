@@ -2039,6 +2039,9 @@ function initTitleCanvas() {
     if (!document.getElementById('title-screen')?.classList.contains('active')) return;
     requestAnimationFrame(loop);
     frame++;
+    // v27-62 최적화: 타이틀 화면은 장식용이라 30fps면 충분 - 프레임 절반 스킵 (타이틀을
+    // 켜둔 채 방치할 때 배터리가 계속 닳던 문제 완화)
+    if (frame % 2 === 1) return;
 
     W = canvas.clientWidth; H = canvas.clientHeight;
     if (canvas.width !== W || canvas.height !== H) { canvas.width=W; canvas.height=H; }
@@ -2049,7 +2052,7 @@ function initTitleCanvas() {
 
     // 성운 orb
     for (const o of orbs) {
-      o.phase += o.speed;
+      o.phase += o.speed * 2; // 프레임 스킵 보정 (x2)
       const pulse = Math.sin(o.phase) * 0.15 + 0.85;
       const g = ctx.createRadialGradient(o.x,o.y,0,o.x,o.y,o.r*pulse);
       g.addColorStop(0, o.color + '12');
@@ -2061,8 +2064,8 @@ function initTitleCanvas() {
 
     // 파티클
     for (const p of particles) {
-      p.x += p.vx * 0.016; p.y += p.vy * 0.016;
-      p.rot += p.spin;
+      p.x += p.vx * 0.032; p.y += p.vy * 0.032; // 프레임 스킵 보정 (x2)
+      p.rot += p.spin * 2;
       if (p.y < -30) { p.y = H + 10; p.x = Math.random()*W; }
 
       ctx.save();
@@ -2073,18 +2076,24 @@ function initTitleCanvas() {
         ctx.textAlign='center'; ctx.textBaseline='middle';
         ctx.fillText(p.emoji, 0, 0);
       } else {
+        // v27-62 최적화: shadowBlur 제거 - 반투명 큰 원 + 작은 원 이중으로 저렴하게 글로우 흉내
         ctx.fillStyle = p.color;
-        ctx.shadowColor = p.color; ctx.shadowBlur = 8;
+        ctx.globalAlpha *= 0.35;
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r*2.2, 0, Math.PI*2); ctx.fill();
+        ctx.globalAlpha /= 0.35;
         ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI*2); ctx.fill();
       }
       ctx.restore();
     }
 
-    // 하단 그라디언트 오버레이
-    const grad = ctx.createLinearGradient(0, H*0.6, 0, H);
-    grad.addColorStop(0, 'transparent');
-    grad.addColorStop(1, 'rgba(3,6,18,0.6)');
-    ctx.fillStyle = grad;
+    // 하단 그라디언트 오버레이 - v27-62 최적화: 매 프레임 생성하던 그라디언트를 크기 변경시에만 재생성
+    if (!loop._grad || loop._gradH !== H) {
+      const grad = ctx.createLinearGradient(0, H*0.6, 0, H);
+      grad.addColorStop(0, 'transparent');
+      grad.addColorStop(1, 'rgba(3,6,18,0.6)');
+      loop._grad = grad; loop._gradH = H;
+    }
+    ctx.fillStyle = loop._grad;
     ctx.fillRect(0, H*0.6, W, H*0.4);
   }
   loop();

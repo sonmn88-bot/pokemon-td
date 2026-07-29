@@ -554,8 +554,11 @@ function _createGachaTower(def, x, y, engine) {
     get fireRate(){ return def.fireRate*Math.min(this._shopSpeedMul||1, BUFF_CAPS.speed)*(this._tempSpeedMul||1); },
     upgradeCost(){ return null; },
     findTarget(enemies){
+      // v27-62 최적화: Math.hypot(제곱근)을 거리² 비교로 대체 - 결과는 완전히 동일하고 sqrt 비용만 제거
+      const r2 = this.range * this.range;
       if(this.target&&!this.target.dead&&!this.target.reachedEnd){
-        if(Math.hypot(this.target.x-this.x,this.target.y-this.y)<=this.range) return this.target;
+        const dx=this.target.x-this.x, dy=this.target.y-this.y;
+        if(dx*dx+dy*dy<=r2) return this.target;
       }
       // v27-25: 타겟이 없을 때의 전체스캔을 초당 최대 10회로 제한 (요청2 - 필드 밀집시 매프레임 O(타워x적)
       // 전수조사가 누적되어 모바일 프레임드랍 유발 가능성) - 유효 타겟 있을 때는 기존처럼 즉시 반환하니 반응성 손실 없음
@@ -566,8 +569,8 @@ function _createGachaTower(def, x, y, engine) {
       let best=null,bestP=-1;
       for(const e of enemies){
         if(e.dead||e.reachedEnd) continue;
-        const d=Math.hypot(e.x-this.x,e.y-this.y);
-        if(d>this.range) continue;
+        const dx=e.x-this.x, dy=e.y-this.y;
+        if(dx*dx+dy*dy>r2) continue;
         if(e.distTraveled>bestP){ bestP=e.distTraveled; best=e; }
       }
       this._lastScanAt = nowMs;
@@ -600,16 +603,26 @@ function _createGachaTower(def, x, y, engine) {
 
       // 합치기 가능 링 (3개 모임 - 초록)
       if(this.engine){
-        const sameCount=this.engine.towerSlots.filter(s=>s.occupied&&s.tower?._gachaId===def.id).length;
+        // v27-62 최적화: 매 프레임 towerSlots 전체 filter(타워 30개면 프레임당 1500회+)를
+        // 0.5초 캐시로 교체 - 합체 카운트는 타워 배치/판매 때만 바뀌므로 0.5초 지연은 체감 불가
+        const nowMs2 = Date.now();
+        if(!this._sameCountAt || nowMs2 - this._sameCountAt > 500){
+          this._sameCountAt = nowMs2;
+          this._sameCount = this.engine.towerSlots.filter(s=>s.occupied&&s.tower?._gachaId===def.id).length;
+        }
+        const sameCount=this._sameCount||0;
         if(sameCount>=3){
+          // v27-62 최적화: shadowBlur 제거 - 굵은 반투명 링 + 얇은 링 이중으로 글로우 대체
           ctx.save(); ctx.beginPath(); ctx.arc(this.x,this.y,30,0,Math.PI*2);
+          ctx.strokeStyle=`rgba(6,214,160,0.25)`; ctx.lineWidth=6; ctx.stroke();
+          ctx.beginPath(); ctx.arc(this.x,this.y,30,0,Math.PI*2);
           ctx.strokeStyle=`rgba(6,214,160,${0.5+Math.sin(Date.now()*0.006)*0.3})`;
-          ctx.lineWidth=2.5; ctx.shadowColor='#06d6a0'; ctx.shadowBlur=10; ctx.stroke(); ctx.restore();
+          ctx.lineWidth=2.5; ctx.stroke(); ctx.restore();
         } else if(sameCount===2){
           // v27-5: 1개만 더 모으면 합체 가능 - 노란색 링으로 미리 표시 (요청: 조합 힌트)
           ctx.save(); ctx.beginPath(); ctx.arc(this.x,this.y,30,0,Math.PI*2);
           ctx.strokeStyle=`rgba(255,214,10,${0.35+Math.sin(Date.now()*0.006)*0.2})`;
-          ctx.lineWidth=2; ctx.setLineDash([4,3]); ctx.shadowColor='#ffd60a'; ctx.shadowBlur=6; ctx.stroke();
+          ctx.lineWidth=2; ctx.setLineDash([4,3]); ctx.stroke();
           ctx.setLineDash([]); ctx.restore();
         }
       }
@@ -624,17 +637,26 @@ function _createGachaTower(def, x, y, engine) {
       // v27-17: 숙련도 각성(20/20 마스터) 오라 (요청1) - 무지개링과 겹쳐도 구분되게 바깥쪽 큰 링으로
       if(this.masteryMul >= 1.4){ // 20중복 = 1+20*0.02 = 1.4
         ctx.save(); const hue2=(Date.now()*0.08+120)%360;
-        ctx.strokeStyle=`hsla(${hue2},90%,70%,0.55)`;
-        ctx.lineWidth=1.5; ctx.shadowColor=`hsl(${hue2},90%,70%)`; ctx.shadowBlur=8;
+        // v27-62 최적화: shadowBlur 제거 - 반투명 굵은 링으로 글로우 대체
+        ctx.strokeStyle=`hsla(${hue2},90%,70%,0.25)`; ctx.lineWidth=4;
+        ctx.beginPath(); ctx.arc(this.x,this.y,35+Math.sin(Date.now()*0.004)*2,0,Math.PI*2); ctx.stroke();
+        ctx.strokeStyle=`hsla(${hue2},90%,70%,0.55)`; ctx.lineWidth=1.5;
         ctx.beginPath(); ctx.arc(this.x,this.y,35+Math.sin(Date.now()*0.004)*2,0,Math.PI*2); ctx.stroke();
         ctx.restore();
       }
-      // 등급 오라
+      // 등급 오라 - v27-62 최적화: 타워마다 매 프레임 createRadialGradient를 만들던 것을
+      // 등급별 1회 생성해 전역 캐시하고 translate로 위치만 이동 (그라디언트 생성은 비싼 연산)
       if(def.grade!=='normal'){
-        ctx.save(); ctx.beginPath(); ctx.arc(this.x,this.y,28,0,Math.PI*2);
-        const g=ctx.createRadialGradient(this.x,this.y,4,this.x,this.y,28);
-        g.addColorStop(0,grade.color+'28'); g.addColorStop(1,'transparent');
-        ctx.fillStyle=g; ctx.fill(); ctx.restore();
+        if(!window._gradeAuraCache) window._gradeAuraCache = {};
+        let aura = window._gradeAuraCache[def.grade];
+        if(!aura){
+          aura = ctx.createRadialGradient(0,0,4,0,0,28);
+          aura.addColorStop(0,grade.color+'28'); aura.addColorStop(1,'transparent');
+          window._gradeAuraCache[def.grade] = aura;
+        }
+        ctx.save(); ctx.translate(this.x,this.y);
+        ctx.beginPath(); ctx.arc(0,0,28,0,Math.PI*2);
+        ctx.fillStyle=aura; ctx.fill(); ctx.restore();
       }
       // v27-5: 합체진화 직후 확장 링 연출 (item1 - 영웅 진화처럼 임팩트 있게)
       if(this._evolveGlowTimer>0){
@@ -699,11 +721,15 @@ function _createGachaTower(def, x, y, engine) {
         ctx.font=`${sz*0.8}px serif`; ctx.textAlign='center'; ctx.textBaseline='middle';
         ctx.fillText(def.emoji,this.x,this.y);
       }
-      // 등급 별
+      // 등급 별 - v27-62 최적화: shadowBlur(값이 작아도 캔버스 슬로우패스 유발)를 타워 전부가
+      // 매 프레임 쓰고 있었음 → 어두운 텍스트를 1px 아래 먼저 그리는 저렴한 가짜 그림자로 교체
       ctx.font='bold 8px -apple-system,sans-serif';
-      ctx.fillStyle=grade.color; ctx.shadowColor='rgba(0,0,0,0.9)'; ctx.shadowBlur=3;
       ctx.textAlign='center';
-      ctx.fillText('★'.repeat(GRADES[def.grade].stars),this.x,this.y-23);
+      const starStr='★'.repeat(GRADES[def.grade].stars);
+      ctx.fillStyle='rgba(0,0,0,0.9)';
+      ctx.fillText(starStr,this.x,this.y-22);
+      ctx.fillStyle=grade.color;
+      ctx.fillText(starStr,this.x,this.y-23);
       // 타입 배지
       ctx.font='9px serif';
       ctx.fillText(typeInfo.emoji,this.x+18,this.y-18);

@@ -702,11 +702,15 @@ class Enemy {
   }
 
   drawHpBar(ctx, drawY) {
+    const ratio = Math.max(0, this.hp / this.maxHp);
+    // v27-62 최적화: 풀피(한 대도 안 맞은) 일반 몬스터는 HP바 생략 - 필드 100마리+ 상황에서
+    // 대부분이 풀피라 라운드렉트×2를 크게 절감. 정보 손실도 없음(풀피 바는 정보가치가 없으므로).
+    // 보스/방어막 몬스터는 항상 표시 (존재감/게임정보상 중요).
+    if (ratio >= 0.999 && !this.isBoss && !this.def.shieldHp) return;
     const bw = Math.max(this.size * 1.6, 36);
     const bh = this.isBoss ? 7 : 5;
     const bx = this.x - bw / 2;
     const by = drawY - this.size * 0.7 - bh - 3;
-    const ratio = Math.max(0, this.hp / this.maxHp);
 
     // 방어막 바 (뮤츠)
     if (this.def.shieldHp) {
