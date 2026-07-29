@@ -155,7 +155,7 @@ const EnemyTypes = {
     isBoss: true,
     shieldHp: 1000,   // 방어막 (먼저 제거해야 함)
     shieldActive: true,
-    teleportCooldown: 0, teleportInterval: 8,
+    teleportCooldown: 0, teleportInterval: 14,
   },
 
   // ─── 콘텐츠 확장: 추가 포켓몬 8종 ───
@@ -577,8 +577,10 @@ class Enemy {
   }
 
   doTeleport() {
-    // 경로를 앞으로 20% 점프
-    const jumpDist = this.totalLen * 0.15;
+    // v27-61 버그수정: 기존 15%/8초 점프가 누적되면서 오른쪽 지그재그 구간(타워 사거리가 닿는 곳)을
+    // 통째로 건너뛰어버려서, 뮤츠가 계속 왼쪽 복귀통로 근처에서만 맴도는 것처럼 보이던 버그
+    // (요청: "뮤츠 소환하면 왼쪽길로만 워프해서 오른쪽 타워가 못 때림"). 점프폭을 줄이고 주기를 늘림.
+    const jumpDist = this.totalLen * 0.06;
     this.distTraveled = Math.min(this.distTraveled + jumpDist, this.totalLen * 0.95);
     this.engine.spawnHitParticle(this.x, this.y, '#7c4dff');
     this.engine.spawnFloatingText('✨ 순간이동!', this.x, this.y - 30, '#b39ddb');

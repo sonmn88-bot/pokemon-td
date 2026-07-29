@@ -363,13 +363,19 @@ class GameEngine {
     this.state = 'wave';
     // v27-14 버그수정: 연속 스킵하면 이월 큐가 계속 쌓여서, 나중에 한꺼번에 몰아서 스폰되며
     // 필드 누적수가 갑자기 확 튀는 문제가 있었음 (요청4). 백로그 상한을 둬서 너무 많이 쌓이지 않게 함.
+    // v27-20: 백로그 상한을 완전히 제거했었으나(스킵해도 몬스터가 안 사라지게), 그 결과 v27-14가
+    // 막으려던 "한꺼번에 몰아서 스폰"이 그대로 재발했음 (요청: "체력은 충분히 잡고 있었는데 갑자기
+    // 뭉텅이로 나와서 끝났다" - 백로그가 스킵을 거듭하며 쌓이다 결국 전부 동시에 '스폰 가능' 상태가 됐던 것).
+    // v27-61: 삭제 없이(전부 언젠간 나옴) + 최소 간격 강제(동시에 쏟아지지 않음) 둘 다 만족시키도록 수정.
     const carryOver = this.spawnQueue.length;
     if (carryOver > 0) {
       const offset = this.spawnTimer;
       let merged = this.spawnQueue.concat(waveData.map(item => ({ ...item, delay: item.delay + offset + 2 })));
-      // v27-20: 백로그 상한을 완전히 제거 (요청3) - 예전엔 70개 넘으면 "곧 나올 것"들이 통째로 삭제돼서
-      // 스킵을 아무리 많이 해도 결국 몬스터 상당수가 영원히 안 나오는 사실상 무료스킵이 되고 있었음.
-      // 이제 몇 번을 스킵하든 큐에 있는 몬스터는 전부 나중에라도 반드시 나옵니다 (밀린 만큼 필드가 위험해짐 - 의도된 페널티).
+      merged.sort((a, b) => a.delay - b.delay);
+      const MIN_GAP = 0.12; // 몬스터 사이 최소 스폰 간격(초) - 아무리 밀려있어도 이거보단 촘촘해지지 않음
+      for (let i = 1; i < merged.length; i++) {
+        if (merged[i].delay < merged[i-1].delay + MIN_GAP) merged[i].delay = merged[i-1].delay + MIN_GAP;
+      }
       this.spawnQueue = merged;
     } else {
       this.spawnQueue = [...waveData];
@@ -424,9 +430,12 @@ class GameEngine {
       // 정확한 수치는 실제 플레이 피드백 받아서 추가로 조정하는 게 좋을 것 같음.
       let waveHpMul = 1 + (this.currentWave - 10) * 0.022;
       if (this.currentWave > 90) {
-        // v27-19: 왕 이후 난이도가 계속 너무 쉬웠음(95웨이브에도 무난히 클리어) - 지수적으로 훨씬 가파르게
+        // v27-61 버그수정: 1.22 지수가 너무 가팔라서 왕(90) 이후 14웨이브만에(104웨이브) 이미
+        // 약 16배가 되어버려 사실상 못 잡는 벽에 부딪히고 있었음(요청: "많이 투자했는데 갑자기
+        // 끝나버린다" - 실제로는 몹이 안 죽어서 계속 필드에 쌓이다 결국 라이프가 한번에 훅 빠진 것).
+        // 훨씬 완만하게(1.11) 조정 - 같은 배율에 도달하는 데 걸리는 웨이브 수가 대략 2배로 늘어남.
         const post = this.currentWave - 90;
-        waveHpMul *= Math.pow(1.22, post);
+        waveHpMul *= Math.pow(1.11, post);
       }
       if (this._runTrait?.key === 'swarm') waveHpMul *= 0.88;
       enemy.maxHp = Math.round(enemy.maxHp * waveHpMul);
