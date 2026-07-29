@@ -419,7 +419,10 @@ class GameEngine {
     // v27-11: 90웨이브 이후(왕 처치 후 무한강화) 체력 스케일링을 훨씬 가파르게 - 기존엔 웨이브 220에서도
     // 3.94배 수준이라 계속 도배해서 잡을 수 있었음. 이제 90 이후로는 복합 성장으로 훨씬 위협적이게.
     if (!item.isKing && !item.bossTier && this.currentWave > 10) {
-      let waveHpMul = 1 + (this.currentWave - 10) * 0.014;
+      // v27-59: 타워 등급별 데미지 배율을 새로 도입하면서 타워 전체 화력이 꽤 올라서
+      // (특히 레전드/유니크는 2~5배) 90웨이브 이전 체력 증가폭도 같이 소폭 상향(1.4%→2.2%/웨이브).
+      // 정확한 수치는 실제 플레이 피드백 받아서 추가로 조정하는 게 좋을 것 같음.
+      let waveHpMul = 1 + (this.currentWave - 10) * 0.022;
       if (this.currentWave > 90) {
         // v27-19: 왕 이후 난이도가 계속 너무 쉬웠음(95웨이브에도 무난히 클리어) - 지수적으로 훨씬 가파르게
         const post = this.currentWave - 90;

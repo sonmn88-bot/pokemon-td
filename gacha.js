@@ -432,12 +432,19 @@ window.FLAVOR_TEXT = FLAVOR_TEXT;
 
 // ===== v27: 밸런스 재설계 - 기본 스탯 전체 하향 (초반엔 약하게, 업그레이드 투자가 중요해지도록) =====
 // v27-3: 사거리 추가 하향 (0.93 -> 0.72) - 위치별 배치가 의미 있어지고, 사거리 강화템 구매가 가치있어지도록
+// v27-59: 데미지는 등급 구분 없이 똑같이 46%로 깎여서 노말/레어가 절대값이 너무 작아지고(5~10대),
+// 유니크가 레전드랑 DPS가 거의 안 갈리는 문제가 있었음 (요청: "합쳐서 등급 올리는 의미가 느껴지게").
+// 등급별로 다른 배율을 줘서 등급이 오를수록 격차가 더 크게 벌어지도록 재설계.
+const GRADE_DMG_MUL = { normal:0.65, rare:0.80, epic:1.00, legend:1.15, unique:2.30 };
 for (const id in GachaTowerDefs) {
   const d = GachaTowerDefs[id];
-  d.damage   = Math.round(d.damage * 0.80 * 0.72 * 0.80 * 10) / 10;
+  d.damage   = Math.round(d.damage * (GRADE_DMG_MUL[d.grade] || 0.46) * 10) / 10;
   d.fireRate = Math.round(d.fireRate * 0.68 * 100) / 100;
   d.range    = Math.round(d.range * 0.72);
 }
+// v27-59 버그수정: 파이어(moltres)만 기본 공속이 3.0으로 다른 레전드(1.3~2.0)보다 훨씬 빨라서
+// 혼자 유니크보다 DPS가 세지는 이상치였음 - 다른 레전드 수준으로 조정
+GachaTowerDefs.moltres.fireRate = Math.round(2.0 * 0.68 * 100) / 100;
 
 // ===== 헬퍼 =====
 function _shot(tower, engine, color, emoji, status, speed, onHit, splash, knockback) {

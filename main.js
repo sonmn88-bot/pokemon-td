@@ -1529,7 +1529,7 @@ class App {
     const a = hero.def.attack;
     const baseLv = a ? Math.round(a.baseDamage + (hero.level-1)*a.damagePerLevel) : 0;
     const skillBonus = hero._skillVal('atkDmg', 0) + (hero._multiTargetDmgBonus || 0);
-    const evoMul = hero._evoStatMul || 1;
+    const evoMul = hero._evoDmgMul || 1;
     const typeMul = hero._typeUpgradeDmgMul ? hero._typeUpgradeDmgMul() : 1;
     const breakdown = `
       <div style="font-size:9.5px;color:#999;margin:4px 0;line-height:1.5;border-top:1px dashed rgba(255,255,255,0.1);padding-top:3px;">

@@ -101,7 +101,8 @@ const HeroDefs = {
     role:'전기 딜러',
     passive:'전기 타워 데미지 +15%',
     evolution:{ level:15, options:[
-      { id:'raichu', name:'라이츄', color:'#ff9800', statMul:1.20 },
+      // v27-60: 데미지 특화로 통일(다른 강화 요소는 패시브 쪽에서 담당)
+      { id:'raichu', name:'라이츄', color:'#ff9800', dmgMul:1.35, rangeMul:1.15, fireRateMul:1.0 },
     ]},
     attack:{
       baseRange:119, baseDamage:10, baseFireRate:1.1,
@@ -112,7 +113,12 @@ const HeroDefs = {
     passiveApply(engine, hero) {
       // v27-49 버그수정: 실존하지 않는 'voltorb' 타워 id를 체크하고 있어서 이 패시브가 완전히
       // 죽어있었음 (요청4 - "피카츄로 하면 유독 어렵다"의 진짜 원인). 리자몽/거북왕처럼 타입 기준으로 수정.
-      const dmgMul = 1.15 + (hero ? hero._skillVal('passiveRange', 0) : 0);
+      // v27-60: "전기 포켓몬을 많이 모으면 강해지는 전략"으로 - 전기 타워 수에 비례해 추가 보너스
+      // (진화(라이츄) 전엔 소폭, 진화 후엔 더 크게 - 몰빵 전략이 진화 이후 확실히 보상받도록)
+      const electricCount = engine.towers.filter(t => t.def?.type === 'electric').length;
+      const perTower = hero.evolved ? 0.035 : 0.02;
+      const stackBonus = Math.min(electricCount * perTower, hero.evolved ? 0.70 : 0.30); // 상한선
+      const dmgMul = 1.15 + stackBonus + (hero ? hero._skillVal('passiveRange', 0) : 0);
       for (const t of engine.towers) {
         if (t.def?.type === 'electric') t.buffDmgMul = Math.max(t.buffDmgMul||1, dmgMul);
       }
@@ -122,11 +128,13 @@ const HeroDefs = {
         name:'100만볼트', emoji:'⚡', baseCooldown:28,
         desc:'범위 내 모든 적에게 전기 데미지 + 감전',
         cast(hero, engine) {
+          // v27-60: 레벨만 반영하던 고정 데미지 → 오토어택 데미지(타입강화/진화 다 반영됨) 비례로 변경
           const r = (140 + hero.level * 10) * (1 + hero._skillVal('skillRange', 0));
+          const dmg = hero.attackDamage * 1.8;
           for (const e of engine.enemies) {
             if (e.dead||e.reachedEnd) continue;
             if (Math.hypot(e.x-hero.x,e.y-hero.y) <= r) {
-              e.takeDamage(40 + hero.level * 9.0, 'special');
+              e.takeDamage(dmg, 'special');
               e.applyStatus('stun', 0.9, 0);
             }
           }
@@ -144,7 +152,8 @@ const HeroDefs = {
             if (e.hp > maxHp) { maxHp=e.hp; target=e; }
           }
           if (target) {
-            target.takeDamage(160 + hero.level * 33.0, 'special');
+            // v27-60: 고정 데미지 → 오토어택 데미지 비례 (타입강화/진화 반영)
+            target.takeDamage(hero.attackDamage * 4.5, 'special');
             engine.particles.push(new ChainBolt(hero.x, hero.y, target.x, target.y));
             engine.spawnFloatingText('💨전광석화!', target.x, target.y-22, '#ffd600');
           }
@@ -158,7 +167,8 @@ const HeroDefs = {
     role:'서포터 / 행운',
     passive:'전체 타워 데미지 소폭 증가 + 골드 보너스',
     evolution:{ level:15, options:[
-      { id:'togetic', name:'토게틱', color:'#f8bbd0', statMul:1.20 },
+      // v27-60: 서포터 역할에 맞게 한 스탯 몰빵 대신 고르게 - 대신 패시브/스킬(행복의알) 쪽이 진짜 힘
+      { id:'togetic', name:'토게틱', color:'#f8bbd0', dmgMul:1.15, rangeMul:1.35, fireRateMul:1.10 },
     ]},
     attack:{
       baseRange:112, baseDamage:9, baseFireRate:1.0,
@@ -180,7 +190,8 @@ const HeroDefs = {
         cast(hero, engine) {
           const roll = Math.floor(Math.random() * 4);
           if (roll === 0) {
-            for (const e of engine.enemies) { if (!e.dead&&!e.reachedEnd) e.takeDamage(65+hero.level*13,'special'); }
+            const dmg = hero.attackDamage * 1.6; // v27-60: 고정값 → 오토어택 비례로 통일
+            for (const e of engine.enemies) { if (!e.dead&&!e.reachedEnd) e.takeDamage(dmg,'special'); }
             engine.spawnFloatingText('🎲전체 피해!', hero.x, hero.y-32, '#ffd54f');
           } else if (roll === 1) {
             for (const e of engine.enemies) { if (!e.dead&&!e.reachedEnd) e.applyStatus('slow',3.5,0.38); }
@@ -197,13 +208,15 @@ const HeroDefs = {
       },
       {
         name:'행복의알', emoji:'🥚', baseCooldown:36,
-        desc:'모든 타워 데미지 +25% (8초)',
+        desc:'모든 타워 데미지 증가 (레벨에 비례, 8초)',
         cast(hero, engine) {
           // v27-29 버그수정: buffDmgMul(영구필드)에 직접 곱하고 타이머 해제 로직이 아예 없어서,
           // 쿨다운 24초마다 재사용할 때마다 데미지가 영구적으로 복리 누적되고 있었음(요청 - 지속피해
           // 원인 재검토 결과 발견. 셋 중 쿨다운이 제일 짧아 가장 심각했을 가능성). 임시배율 필드로 교체.
+          // v27-60: 고정 +25%는 레벨을 올려도 안 세지는 유일한 스킬이었음 - 레벨 비례로 변경(Lv1=+25%, Lv25=+40%)
+          const mul = 1 + 0.25 + hero.level * 0.006;
           for (const t of engine.towers) {
-            t._tempDmgMul = 1.25;
+            t._tempDmgMul = mul;
             t._pokecenterTimer = 8; // 타워 update()의 만료처리 로직 재사용
           }
           engine.spawnFloatingText('🥚행복의알!', hero.x, hero.y-32, '#fff59d');
@@ -225,9 +238,11 @@ HeroDefs.eevee = {
     projColor:'#d7ccc8', projEmoji:'⭐', dmgType:'special',
   },
   evolution:{ level:12, options:[
-    { id:'vaporeon', name:'샤미드',   color:'#29b6f6', statMul:1.28, focus:'물(사거리 특화)' },
-    { id:'jolteon',  name:'쥬피썬더', color:'#ffd600', statMul:1.28, focus:'전기(공속 특화)' },
-    { id:'flareon',  name:'부스터',   color:'#ff5722', statMul:1.28, focus:'불(데미지 특화)' },
+    // v27-60: "사거리 특화"는 DPS에 실질적 의미가 없다는 지적 반영 - 샤미드는 사거리 대신
+    // 슬로우/CC 기능을 실제로 강화하는 쪽으로 재설계 (아래 '적응' 스킬에서 분기 처리)
+    { id:'vaporeon', name:'샤미드',   color:'#29b6f6', dmgMul:1.10, rangeMul:1.30, fireRateMul:1.00, focus:'물(슬로우 서포터 특화)' },
+    { id:'jolteon',  name:'쥬피썬더', color:'#ffd600', dmgMul:1.10, rangeMul:1.05, fireRateMul:1.45, focus:'전기(공속 특화)' },
+    { id:'flareon',  name:'부스터',   color:'#ff5722', dmgMul:1.45, rangeMul:1.05, fireRateMul:1.00, focus:'불(데미지 특화)' },
   ]},
   passiveApply(engine, hero) {
     const mul = 1.05 + (hero ? hero._skillVal('passiveRange', 0) : 0);
@@ -236,14 +251,21 @@ HeroDefs.eevee = {
   skills:[
     {
       name:'적응', emoji:'🌀', baseCooldown:28,
-      desc:'범위 내 모든 적 슬로우 + 소량 피해',
+      desc:'범위 내 모든 적 슬로우 + 소량 피해 (진화 시 특성 강화)',
       cast(hero, engine) {
+        // v27-60: 고정 데미지 → 오토어택 비례로 변경 + 진화별 실제 기능 차등
+        // (기존엔 샤미드/쥬피썬더/부스터가 색깔만 다르고 완전히 같은 스킬이었음)
         const r = (140 + hero.level * 8) * (1 + hero._skillVal('skillRange', 0));
+        let dmgMul = 1.5, slowDur = 2.5, slowFactor = 0.5;
+        if (hero.evolved === 'vaporeon') { dmgMul = 1.2; slowDur = 4.0; slowFactor = 0.65; }      // 물: 슬로우 서포터
+        else if (hero.evolved === 'flareon') { dmgMul = 2.0; slowDur = 1.5; slowFactor = 0.30; }   // 불: 데미지 특화
+        // 쥬피썬더는 기본값 유지 (공속 특화는 오토어택 fireRateMul로 이미 충분히 반영됨)
+        const dmg = hero.attackDamage * dmgMul;
         for (const e of engine.enemies) {
           if (e.dead||e.reachedEnd) continue;
           if (Math.hypot(e.x-hero.x,e.y-hero.y) <= r) {
-            e.takeDamage(18 + hero.level * 3.6, 'special');
-            e.applyStatus('slow', 2.5, 0.5);
+            e.takeDamage(dmg, 'special');
+            e.applyStatus('slow', slowDur, slowFactor);
           }
         }
         engine.particles.push(new AoeBurst(hero.x, hero.y, r, hero._evoColor || '#a1887f'));
@@ -251,11 +273,15 @@ HeroDefs.eevee = {
       }
     },
     {
-      name:'재빠른몸놀림', emoji:'💨', baseCooldown:40,
-      desc:'모든 스킬 쿨다운 즉시 30% 감소',
+      // v27-60: 기존 "쿨다운 즉시 30% 감소"는 다른 영웅들의 즉발 딜/CC 스킬에 비해 체감이
+      // 약하다는 지적(요청) - 이브이의 "다재다능(여러 형태로 진화 가능)" 컨셉에 맞게, 짧은 시간
+      // 데미지·공속·사거리를 전부 끌어올리는 올스탯 버스트로 교체 (진화 후에도 그대로 사용 가능)
+      name:'다재다능', emoji:'🌈', baseCooldown:32,
+      desc:'짧은 시간 데미지+공속+사거리 대폭 상승',
       cast(hero, engine) {
-        for (const h of engine.heroes) h.cooldowns = h.cooldowns.map(c => c * 0.7);
-        engine.spawnFloatingText('💨재빠른몸놀림!', hero.x, hero.y-32, '#fff59d');
+        hero._burstTimer = 4 + hero.level * 0.12; // 레벨이 오를수록 지속시간도 늘어남
+        engine.particles.push(new AoeBurst(hero.x, hero.y, 60, hero._evoColor || '#ce93d8'));
+        engine.spawnFloatingText('🌈다재다능!', hero.x, hero.y-32, '#ce93d8');
       }
     },
   ],
@@ -297,12 +323,14 @@ class Hero {
   get attackRange() {
     const a = this.def.attack;
     if (!a) return 0;
-    return (a.baseRange + (this.level-1)*a.rangePerLevel) * (1 + this._skillVal('atkRange', 0)) * (this._evoStatMul || 1);
+    const burst = (this._burstTimer > 0) ? 1.3 : 1;
+    return (a.baseRange + (this.level-1)*a.rangePerLevel) * (1 + this._skillVal('atkRange', 0)) * (this._evoRangeMul || 1) * burst;
   }
   get attackDamage() {
     const a = this.def.attack;
     if (!a) return 0;
-    const base = (a.baseDamage + (this.level-1)*a.damagePerLevel) * (1 + this._skillVal('atkDmg', 0) + (this._multiTargetDmgBonus || 0)) * (this._evoStatMul || 1);
+    const burst = (this._burstTimer > 0) ? 1.4 : 1;
+    const base = (a.baseDamage + (this.level-1)*a.damagePerLevel) * (1 + this._skillVal('atkDmg', 0) + (this._multiTargetDmgBonus || 0)) * (this._evoDmgMul || 1) * burst;
     return base * this._typeUpgradeDmgMul();
   }
 
@@ -320,7 +348,10 @@ class Hero {
   get attackFireRate() {
     const a = this.def.attack;
     if (!a) return 0;
-    return a.baseFireRate * (1 + this._skillVal('fireRate', 0));
+    const burst = (this._burstTimer > 0) ? 1.4 : 1;
+    // v27-60 버그수정: 진화 배율이 공속엔 전혀 안 붙고 있었음 - "쥬피썬더는 공속특화"가
+    // 사실상 이름만 붙어있고 실제 공속은 이브이랑 완전히 같았던 문제 (요청: 진화별 실제 기능 차등)
+    return a.baseFireRate * (1 + this._skillVal('fireRate', 0)) * (this._evoFireRateMul || 1) * burst;
   }
 
   // 스킬트리 값 합산
@@ -390,7 +421,12 @@ class Hero {
   _evolve(option, engine) {
     this.evolved = option.id;
     this.evolutionPending = false;
-    this._evoStatMul = option.statMul || 1.2;
+    // v27-60: 데미지/사거리/공속을 각각 다른 배율로 - 진화마다 "숫자만 다른 같은 유닛"이 아니라
+    // 진짜 역할이 갈리도록 (요청: "샤미드 같은 애들 너무 약함... 기능적인 면이 더 들어가야")
+    const fallback = option.statMul || 1.2;
+    this._evoDmgMul = option.dmgMul || fallback;
+    this._evoRangeMul = option.rangeMul || fallback;
+    this._evoFireRateMul = option.fireRateMul || 1.0;
     this._evoColor = option.color;
     this._evoName = option.name; // v27 fix: 진화 후 이름이 안 바뀌던 버그
     engine && engine.spawnFloatingText(`✨ ${option.name}(으)로 진화!`, this.x, this.y-46, option.color);
@@ -486,6 +522,7 @@ class Hero {
       if (this.cooldowns[i] > 0) this.cooldowns[i] -= dt;
       if (this.castFlash[i] > 0) this.castFlash[i] -= dt;
     }
+    if (this._burstTimer > 0) this._burstTimer -= dt; // v27-60: 이브이 '다재다능' 스킬 지속시간
 
     // 자동 공격
     if (this.def.attack && engine.enemies) {
