@@ -654,6 +654,11 @@ class App {
         btn.classList.add('active');
       });
     });
+    // v27-63: 카메라 원위치 버튼 (요청 - 화면이 확대/이동된 채 못 돌아오는 문제의 복구 수단)
+    const camBtn = document.getElementById('btn-cam-reset');
+    if (camBtn) camBtn.addEventListener('click', () => {
+      if (this.engine) { this.engine.resetCamera(); this.showWaveAnnounce('🧭 화면 원위치', '#4fc3f7'); }
+    });
   }
 
   _updateWaveHUD() {
@@ -1268,9 +1273,7 @@ class App {
     this.engine.update = () => {
       origUpdate();
       if (this.engine.state === 'wave' || this.engine.state === 'idle') {
-        // v27-58 버그수정: engine.js의 원래 update()가 이미 this.heroes를 업데이트하고 있는데
-        // 여기서 또 한 번 돌려서 영웅 스킬/쿨다운/스탯이 실질적으로 2배 속도로 도는 버그였음
-        // (겉보기엔 "영웅이 2마리"처럼 보이는 원인 중 하나 - 아래 draw 이중호출과 합쳐져서 더 눈에 띔).
+        for (const h of this.engine.heroes) h.update(this.engine.dt, this.engine);
         this.spellMgr.update(this.engine.dt);
         this.updateSpellBarUI();
         this.updateHeroSkillBarUI();
@@ -1341,11 +1344,11 @@ class App {
       }
     };
 
-    // v27-58 버그수정: "영웅이 2마리로 보인다" 최종 원인 - engine.js의 draw()가 카메라 변환이 걸린
-    // 상태에서 이미 this.heroes를 정상적으로 그리는데, 여기서 origDraw() 이후(카메라 변환이 이미
-    // ctx.restore()로 풀린 시점)에 같은 영웅을 화면좌표 기준으로 또 그리고 있었음 - 그 결과 실제 영웅
-    // 옆에 (world 좌표를 화면 좌표로 착각해서 그려진) "유령 영웅"이 하나 더 보이던 것. 중복 draw 제거.
-    // engine.draw는 원본 그대로 사용(오버라이드 불필요).
+    const origDraw = this.engine.draw.bind(this.engine);
+    this.engine.draw = () => {
+      origDraw();
+      for (const h of this.engine.heroes) h.draw(this.engine.ctx);
+    };
 
     const origPlace = this.engine.placeTower.bind(this.engine);
     this.engine.placeTower = (TowerClass, slotIdx) => {
@@ -1529,7 +1532,7 @@ class App {
     const a = hero.def.attack;
     const baseLv = a ? Math.round(a.baseDamage + (hero.level-1)*a.damagePerLevel) : 0;
     const skillBonus = hero._skillVal('atkDmg', 0) + (hero._multiTargetDmgBonus || 0);
-    const evoMul = hero._evoDmgMul || 1;
+    const evoMul = hero._evoStatMul || 1;
     const typeMul = hero._typeUpgradeDmgMul ? hero._typeUpgradeDmgMul() : 1;
     const breakdown = `
       <div style="font-size:9.5px;color:#999;margin:4px 0;line-height:1.5;border-top:1px dashed rgba(255,255,255,0.1);padding-top:3px;">
@@ -1554,6 +1557,25 @@ class App {
   }
 
   bindCanvasInput() {
+    // v27-63: 모바일에서 브라우저 자체의 "페이지 확대"가 어쩌다 발동되면(더블탭/핀치줌 오인식)
+    // 사파리는 되돌릴 방법을 안 줘서 화면이 확대된 채 게임을 망치는 문제 (요청).
+    // CSS touch-action:none만으로는 iOS 사파리가 무시하는 경우가 있어 3중으로 차단:
+    // 1) iOS 전용 gesture 이벤트(페이지 핀치줌의 근원) 차단 - 게임 카메라 핀치줌은
+    //    canvas의 touch 이벤트로 처리되므로 영향 없음
+    ['gesturestart','gesturechange','gestureend'].forEach(ev =>
+      document.addEventListener(ev, e => e.preventDefault(), { passive: false }));
+    // 2) 더블클릭 줌 차단
+    document.addEventListener('dblclick', e => e.preventDefault(), { passive: false });
+    // 3) 비인터랙티브 요소(패널 여백 등)에서의 빠른 연속탭 → 사파리 더블탭줌 휴리스틱 차단.
+    //    버튼/입력요소/랭킹타이틀(관리자 5탭)은 제외해서 뽑기 연타 등 정상 연타 UX는 그대로 유지.
+    let _lastTapEnd = 0;
+    document.addEventListener('touchend', (e) => {
+      const t = Date.now();
+      const isInteractive = e.target.closest && e.target.closest('button, input, select, textarea, a, #rank-title, #game-canvas');
+      if (!isInteractive && t - _lastTapEnd < 320) e.preventDefault();
+      _lastTapEnd = t;
+    }, { passive: false });
+
     // v27-36: 모바일은 마우스 호버가 없어서 title 속성(스킬/아이템 설명)을 볼 방법이 없었음 (요청8).
     // 버튼을 터치하는 순간 title 텍스트를 짧게 화면에 띄워주고, 원래 탭 동작(클릭)은 그대로 진행되게 함
     // (설명 확인과 실제 사용을 방해하지 않고 동시에 되도록 - preventDefault 안 씀).
@@ -2039,9 +2061,6 @@ function initTitleCanvas() {
     if (!document.getElementById('title-screen')?.classList.contains('active')) return;
     requestAnimationFrame(loop);
     frame++;
-    // v27-62 최적화: 타이틀 화면은 장식용이라 30fps면 충분 - 프레임 절반 스킵 (타이틀을
-    // 켜둔 채 방치할 때 배터리가 계속 닳던 문제 완화)
-    if (frame % 2 === 1) return;
 
     W = canvas.clientWidth; H = canvas.clientHeight;
     if (canvas.width !== W || canvas.height !== H) { canvas.width=W; canvas.height=H; }
@@ -2052,7 +2071,7 @@ function initTitleCanvas() {
 
     // 성운 orb
     for (const o of orbs) {
-      o.phase += o.speed * 2; // 프레임 스킵 보정 (x2)
+      o.phase += o.speed;
       const pulse = Math.sin(o.phase) * 0.15 + 0.85;
       const g = ctx.createRadialGradient(o.x,o.y,0,o.x,o.y,o.r*pulse);
       g.addColorStop(0, o.color + '12');
@@ -2064,8 +2083,8 @@ function initTitleCanvas() {
 
     // 파티클
     for (const p of particles) {
-      p.x += p.vx * 0.032; p.y += p.vy * 0.032; // 프레임 스킵 보정 (x2)
-      p.rot += p.spin * 2;
+      p.x += p.vx * 0.016; p.y += p.vy * 0.016;
+      p.rot += p.spin;
       if (p.y < -30) { p.y = H + 10; p.x = Math.random()*W; }
 
       ctx.save();
@@ -2076,24 +2095,18 @@ function initTitleCanvas() {
         ctx.textAlign='center'; ctx.textBaseline='middle';
         ctx.fillText(p.emoji, 0, 0);
       } else {
-        // v27-62 최적화: shadowBlur 제거 - 반투명 큰 원 + 작은 원 이중으로 저렴하게 글로우 흉내
         ctx.fillStyle = p.color;
-        ctx.globalAlpha *= 0.35;
-        ctx.beginPath(); ctx.arc(p.x, p.y, p.r*2.2, 0, Math.PI*2); ctx.fill();
-        ctx.globalAlpha /= 0.35;
+        ctx.shadowColor = p.color; ctx.shadowBlur = 8;
         ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI*2); ctx.fill();
       }
       ctx.restore();
     }
 
-    // 하단 그라디언트 오버레이 - v27-62 최적화: 매 프레임 생성하던 그라디언트를 크기 변경시에만 재생성
-    if (!loop._grad || loop._gradH !== H) {
-      const grad = ctx.createLinearGradient(0, H*0.6, 0, H);
-      grad.addColorStop(0, 'transparent');
-      grad.addColorStop(1, 'rgba(3,6,18,0.6)');
-      loop._grad = grad; loop._gradH = H;
-    }
-    ctx.fillStyle = loop._grad;
+    // 하단 그라디언트 오버레이
+    const grad = ctx.createLinearGradient(0, H*0.6, 0, H);
+    grad.addColorStop(0, 'transparent');
+    grad.addColorStop(1, 'rgba(3,6,18,0.6)');
+    ctx.fillStyle = grad;
     ctx.fillRect(0, H*0.6, W, H*0.4);
   }
   loop();

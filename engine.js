@@ -153,6 +153,14 @@ class GameEngine {
   }
 
   // v27-47: 카메라가 월드 밖으로 안 나가게 고정 (요청A)
+  // v27-63: 카메라 원위치 (요청 - 화면이 확대/이동된 채 돌아오지 못하는 경우의 복구 수단)
+  resetCamera() {
+    this.camera.x = this.worldWidth / 2;
+    this.camera.y = this.worldHeight / 2;
+    this.camera.zoom = Math.max(this.minZoom, Math.min(this.maxZoom,
+      Math.min(this.width / this.worldWidth, this.height / this.worldHeight) * 1.15));
+    this.clampCamera();
+  }
   clampCamera() {
     const viewW = this.width / this.camera.zoom, viewH = this.height / this.camera.zoom;
     const halfW = viewW / 2, halfH = viewH / 2;
@@ -204,28 +212,9 @@ class GameEngine {
     if (!this.running) return;
     const raw = Math.min((ts - this.lastTime) / 1000, 0.05);
     this.lastTime = ts;
-
-    // v27-62 최적화1 (3배속 끊김의 근본수정): 배속을 dt에 한번에 곱하면 한 프레임에 이동거리가
-    // 3배로 커져서 움직임이 뚝뚝 끊겨보이고, 충돌/상태이상 판정도 성겨짐. 시뮬레이션을 최대 1/50초
-    // 단위의 서브스텝으로 잘게 쪼개 여러 번 돌리면 물리 정확도가 배속과 무관하게 유지됨.
-    // (렌더링은 프레임당 1번만 - 비용이 큰 건 draw쪽이라 전체 비용 증가는 미미함)
-    const total = raw * this.speedMul;
-    const MAX_STEP = 1 / 50;
-    let remaining = total;
-    while (remaining > 0.0001) {
-      this.dt = Math.min(remaining, MAX_STEP);
-      this.update();
-      remaining -= this.dt;
-    }
-    this.dt = total; // draw쪽에서 dt를 참조하는 이펙트가 있어도 프레임 전체 시간 기준으로 동작하게
-
-    // v27-62 최적화2 (배터리): 완전 유휴상태(idle + 필드에 아무것도 없음)에서는 화면이 사실상
-    // 정지 상태이므로 렌더링을 절반(약 30fps)으로 낮춰 GPU 부하/배터리 소모를 줄임.
-    const isQuiet = this.state === 'idle' && this.enemies.length === 0 &&
-                    this.projectiles.length === 0 && this.particles.length === 0;
-    this._frameSkip = (this._frameSkip || 0) + 1;
-    if (!isQuiet || this._frameSkip % 2 === 0) this.draw();
-
+    this.dt = raw * this.speedMul;
+    this.update();
+    this.draw();
     requestAnimationFrame(t=>this.loop(t));
   }
 
@@ -240,13 +229,7 @@ class GameEngine {
       this.deployPoints = Math.min(this.maxDeployPoints, this.deployPoints + this.deployRegenRate * this.dt);
       // 웨이브 제한시간 (시간 내 전멸 못 시키면 남은 적 수만큼 라이프 손실)
       this.waveTimeRemaining -= this.dt;
-      // v27-62 최적화: 타이머 DOM 업데이트를 초당 4회로 제한 (매 서브스텝마다 DOM 건드리면
-      // 모바일에서 레이아웃/페인트 비용이 상당함 - 0.25초 정밀도면 표시용으론 충분)
-      this._timerUiAcc = (this._timerUiAcc || 0) + this.dt;
-      if (this._timerUiAcc >= 0.25) {
-        this._timerUiAcc = 0;
-        this.onWaveTimerChange && this.onWaveTimerChange(Math.max(0, this.waveTimeRemaining), this.waveTimeLimit);
-      }
+      this.onWaveTimerChange && this.onWaveTimerChange(Math.max(0, this.waveTimeRemaining), this.waveTimeLimit);
       if (this.waveTimeRemaining <= 0) this.timeoutWave();
     }
 
@@ -388,19 +371,13 @@ class GameEngine {
     this.state = 'wave';
     // v27-14 버그수정: 연속 스킵하면 이월 큐가 계속 쌓여서, 나중에 한꺼번에 몰아서 스폰되며
     // 필드 누적수가 갑자기 확 튀는 문제가 있었음 (요청4). 백로그 상한을 둬서 너무 많이 쌓이지 않게 함.
-    // v27-20: 백로그 상한을 완전히 제거했었으나(스킵해도 몬스터가 안 사라지게), 그 결과 v27-14가
-    // 막으려던 "한꺼번에 몰아서 스폰"이 그대로 재발했음 (요청: "체력은 충분히 잡고 있었는데 갑자기
-    // 뭉텅이로 나와서 끝났다" - 백로그가 스킵을 거듭하며 쌓이다 결국 전부 동시에 '스폰 가능' 상태가 됐던 것).
-    // v27-61: 삭제 없이(전부 언젠간 나옴) + 최소 간격 강제(동시에 쏟아지지 않음) 둘 다 만족시키도록 수정.
     const carryOver = this.spawnQueue.length;
     if (carryOver > 0) {
       const offset = this.spawnTimer;
       let merged = this.spawnQueue.concat(waveData.map(item => ({ ...item, delay: item.delay + offset + 2 })));
-      merged.sort((a, b) => a.delay - b.delay);
-      const MIN_GAP = 0.12; // 몬스터 사이 최소 스폰 간격(초) - 아무리 밀려있어도 이거보단 촘촘해지지 않음
-      for (let i = 1; i < merged.length; i++) {
-        if (merged[i].delay < merged[i-1].delay + MIN_GAP) merged[i].delay = merged[i-1].delay + MIN_GAP;
-      }
+      // v27-20: 백로그 상한을 완전히 제거 (요청3) - 예전엔 70개 넘으면 "곧 나올 것"들이 통째로 삭제돼서
+      // 스킵을 아무리 많이 해도 결국 몬스터 상당수가 영원히 안 나오는 사실상 무료스킵이 되고 있었음.
+      // 이제 몇 번을 스킵하든 큐에 있는 몬스터는 전부 나중에라도 반드시 나옵니다 (밀린 만큼 필드가 위험해짐 - 의도된 페널티).
       this.spawnQueue = merged;
     } else {
       this.spawnQueue = [...waveData];
@@ -450,17 +427,11 @@ class GameEngine {
     // v27-11: 90웨이브 이후(왕 처치 후 무한강화) 체력 스케일링을 훨씬 가파르게 - 기존엔 웨이브 220에서도
     // 3.94배 수준이라 계속 도배해서 잡을 수 있었음. 이제 90 이후로는 복합 성장으로 훨씬 위협적이게.
     if (!item.isKing && !item.bossTier && this.currentWave > 10) {
-      // v27-59: 타워 등급별 데미지 배율을 새로 도입하면서 타워 전체 화력이 꽤 올라서
-      // (특히 레전드/유니크는 2~5배) 90웨이브 이전 체력 증가폭도 같이 소폭 상향(1.4%→2.2%/웨이브).
-      // 정확한 수치는 실제 플레이 피드백 받아서 추가로 조정하는 게 좋을 것 같음.
-      let waveHpMul = 1 + (this.currentWave - 10) * 0.022;
+      let waveHpMul = 1 + (this.currentWave - 10) * 0.014;
       if (this.currentWave > 90) {
-        // v27-61 버그수정: 1.22 지수가 너무 가팔라서 왕(90) 이후 14웨이브만에(104웨이브) 이미
-        // 약 16배가 되어버려 사실상 못 잡는 벽에 부딪히고 있었음(요청: "많이 투자했는데 갑자기
-        // 끝나버린다" - 실제로는 몹이 안 죽어서 계속 필드에 쌓이다 결국 라이프가 한번에 훅 빠진 것).
-        // 훨씬 완만하게(1.11) 조정 - 같은 배율에 도달하는 데 걸리는 웨이브 수가 대략 2배로 늘어남.
+        // v27-19: 왕 이후 난이도가 계속 너무 쉬웠음(95웨이브에도 무난히 클리어) - 지수적으로 훨씬 가파르게
         const post = this.currentWave - 90;
-        waveHpMul *= Math.pow(1.11, post);
+        waveHpMul *= Math.pow(1.22, post);
       }
       if (this._runTrait?.key === 'swarm') waveHpMul *= 0.88;
       enemy.maxHp = Math.round(enemy.maxHp * waveHpMul);
@@ -647,32 +618,20 @@ class GameEngine {
     }
 
     this._drawBgCached(ctx);
-    // v27-62 최적화3: drawPaths는 4중 스트로크(그림자/테두리/본체/하이라이트) + 화살표 수십 개를
-    // 매 프레임 그리고 있었음 - 경로는 월드좌표상 완전히 정적이므로 배경 캐시에 함께 구워버림
-    // (이제 _drawBgCached 생성시에만 1회 그려짐). 모바일 GPU 부하의 가장 큰 단일 절감 포인트.
+    this.drawPaths(ctx);
     this.drawSlots(ctx);
 
-    // v27-62 최적화4: 뷰포트 컬링 - 카메라 화면 밖에 있는 개체는 그리지 않음.
-    // 모바일은 기본적으로 줌인 상태로 플레이해서 월드의 일부만 보이는데, 기존엔 화면 밖
-    // 개체들도 전부 그리고 있었음 (특히 후반 몬스터 100마리+ 상황에서 큰 낭비).
-    const cullMargin = 80; // 큰 보스/이펙트가 경계에서 잘려보이지 않게 여유
-    const viewHalfW = this.width / 2 / this.camera.zoom + cullMargin;
-    const viewHalfH = this.height / 2 / this.camera.zoom + cullMargin;
-    const cx = this.camera.x, cy = this.camera.y;
-    const inView = (o) => Math.abs(o.x - cx) <= viewHalfW && Math.abs(o.y - cy) <= viewHalfH;
-
-    for (const t of this.towers) if (inView(t)) t.draw(ctx);
+    for (const t of this.towers) t.draw(ctx);
     for (const h of this.heroes) h.draw(ctx);
 
-    // Y순 정렬 - v27-62 최적화: 매 프레임 [...spread] 복사 제거, 제자리 정렬
-    // (enemies 배열 순서는 게임 로직에 영향 없고, 거의 정렬된 상태 유지라 sort 비용도 저렴)
-    this.enemies.sort((a,b)=>a.y-b.y);
-    for (const e of this.enemies) if (inView(e)) e.draw(ctx);
+    // Y순 정렬
+    const sorted = [...this.enemies].sort((a,b)=>a.y-b.y);
+    for (const e of sorted) e.draw(ctx);
 
-    for (const p of this.projectiles) if (inView(p)) p.draw(ctx);
+    for (const p of this.projectiles) p.draw(ctx);
     // v27-47: RedFlash(전체화면 빨간 비네트)는 스크린 좌표 기준이라 카메라 변환 밖에서 그려야 함
     // (안에서 그리면 카메라 위치/줌에 따라 화면을 제대로 못 덮는 버그가 생김)
-    for (const p of this.particles) if (!(p instanceof RedFlash) && (p.x === undefined || inView(p))) p.draw(ctx);
+    for (const p of this.particles) if (!(p instanceof RedFlash)) p.draw(ctx);
 
     if (this.selectedTower) this._drawRange(ctx, this.selectedTower);
     if (this.selectedSlotIdx !== null && this.selectedTowerType) this._drawPreview(ctx);
@@ -684,53 +643,6 @@ class GameEngine {
 
     // v27-47: 보스 HP바는 화면 상단 고정 UI라서 카메라 변환 밖(화면좌표)에서 그림
     if (this.activeBoss) this._drawBossBar(ctx);
-  }
-
-  // v27-58: 타일 텍스처(잔디/흙/용암/벽돌) 여러 장을 하나의 모자이크 캔버스로 합쳐서
-  // CanvasPattern으로 반복시키는 헬퍼. 변종 이미지를 섞고 일부는 반전시켜서
-  // 눈에 띄는 반복(타일링 티)을 최대한 줄인다. 로딩 전에는 null 반환(호출부가 폴백 처리).
-  _getMosaicPattern(ctx, key, urls, worldTileSize) {
-    if (!this._texCache) this._texCache = {};
-    const cacheKey = key + '_' + worldTileSize;
-    let entry = this._texCache[cacheKey];
-    if (!entry) {
-      entry = { images: [], loadedCount: 0, ready: false, pattern: null };
-      urls.forEach((u, i) => {
-        const im = new Image();
-        im.onload = () => {
-          entry.loadedCount++;
-          if (entry.loadedCount === urls.length) { entry.ready = true; this._bgDirty = true; }
-        };
-        im.src = u;
-        entry.images[i] = im;
-      });
-      this._texCache[cacheKey] = entry;
-    }
-    if (!entry.ready) return null;
-    if (!entry.pattern) {
-      const s = entry.images[0].naturalWidth || 512;
-      const cols = entry.images.length >= 2 ? 2 : 1;
-      const rows = Math.ceil(entry.images.length / cols);
-      const mc = document.createElement('canvas');
-      mc.width = s * cols; mc.height = s * rows;
-      const mctx = mc.getContext('2d');
-      entry.images.forEach((im, i) => {
-        const cx = (i % cols) * s, cy = Math.floor(i / cols) * s;
-        const flipX = (i * 7) % 3 === 0, flipY = (i * 11) % 4 === 0;
-        mctx.save();
-        mctx.translate(cx + (flipX ? s : 0), cy + (flipY ? s : 0));
-        mctx.scale(flipX ? -1 : 1, flipY ? -1 : 1);
-        mctx.drawImage(im, 0, 0, s, s);
-        mctx.restore();
-      });
-      const pat = ctx.createPattern(mc, 'repeat');
-      if (pat && pat.setTransform) {
-        const scale = worldTileSize / s;
-        try { pat.setTransform(new DOMMatrix().scale(scale)); } catch (e) {}
-      }
-      entry.pattern = pat;
-    }
-    return entry.pattern;
   }
 
   _drawBgCached(ctx) {
@@ -747,20 +659,8 @@ class GameEngine {
       const bctx = bc.getContext('2d');
       const map = this.currentMap;
 
-      // v27-58: 반복 타일 텍스처(잔디/용암 등) 우선 사용 - 자연스러운 배경을 위해 모자이크 패턴으로 채움
-      if (map.bgTextures) {
-        const pat = this._getMosaicPattern(bctx, map.name + '_bg', map.bgTextures, map.bgTileSize || 300);
-        if (pat) {
-          bctx.fillStyle = pat;
-          bctx.fillRect(0, 0, this.worldWidth, this.worldHeight);
-        } else {
-          bctx.fillStyle = map.bgColor;
-          bctx.fillRect(0, 0, this.worldWidth, this.worldHeight);
-        }
-        // 어두운 오버레이로 게임 톤(다크)과 어우러지게
-        bctx.fillStyle = 'rgba(0,0,0,0.30)';
-        bctx.fillRect(0, 0, this.worldWidth, this.worldHeight);
-      } else if (map.bgImage) {
+      // 배경 이미지 있으면 사용, 없으면 단색
+      if (map.bgImage) {
         if (!this._bgImg || this._bgImg._src !== map.bgImage) {
           const im = new Image();
           im._src = map.bgImage;
@@ -791,10 +691,6 @@ class GameEngine {
 
       // 맵별 이모지/장식 오버레이
       if (map.drawBg) map.drawBg(bctx, this.worldWidth, this.worldHeight);
-      // v27-62 최적화3: 정적인 경로(4중 스트로크+화살표)를 배경 캐시에 함께 구움 - draw()에서 매
-      // 프레임 그리던 것을 제거하고 여기서 1회만. (경로 텍스처 패턴이 아직 로딩 전이면
-      // _getMosaicPattern이 로드 완료시 _bgDirty를 세워서 자동으로 재생성됨)
-      this.drawPaths(bctx);
       this._bgCanvas = bc; this._bgDirty = false;
     }
     ctx.drawImage(this._bgCanvas, 0, 0);
@@ -819,13 +715,8 @@ class GameEngine {
       for (let i=1;i<path.length;i++) ctx.lineTo(path[i].x,path[i].y);
       ctx.stroke(); ctx.restore();
 
-      // 경로 본체 - v27-58: 텍스처(흙/벽돌) 있으면 패턴으로, 없으면 기존 단색
-      let pathFill = map.pathColor;
-      if (map.pathTextures) {
-        const ppat = this._getMosaicPattern(ctx, map.name + '_path', map.pathTextures, map.pathTileSize || 40);
-        if (ppat) pathFill = ppat;
-      }
-      ctx.save(); ctx.strokeStyle=pathFill;
+      // 경로 본체
+      ctx.save(); ctx.strokeStyle=map.pathColor;
       ctx.lineWidth=pw; ctx.lineCap='round'; ctx.lineJoin='round';
       ctx.beginPath(); ctx.moveTo(path[0].x,path[0].y);
       for (let i=1;i<path.length;i++) ctx.lineTo(path[i].x,path[i].y);
@@ -866,14 +757,9 @@ class GameEngine {
   }
 
   drawSlots(ctx) {
-    // v27-62 최적화: 화면 밖 슬롯 컬링 (그림자+원+테두리를 슬롯마다 매 프레임 그리므로)
-    const margin = 40;
-    const halfW = this.width / 2 / this.camera.zoom + margin;
-    const halfH = this.height / 2 / this.camera.zoom + margin;
     for (let i=0; i<this.towerSlots.length; i++) {
       const s = this.towerSlots[i];
       if (s.occupied) continue;
-      if (Math.abs(s.x - this.camera.x) > halfW || Math.abs(s.y - this.camera.y) > halfH) continue;
       const isHL = this.selectedTowerType !== null;
       const isHov = this.selectedSlotIdx === i;
       const isMouseHover = this.hoveredSlotIdx === i && !isHov; // v27-49: 데스크탑 마우스 호버 표시 (배치모드 하이라이트와 안 겹치게)
