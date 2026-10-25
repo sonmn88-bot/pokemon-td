@@ -74,21 +74,21 @@
     <!-- HUD -->
     <div id="hud-top">
       <div class="hud-cell" id="hud-lives" style="display:none">❤️ <span id="lives-val">20</span></div>
-      <div class="hud-cell" id="hud-gold">💰 <span id="gold-val">200</span></div>
-      <div class="hud-cell" id="hud-wave">🌊 <span id="wave-val">0</span>/<span id="wave-total">∞</span></div>
-      <div class="hud-cell" id="hud-score">🏅 <span id="score-val">0</span></div>
-      <div class="hud-cell" id="hud-field" title="필드 몬스터 (200마리가 되면 패배)">👾 <span id="field-count-val">0</span><span class="fg-bar"><i id="field-gauge"></i></span></div>
+      <div class="hud-cell" id="hud-gold"><i data-ic="coin"></i><span id="gold-val">200</span></div>
+      <div class="hud-cell" id="hud-wave"><i data-ic="wave"></i><span id="wave-val">0</span>/<span id="wave-total">∞</span></div>
+      <div class="hud-cell" id="hud-score"><i data-ic="medal"></i><span id="score-val">0</span></div>
+      <div class="hud-cell" id="hud-field" title="필드 몬스터 (200마리가 되면 패배)"><i data-ic="monster"></i><span id="field-count-val">0</span><span class="fg-bar"><i id="field-gauge"></i></span></div>
       <div class="hud-cell" id="hud-trait" title="이번 판 시드특성" style="cursor:help">🎲</div>
-      <div class="hud-cell" id="hud-timer" style="display:none">⏱ <span id="timer-val">--</span>s</div>
+      <div class="hud-cell" id="hud-timer" style="display:none"><i data-ic="timer"></i><span id="timer-val">--</span>s</div>
       <div id="hud-speed">
         <button class="speed-btn active" data-speed="1">1×</button>
         <button class="speed-btn" data-speed="2">2×</button>
         <button class="speed-btn" data-speed="3">3×</button>
       </div>
-      <button id="btn-cam-reset" class="hud-btn" title="화면 원위치 (카메라 줌/위치 초기화)">🧭</button>
-      <button id="btn-mission" class="hud-btn" title="미션 보드">🎯</button>
-      <button id="btn-power" class="hud-btn" title="종합 전력 요약">📈</button>
-      <button id="btn-menu" class="hud-btn">⏸</button>
+      <button id="btn-cam-reset" class="hud-btn" title="화면 원위치 (카메라 줌/위치 초기화)"><i data-ic="compass"></i></button>
+      <button id="btn-mission" class="hud-btn" title="미션 보드"><i data-ic="target"></i></button>
+      <button id="btn-power" class="hud-btn" title="종합 전력 요약"><i data-ic="chart"></i></button>
+      <button id="btn-menu" class="hud-btn"><i data-ic="pause"></i></button>
     </div>
 
     <!-- 웨이브 버튼 -->
@@ -103,6 +103,7 @@
 
 </div>
 
+<script src="icons.js"></script>
 <script src="engine.js"></script>
 <script src="maps.js"></script>
 <script src="sprites.js"></script>

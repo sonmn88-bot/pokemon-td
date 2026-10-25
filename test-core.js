@@ -30,6 +30,7 @@ function loadScript(file) {
 }
 
 try {
+  loadScript('icons.js');
   loadScript('gacha.js');
   loadScript('pokedex.js');
   loadScript('shop.js');
@@ -132,7 +133,7 @@ for (const item of w.ShopItems || []) {
   check('도감: 등급 분포 N52/R60/E32/L5/U2', cnt.normal === 52 && cnt.rare === 60 && cnt.epic === 32 && cnt.legend === 5 && cnt.unique === 2, JSON.stringify(cnt));
   const bad = defs.filter(d => !(d.damage > 0) || !(d.fireRate > 0) || !(d.range > 0) || typeof d.fire !== 'function' || !w.TYPES[d.type] || !d.desc);
   check('도감: 모든 종 수치·공격·타입·설명 유효', bad.length === 0, bad.map(d => d.id).join(','));
-  check('도감: 이미지 경로 151개', defs.every(d => !!w.TowerSpriteImages[d.id]));
+  check('도감: 이미지 경로는 실제 파일만', Object.values(w.TowerSpriteImages).every(p => require('fs').existsSync(require('path').join(__dirname, p))));
   for (const g of ['normal','rare','epic','legend']) check(`도감: ${g} 풀에 전기 타입 있음`, w.GRADE_POOLS[g].some(id => w.GachaTowerDefs[id].type === 'electric'));
   check('도감: 뮤는 뽑기 풀 제외', !w.GRADE_POOLS.unique.includes('mew'));
   const ev = new Set(); for (let i = 0; i < 300; i++) ev.add(w.getEvolutionId('eevee'));

@@ -12,7 +12,7 @@ function shopItemCost(item, engine) {
 
 const ShopItems = [
   {
-    key: 'monsterball', name: '몬스터볼', emoji: '⚪', cost: 80, perWaveCost: 4, perWave: 2,
+    key: 'monsterball', icon:'net', name: '몬스터볼', emoji: '⚪', cost: 80, perWaveCost: 4, perWave: 2,
     desc: '가장 앞선 적 1체 즉시 제거 (보스 제외, 웨이브당 2회)',
     buy(engine) {
       const target = engine.enemies
@@ -28,7 +28,7 @@ const ShopItems = [
     }
   },
   {
-    key: 'evacuate', name: '대피시키기', emoji: '🌀', cost: 100, perWaveCost: 10, perWave: 1,
+    key: 'evacuate', icon:'swirl', name: '대피시키기', emoji: '🌀', cost: 100, perWaveCost: 10, perWave: 1,
     desc: '체력 비율 하위 15% 즉시 처치 (최대 10마리, 웨이브당 1회)',
     buy(engine) {
       // v27-46: 거의 안 쓰이던 블리자드(슬로우) 대체 - 이 게임의 핵심 압박인 "필드 누적"에
@@ -43,7 +43,7 @@ const ShopItems = [
     }
   },
   {
-    key: 'revive', name: '확장 부지', emoji: '🏗️', cost: 450, scaling: true,
+    key: 'revive', icon:'build', name: '확장 부지', emoji: '🏗️', cost: 450, scaling: true,
     desc: '트랙 안쪽에 빈 배치슬롯 1개 즉시 추가 (살수록 비싸짐)',
     buy(engine) {
       const w = engine.worldWidth, h = engine.worldHeight; // v27-47: 카메라 시스템 도입으로 월드 크기 기준
@@ -89,7 +89,7 @@ const ShopItems = [
   },
   {
     // v28 (설계서 §5): 랜덤 합성에 '선택'을 한 번 끼워넣는 아이템 - 운 + 판단
-    key: 'luckycoin', name: '행운의 동전', emoji: '🪙', cost: 300,
+    key: 'luckycoin', icon:'luckycoin', name: '행운의 동전', emoji: '🪙', cost: 300,
     desc: '다음 랜덤 합성 결과를 2개 중에서 고름 (여러 개 모아둘 수 있음)',
     buy(engine) {
       engine._luckyCoins = (engine._luckyCoins || 0) + 1;
@@ -98,7 +98,7 @@ const ShopItems = [
     }
   },
   {
-    key: 'rarecandy', name: '이상한사탕', emoji: '🍬', cost: 2500, oneTime: true,
+    key: 'rarecandy', icon:'candy', name: '이상한사탕', emoji: '🍬', cost: 2500, oneTime: true,
     desc: '3성(에픽) 타워 1개를 랜덤 레전드로 진화 (게임당 1회) - 후반 전략용 고가 아이템',
     buy(engine) {
       // v27 fix: 아무 등급이나 무한정 되던 걸 3성(epic) 한정 + 1회용으로 변경 (안 그러면 도배해서 다 5성 만들어버림)
@@ -135,7 +135,7 @@ const GlobalSpells = {
   // v27-46: 포켓몬센터(데미지버프)는 영웅스킬 "행복의알"과 정확히 겹치는 효과라 의미가 옅었음.
   // "훈련소"로 교체 - 공속을 올려서 데미지 버프와는 다른 결의 효과, 여전히 영웅스킬과 안 겹침.
   trainingCamp: {
-    name: '훈련소', emoji: '🏋️', cooldown: 150,
+    name: '훈련소', icon:'dumbbell', emoji: '🏋️', cooldown: 150,
     desc: '모든 타워 6초간 공격속도 +25%',
     cast(engine) {
       for (const t of engine.towers) {
@@ -149,7 +149,7 @@ const GlobalSpells = {
   // "그물망 함정"으로 교체 - 데미지 없이 강력한 스턴만 걸어서, 그 사이 타워들이 자유롭게 몰아치게
   // 해주는 순수 유틸 스킬로 차별화.
   netTrap: {
-    name: '그물망 함정', emoji: '🕸️', cooldown: 100,
+    name: '그물망 함정', icon:'web', emoji: '🕸️', cooldown: 100,
     desc: '전체 적 2.5초 확정 스턴 (데미지 없음)',
     cast(engine) {
       let n = 0;

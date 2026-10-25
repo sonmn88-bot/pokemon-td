@@ -776,8 +776,11 @@ function _createGachaTower(def, x, y, engine) {
         if (b) ctx.drawImage(img, b.x, b.y, b.w, b.h, this.x-dw/2, this.y-dh/2+bobY, dw, dh);
         else ctx.drawImage(img,this.x-dw/2,this.y-dh/2+bobY,dw,dh);
       } else {
-        ctx.font=`${sz*0.8}px serif`; ctx.textAlign='center'; ctx.textBaseline='middle';
-        ctx.fillText(def.emoji,this.x,this.y);
+        const ti = window.ICON_IMG && ICON_IMG(def.type); // v3.0: 이미지 없는 포켓몬 = 타입 배지 + 이름 첫 글자
+        if (ti && ti.complete) ctx.drawImage(ti, this.x - sz*0.42, this.y - sz*0.42, sz*0.84, sz*0.84);
+        ctx.font=`900 ${Math.round(sz*0.3)}px Pretendard,-apple-system,sans-serif`; ctx.textAlign='center'; ctx.textBaseline='middle';
+        ctx.lineWidth=3; ctx.strokeStyle='rgba(0,0,0,0.55)'; ctx.strokeText(def.name[0], this.x, this.y + sz*0.42);
+        ctx.fillStyle='#fff'; ctx.fillText(def.name[0], this.x, this.y + sz*0.42);
       }
       // 등급 별 - v27-62 최적화: shadowBlur(값이 작아도 캔버스 슬로우패스 유발)를 타워 전부가
       // 매 프레임 쓰고 있었음 → 어두운 텍스트를 1px 아래 먼저 그리는 저렴한 가짜 그림자로 교체
@@ -789,8 +792,8 @@ function _createGachaTower(def, x, y, engine) {
       ctx.fillStyle=grade.color;
       ctx.fillText(starStr,this.x,this.y-23);
       // 타입 배지
-      ctx.font='9px serif';
-      ctx.fillText(typeInfo.emoji,this.x+18,this.y-18);
+      const tb = window.ICON_IMG && ICON_IMG(def.type);
+      if (tb && tb.complete) ctx.drawImage(tb, this.x+12, this.y-24, 12, 12);
       ctx.restore();
     },
   };

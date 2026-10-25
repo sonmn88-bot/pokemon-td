@@ -66,7 +66,7 @@ Object.assign(App.prototype, {
 
     const mergeBtn = document.createElement('button');
     mergeBtn.className = 'tower-btn storage-merge-btn';
-    mergeBtn.innerHTML = `<span class="tower-btn-emoji">🧬</span><span class="tower-btn-name">합성</span><span class="tower-btn-cost">${(this._inventory||[]).length}개 보관</span>`;
+    mergeBtn.innerHTML = `<span class="tower-btn-emoji">${ICON('flask', 24)}</span><span class="tower-btn-name">합성</span><span class="tower-btn-cost">${(this._inventory||[]).length}개 보관</span>`;
     if (this.engine && this._mergeAvailable()) mergeBtn.classList.add('has-dot');
     mergeBtn.title = '같은 등급 3개 → 다음 등급 랜덤 / 유니크 레시피';
     mergeBtn.addEventListener('click', () => this.openMergePanel());
@@ -77,7 +77,7 @@ Object.assign(App.prototype, {
       const b = document.createElement('button');
       b.className = 'storage-item' + (this._placingId === def.id ? ' placing' : '');
       b.style.setProperty('--gc', g.color);
-      b.innerHTML = `<span class="si-emoji">${def.emoji}</span><span class="si-stars">${'★'.repeat(g.stars)}</span>${count > 1 ? `<span class="si-count">×${count}</span>` : ''}`;
+      b.innerHTML = `<span class="si-emoji">${PKM(def, 30)}</span><span class="si-stars">${'★'.repeat(g.stars)}</span>${count > 1 ? `<span class="si-count">×${count}</span>` : ''}`;
       b.title = `${def.name} (${g.name}) - 탭해서 배치`;
       b.addEventListener('click', () => this._onStorageItemTap(def.id));
       strip.appendChild(b);
@@ -183,7 +183,7 @@ Object.assign(App.prototype, {
       const cards = list.length ? list.map(m => `
         <button class="mg-card ${ui.sel.has(m.key) ? 'sel' : ''}" data-key="${m.key}" style="--gc:${G.color}">
           ${m.kind === 'field' ? '<span class="mg-field">📍필드</span>' : ''}
-          <span class="mg-emoji">${m.def.emoji}</span><span class="mg-name">${m.def.name}</span>
+          <span class="mg-emoji">${PKM(m.def, 34)}</span><span class="mg-name">${m.def.name}</span>
         </button>`).join('') : `<div class="mg-empty">이 등급의 포켓몬이 없어요</div>`;
 
       const n = selected.length;
@@ -194,7 +194,7 @@ Object.assign(App.prototype, {
       const nextG = window.NEXT_GRADE[ui.grade] ? window.GRADES[window.NEXT_GRADE[ui.grade]] : null;
 
       overlay.innerHTML = `
-        <div class="mg-head"><div class="mg-title">🧬 합성 연구소</div><button class="mg-x" data-act="close">✕</button></div>
+        <div class="mg-head"><div class="mg-title">${ICON('flask', 20)} 합성 연구소</div><button class="mg-x" data-act="close">✕</button></div>
         <div class="mg-recipes">${recipeHtml}</div>
         <div class="mg-tabs">${tabs}</div>
         <div class="mg-opts">
@@ -289,7 +289,7 @@ Object.assign(App.prototype, {
     ov.innerHTML = `<div class="mr-pick-title">🪙 행운의 동전 — 하나를 고르세요${jumped ? ' (🍀 2단 상승!)' : ''}</div>
       <div class="mr-pick-row">${defs.map((d, i) => {
         const G = window.GRADES[d.grade];
-        return `<div class="mr-card shown" data-i="${i}" style="--gc:${G.color}"><div class="mr-emoji">${d.emoji}</div>
+        return `<div class="mr-card shown" data-i="${i}" style="--gc:${G.color}"><div class="mr-emoji">${PKM(d, 72)}</div>
           <div class="mr-name"><div class="mr-tag">${'★'.repeat(G.stars)} ${G.name}</div><b>${d.name}</b><small>${d.desc || ''}</small></div></div>`;
       }).join('')}</div>`;
     document.getElementById('game-screen').appendChild(ov);
@@ -318,7 +318,7 @@ Object.assign(App.prototype, {
       phase = 'shown'; clearTimeout(timer);
       card.classList.remove('spinning'); card.classList.add('shown');
       if (big) ov.classList.add('cutin');
-      em.textContent = def.emoji;
+      em.innerHTML = PKM(def, 72);
       const tag = opts.birds ? '🌟 전설의 새 3신조! ' : opts.jumped ? '🍀 행운의 2단 상승! ' : opts.evolve ? '✨ 진화! ' : '';
       nm.innerHTML = `<div class="mr-tag">${tag}${'★'.repeat(G.stars)} ${G.name}</div><b>${def.name}</b><small>${def.desc || ''}</small>`;
       ov.querySelector('.mr-skip').textContent = '탭해서 계속';
@@ -329,7 +329,7 @@ Object.assign(App.prototype, {
     const spin = () => {
       if (phase !== 'spin') return;
       const d = pool[Math.floor(Math.random() * pool.length)];
-      em.textContent = d.emoji; nm.textContent = d.name;
+      em.innerHTML = PKM(d, 72); nm.textContent = d.name;
       t += delay; delay *= 1.12; // 점점 느려지는 슬롯머신
       if (t >= 1200) reveal(); else timer = setTimeout(spin, delay);
     };

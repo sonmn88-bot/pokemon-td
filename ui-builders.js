@@ -15,7 +15,7 @@ Object.assign(App.prototype, {
     {
       const ub = document.createElement('button');
       ub.className = 'tower-btn upg-open-btn';
-      ub.innerHTML = `<span class="tower-btn-emoji">🛠</span><span class="tower-btn-name">강화</span><span class="tower-btn-cost">상점</span>`;
+      ub.innerHTML = `<span class="tower-btn-emoji">${ICON('upgrade', 24)}</span><span class="tower-btn-name">강화</span><span class="tower-btn-cost">상점</span>`;
       ub.title = '타입 강화 + 상점 (단축키: U)';
       ub.addEventListener('click', () => this.toggleUpgradeSheet());
       scroll.appendChild(ub);
@@ -23,10 +23,10 @@ Object.assign(App.prototype, {
 
     // 뽑기 버튼 3종 (v27 fix: cost를 여기 하드코딩하지 말고 실제 과금 기준인 PULL_COSTS에서 읽어오도록 - 안 그러면 가격 바꿀 때마다 표시랑 실제가 어긋남)
     const pulls = [
-      { key:'normal',  label:'일반 뽑기',  color:'#a7adba', emoji:'🎰', hotkey:'1' },
-      { key:'premium', label:'프리미엄',   color:'#5b9dff', emoji:'💎', hotkey:'2' },
-      { key:'gamble',  label:'도박 뽑기',  color:'#ffc24b', emoji:'🎲', hotkey:'3' },
-      { key:'ten',     label:'10연 뽑기',  color:'#b18cff', emoji:'🌟', ten:true, hotkey:'4' },
+      { key:'normal',  label:'일반 뽑기',  color:'#a7adba', icon:'capsule', hotkey:'1' },
+      { key:'premium', label:'프리미엄',   color:'#5b9dff', icon:'capsuleBlue', hotkey:'2' },
+      { key:'gamble',  label:'도박 뽑기',  color:'#ffc24b', icon:'dice', hotkey:'3' },
+      { key:'ten',     label:'10연 뽑기',  color:'#b18cff', icon:'capsules', ten:true, hotkey:'4' },
     ];
 
     for (const p of pulls) {
@@ -37,9 +37,9 @@ Object.assign(App.prototype, {
       btn.style.borderColor = p.color + '60';
       btn.innerHTML = `
         <span class="hotkey-badge">${p.hotkey}</span>
-        <span class="tower-btn-emoji">${p.emoji}</span>
+        <span class="tower-btn-emoji">${ICON(p.icon, 26)}</span>
         <span class="tower-btn-name" style="color:${p.color}">${p.label}</span>
-        <span class="tower-btn-cost">💰${cost}</span>
+        <span class="tower-btn-cost">${ICON('coin', 11)}${cost}</span>
       `;
       btn.title = p.key === 'gamble' ? '2~5성 확정! (단, 4성 극희귀·5성 극악희귀, 고가) (단축키: ' + p.hotkey + ')' :
                   p.key === 'ten'    ? '10개 묶음 (개당 90g, 일반뽑기와 동일 확률=1성만) (단축키: ' + p.hotkey + ')' :
@@ -161,9 +161,9 @@ Object.assign(App.prototype, {
           ${canMerge
             ? `<button class="tp-btn tp-upgrade" data-action="merge">✨ 합치기 진화!</button>`
             : `<button class="tp-btn tp-maxed" disabled>합치기 ${sameCount}/3</button>`}
-          <button class="tp-btn" data-action="recall" style="background:linear-gradient(135deg,#7c4dff,#4527a0)">🎒 회수</button>
+          <button class="tp-btn" data-action="recall" style="background:linear-gradient(135deg,#7c4dff,#4527a0)">${ICON('bag', 14)} 회수</button>
           ${window.canUseTM && window.canUseTM(t) ? `<button class="tp-btn" data-action="tm" style="background:linear-gradient(135deg,#00b4d8,#0077b6)" title="태그 1개를 랜덤으로 배움 (타워당 1회)">💿 기술머신 ${window.TM_COST}g</button>` : ''}
-          <button class="tp-btn tp-sell" data-action="sell">💸 +${refund}g</button>
+          <button class="tp-btn tp-sell" data-action="sell">${ICON('sell', 14)} +${refund}g</button>
         </div>
       `;
       // v28: 필드 타워를 보관함으로 회수 (무료) - 합성 재료로 쓰거나 자리 재배치용
@@ -347,7 +347,7 @@ Object.assign(App.prototype, {
     if (!sheet) {
       sheet = document.createElement('div');
       sheet.id = 'upgrade-sheet';
-      sheet.innerHTML = `<div class="us-head"><span>🛠 강화 · 상점</span><button class="us-close" aria-label="닫기">✕</button></div>
+      sheet.innerHTML = `<div class="us-head"><span>${ICON('upgrade', 18)} 강화 · 상점</span><button class="us-close" aria-label="닫기">✕</button></div>
         <div class="us-label">타입 강화 <small>해당 타입 타워 전부 · 등급별 고정 데미지 + 6%</small></div>
         <div class="us-grid us-types"></div>
         <div class="us-label">상점 <small>웨이브마다 사용 횟수 초기화</small></div>
@@ -369,10 +369,10 @@ Object.assign(App.prototype, {
       btn.className = 'us-card';
       btn.style.setProperty('--c', typeInfo.color);
       btn.disabled = this.engine.gold < nextUpg.cost;
-      btn.innerHTML = `<b>${typeInfo.emoji} ${typeInfo.name} <span class="us-lv">Lv${level}</span></b>
+      btn.innerHTML = `<b>${ICON(typeKey, 18)} ${typeInfo.name} <span class="us-lv">Lv${level}</span></b>
         <span class="us-desc">노말+${F.normal*k} · 에픽+${F.epic*k} · +${Math.round((nextUpg.val||0)*100)}%</span>
         <span class="us-meta">필드 ${fieldCnt}마리</span>
-        <span class="us-cost">💰${nextUpg.cost}</span>`;
+        <span class="us-cost">${ICON('coin', 12)}${nextUpg.cost}</span>`;
       btn.title = `${nextUpg.label}: 노말+${F.normal*k} 레어+${F.rare*k} 에픽+${F.epic*k} 레전드+${F.legend*k} (+${Math.round((nextUpg.val||0)*100)}%)`;
       btn.addEventListener('click', () => {
         if (window.applyTypeUpgrade(typeKey, this.engine)) {
@@ -420,7 +420,7 @@ Object.assign(App.prototype, {
       btn.className = 'spell-btn';
       btn.dataset.spellKey = key;
       btn.innerHTML = `
-        <span class="spell-emoji">${spell.emoji}</span>
+        <span class="spell-emoji">${spell.icon ? ICON(spell.icon, 16) : spell.emoji}</span>
         <span class="spell-name" style="font-size:10px;font-weight:700">${spell.name}</span>
         <span class="spell-cd"></span>
       `;
@@ -729,8 +729,8 @@ Object.assign(App.prototype, {
       const btn = document.createElement('button');
       btn.className = 'us-card shop';
       btn.disabled = used || this.engine.gold < cost;
-      btn.innerHTML = `<b>${item.emoji} ${item.name}</b><span class="us-desc">${item.desc}</span>
-        <span class="us-meta">${used ? '사용 완료' : left}</span><span class="us-cost">💰${cost}</span>`;
+      btn.innerHTML = `<b>${item.icon ? ICON(item.icon, 18) : item.emoji} ${item.name}</b><span class="us-desc">${item.desc}</span>
+        <span class="us-meta">${used ? '사용 완료' : left}</span><span class="us-cost">${ICON('coin', 12)}${cost}</span>`;
       btn.addEventListener('click', () => {
         if (used) return;
         if (!this.engine.spendGold(cost)) { this.showWaveAnnounce('골드가 부족합니다', '#ff5c7a'); return; }

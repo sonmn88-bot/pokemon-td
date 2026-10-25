@@ -1,4 +1,4 @@
-const CACHE = 'pokemon-td-v34';
+const CACHE = 'pokemon-td-v36';
 const ASSETS = [
   '/pokemon-td/',
   '/pokemon-td/index.html',
@@ -16,6 +16,7 @@ const ASSETS = [
   '/pokemon-td/firebase-config.js',
   '/pokemon-td/ui-builders.js',
   '/pokemon-td/storage.js',
+  '/pokemon-td/icons.js',
   '/pokemon-td/sprites.js',
   '/pokemon-td/manifest.json',
 ];

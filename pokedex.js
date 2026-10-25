@@ -189,6 +189,9 @@ const DEX_RAW = `
 151|mew|뮤|psychic|unique|-|S|N|multi,range|💗
 `;
 
+// assets/towers에 실제로 있는 이미지 목록 (이미지 추가 시 이 줄만 갱신)
+const DEX_HAS_IMG = new Set('abra aerodactyl alakazam arcanine articuno blastoise bulbasaur charizard charmander charmeleon clefable clefairy diglett dragonair dratini dugtrio gastly gengar geodude gloom golduck growlithe haunter horsea ivysaur kadabra lapras lickitung magnemite magneton moltres oddish onix pidgeot pidgeotto pidgey psyduck raticate rattata scyther squirtle venusaur vileplume wartortle zapdos'.split(' '));
+
 // 손으로 만든 고유 공격이 있는 전설·유니크는 기존 fire를 유지 (눈보라·EMP·뮤 전체버프 등 시그니처)
 const DEX_KEEP_FIRE = ['articuno','zapdos','moltres','dragonite','gengar','mewtwo','mew'];
 
@@ -227,7 +230,8 @@ const DEX_KEEP_FIRE = ['articuno','zapdos','moltres','dragonite','gengar','mewtw
     } else d.fire = _dexFire(d, typeColor(r.type));
     GachaTowerDefs[r.id] = d;
     if (r.id !== 'mew') GRADE_POOLS[r.grade].push(r.id); // 뮤는 레시피 전용
-    if (!window.TowerSpriteImages[r.id]) window.TowerSpriteImages[r.id] = `assets/towers/${r.id}.png`;
+    if (!window.TowerSpriteImages[r.id] && DEX_HAS_IMG.has(r.id)) window.TowerSpriteImages[r.id] = `assets/towers/${r.id}.png`;
+    else if (!window.TowerSpriteImages[r.id] && ['pikachu','raichu','eevee','vaporeon','jolteon','flareon'].includes(r.id)) window.TowerSpriteImages[r.id] = `assets/heroes/${r.id}.png`; // 영웅 이미지 재사용
   }
   // 확정 진화: 같은 라인의 다음 단계 (이브이는 3갈래 중 랜덤)
   const byLine = {};

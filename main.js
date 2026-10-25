@@ -829,7 +829,7 @@ class App {
       card.className = `tenpull-card grade-${def.grade}`;
       card.style.borderColor = grade.color;
       card.style.boxShadow = `0 0 12px ${grade.glow}`;
-      card.innerHTML = `<div class="tp-emoji">${def.emoji}</div><div class="tp-name" style="color:${grade.color}">${def.name}</div><div class="tp-grade">${'★'.repeat(grade.stars)}</div><div class="tp-grade-name">${grade.name}</div>`;
+      card.innerHTML = `<div class="tp-emoji">${PKM(def, 40)}</div><div class="tp-name" style="color:${grade.color}">${def.name}</div><div class="tp-grade">${'★'.repeat(grade.stars)}</div><div class="tp-grade-name">${grade.name}</div>`;
       if (canPlace) card.addEventListener('click', () => { overlay.remove(); this._placeFromStorage(def.id, slotIdx); });
       grid.appendChild(card);
     }
@@ -1135,7 +1135,7 @@ class App {
       if (!def) continue;
       const card = document.createElement('div');
       card.style.cssText = 'cursor:pointer;background:rgba(20,20,40,0.85);border:2px solid rgba(255,255,255,0.2);border-radius:14px;padding:16px;text-align:center;min-width:100px;transition:transform 0.15s;';
-      card.innerHTML = `<div style="font-size:36px">${def.emoji}</div><div style="color:#fff;font-size:13px;margin-top:6px">${def.name}</div><div style="color:#888;font-size:10px;margin-top:4px">${def.desc||''}</div>`;
+      card.innerHTML = `<div style="font-size:36px">${PKM(def, 52)}</div><div style="color:#fff;font-size:13px;margin-top:6px">${def.name}</div><div style="color:#888;font-size:10px;margin-top:4px">${def.desc||''}</div>`;
       card.addEventListener('click', () => {
         const emptySlot = this.engine.towerSlots.find(s => !s.occupied);
         if (emptySlot) {
@@ -1867,7 +1867,7 @@ class App {
     if (this._resizeDebounceTimer) { clearTimeout(this._resizeDebounceTimer); this._resizeDebounceTimer = null; } // v27-26: 안 쓰는 타이머 정리
     this.BGM.stop();
     if (this.engine) { this.engine.stop(); this.engine = null; }
-    this.els.btnMenu.textContent = '⏸';
+    this.els.btnMenu.innerHTML = ICON('pause', 18);
     document.getElementById('upgrade-sheet')?.classList.remove('open');
     document.querySelector('.upg-open-btn')?.classList.remove('active');
     // 배속 초기화
@@ -1908,7 +1908,7 @@ class App {
       this._pausedFromState = this.engine.state;
       this.engine.state = 'paused';
       this.engine.stop();
-      this.els.btnMenu.textContent = '▶';
+      this.els.btnMenu.innerHTML = ICON('play', 18);
       // v28 세션E: 일시정지 메뉴 (웨이브 버튼과 겹치던 '← 맵' 버튼을 여기로 옮김)
       const ov = document.createElement('div');
       ov.className = 'pause-overlay';
@@ -1920,7 +1920,7 @@ class App {
     } else if (this.engine.state === 'paused') {
       this.engine.state = this._pausedFromState || 'wave';
       this.engine.start();
-      this.els.btnMenu.textContent = '⏸';
+      this.els.btnMenu.innerHTML = ICON('pause', 18);
       document.querySelector('.pause-overlay')?.remove();
     }
   }
@@ -1928,6 +1928,7 @@ class App {
 
 // ===== BOOT =====
 window.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('i[data-ic]').forEach(el => { el.outerHTML = ICON(el.dataset.ic, 18); }); // v3.0 아이콘
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
   window.app = new App();
   initTitleCanvas();
