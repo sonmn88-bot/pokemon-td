@@ -82,23 +82,42 @@ const NaturalLayout = {
 
     const path = _closedSpline(ctrl, 7);
 
-    // ---- 타워 자리: 길에서 40~105px, 서로 64px 이상, 길이 많이 지나가는 곳(커버리지) 우선 ----
-    const target = Math.round(Math.min(50, Math.max(38, (w * h) / 23000)));
-    const cand = [];
-    for (let y = 40; y < h - 40; y += 13) for (let x = 40; x < w - 40; x += 13) {
-      const px = x + (rnd() - 0.5) * 10, py = y + (rnd() - 0.5) * 10;
-      const d = _distToPath(px, py, path);
-      if (d < 42 || d > 105) continue;
-      let near = 0;                               // 사거리(~150) 안에 지나가는 길 점 수 = 쓸모
-      for (let i = 0; i < path.length; i += 3) { const q = path[i]; if ((q.x-px)**2 + (q.y-py)**2 < 22500) near++; }
-      cand.push({ x: px, y: py, score: near * (0.75 + rnd() * 0.5) - Math.abs(d - 64) * 0.4 });
-    }
-    cand.sort((a, b) => b.score - a.score);
-    const slots = [];
-    for (const c of cand) {
-      if (slots.length >= target) break;
-      if (slots.every(s => (s.x - c.x)**2 + (s.y - c.y)**2 >= 64*64)) slots.push({ x: Math.round(c.x), y: Math.round(c.y) });
-    }
+    // ---- 타워 자리 (균형 배치): 세로줄로 길을 훑어서 '두 길 사이 띠'마다 1/3·2/3 높이에 2줄로 지그재그 배치 ----
+    // → 어느 자리든 가까운 길까지 ~70px, 먼 길까지도 사거리 안. 가로 간격은 목표 개수에 맞춰 균등.
+    const target = Math.round(Math.min(52, Math.max(40, (w * h) / 22000)));
+    const crossings = (x) => {
+      const out = [];
+      for (let i = 0; i < path.length - 1; i++) {
+        const a = path[i], b = path[i + 1];
+        if ((a.x - x) * (b.x - x) <= 0 && a.x !== b.x) out.push(a.y + (b.y - a.y) * (x - a.x) / (b.x - a.x));
+      }
+      return out.sort((p, q) => p - q);
+    };
+    const place = (sp) => {
+      const res = [], x0 = w * 0.23, x1 = w * 0.85;
+      const n = Math.max(2, Math.round((x1 - x0) / sp) + 1);
+      for (let k = 0; k < n; k++) for (const half of [0, 1]) {
+        const x = x0 + (x1 - x0) * (k + half * 0.5) / (n - 0.5);
+        const ys = crossings(x);
+        const cand = [];
+        if (ys.length && ys[0] - 72 > 45 && half === 0) cand.push(ys[0] - 72);                       // 맨 위 길 바깥
+        if (ys.length && ys[ys.length - 1] + 72 < h - 45 && half === 0) cand.push(ys[ys.length - 1] + 72); // 맨 아래 길 바깥
+        for (let j = 0; j < ys.length - 1; j++) {
+          const g = ys[j + 1] - ys[j];
+          if (g < 92) continue;                                                                   // 커브 안쪽 좁은 틈은 제외
+          if (g < 175) { if (half === 0) cand.push(ys[j] + g / 2); }                              // 좁은 띠: 가운데 1줄
+          else cand.push(ys[j] + g * (half ? 2 / 3 : 1 / 3));                                     // 넓은 띠: 2줄 지그재그
+        }
+        for (const y of cand) {
+          const d = _distToPath(x, y, path);
+          if (d < 44 || d > 120) continue;
+          if (res.every(s => (s.x - x) ** 2 + (s.y - y) ** 2 >= 60 * 60)) res.push({ x: Math.round(x), y: Math.round(y) });
+        }
+      }
+      return res;
+    };
+    let slots = place(70);                          // 가로 간격을 바꿔가며 목표 개수에 가장 가까운 배치 선택
+    for (let sp = 60; sp <= 400; sp += 4) { const r = place(sp); if (Math.abs(r.length - target) < Math.abs(slots.length - target)) slots = r; }
     slots.sort((a, b) => a.y - b.y || a.x - b.x);  // 위→아래 순서 (인덱스 안정)
 
     this._cache = { key, path, slots, ys, gap };
