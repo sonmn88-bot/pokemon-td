@@ -190,7 +190,7 @@ const DEX_RAW = `
 `;
 
 // assets/towers에 실제로 있는 이미지 목록 (이미지 추가 시 이 줄만 갱신)
-const DEX_HAS_IMG = new Set('abra aerodactyl alakazam arcanine articuno blastoise bulbasaur charizard charmander charmeleon clefable clefairy diglett dragonair dratini dugtrio gastly gengar geodude gloom golduck growlithe haunter horsea ivysaur kadabra lapras lickitung magnemite magneton moltres oddish onix pidgeot pidgeotto pidgey psyduck raticate rattata scyther squirtle venusaur vileplume wartortle zapdos'.split(' '));
+const DEX_HAS_IMG = new Set('abra aerodactyl alakazam arbok arcanine articuno beedrill bellsprout blastoise bulbasaur butterfree caterpie chansey charizard charmander charmeleon clefable clefairy cloyster cubone dewgong diglett ditto dodrio doduo dragonair dragonite dratini drowzee dugtrio eevee ekans electabuzz electrode exeggcute exeggutor farfetchd fearow flareon gastly gengar geodude gloom golbat goldeen golduck golem graveler grimer growlithe gyarados haunter hitmonchan hitmonlee horsea hypno ivysaur jigglypuff jolteon jynx kabuto kabutops kadabra kakuna kangaskhan kingler koffing krabby lapras lickitung machamp machoke machop magikarp magmar magnemite magneton mankey marowak meowth metapod mew mewtwo moltres mrmime muk nidoking nidoqueen nidoranf nidoranm nidorina nidorino ninetales oddish omanyte omastar onix paras parasect persian pidgeot pidgeotto pidgey pikachu pinsir poliwag poliwhirl poliwrath ponyta porygon primeape psyduck raichu rapidash raticate rattata rhydon rhyhorn sandshrew sandslash scyther seadra seaking seel shellder slowbro slowpoke snorlax spearow squirtle starmie staryu tangela tauros tentacool tentacruel vaporeon venomoth venonat venusaur victreebel vileplume voltorb vulpix wartortle weedle weepinbell weezing wigglytuff zapdos zubat'.split(' '));
 
 // 손으로 만든 고유 공격이 있는 전설·유니크는 기존 fire를 유지 (눈보라·EMP·뮤 전체버프 등 시그니처)
 const DEX_KEEP_FIRE = ['articuno','zapdos','moltres','dragonite','gengar','mewtwo','mew'];
@@ -230,7 +230,7 @@ const DEX_KEEP_FIRE = ['articuno','zapdos','moltres','dragonite','gengar','mewtw
     } else d.fire = _dexFire(d, typeColor(r.type));
     GachaTowerDefs[r.id] = d;
     if (r.id !== 'mew') GRADE_POOLS[r.grade].push(r.id); // 뮤는 레시피 전용
-    if (!window.TowerSpriteImages[r.id] && DEX_HAS_IMG.has(r.id)) window.TowerSpriteImages[r.id] = `assets/towers/${r.id}.png`;
+    if (DEX_HAS_IMG.has(r.id)) window.TowerSpriteImages[r.id] = `assets/towers/${r.id}.png`; // v3.1: 151종 공식 일러스트로 통일 (예전 enemies/heroes 경로보다 우선)
     else if (!window.TowerSpriteImages[r.id] && ['pikachu','raichu','eevee','vaporeon','jolteon','flareon'].includes(r.id)) window.TowerSpriteImages[r.id] = `assets/heroes/${r.id}.png`; // 영웅 이미지 재사용
   }
   // 확정 진화: 같은 라인의 다음 단계 (이브이는 3갈래 중 랜덤)
