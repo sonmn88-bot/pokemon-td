@@ -2,6 +2,9 @@
 
 // v27: 영구 강화류는 상한(maxBuys) 대신 살수록 가격이 올라가는 방식으로 변경
 function shopItemCost(item, engine) {
+  // v28 (설계서 §5): 웨이브 연동 가격 - 몹 체력은 지수로 오르는데 즉사형 아이템 가격이 고정이면 후반 정답템이 됨
+  if (item.perWaveCost) return Math.round(item.cost + (engine.currentWave || 0) * item.perWaveCost);
+  if (item.key === 'luckycoin') return Math.round(item.cost * (1 - (engine._coinDiscount || 0))); // 토게피 '동전 수집'
   if (!item.scaling) return item.cost;
   const n = (engine._shopBuyCount && engine._shopBuyCount[item.key]) || 0;
   return Math.round(item.cost * Math.pow(1.28, n)); // v27-46: 1.4→1.28 (요청8: 슬롯 늘려서 합체 수월하게)
@@ -9,8 +12,8 @@ function shopItemCost(item, engine) {
 
 const ShopItems = [
   {
-    key: 'monsterball', name: '몬스터볼', emoji: '⚪', cost: 80,
-    desc: '가장 앞선 적 1체 즉시 제거 (보스 제외)',
+    key: 'monsterball', name: '몬스터볼', emoji: '⚪', cost: 80, perWaveCost: 4, perWave: 2,
+    desc: '가장 앞선 적 1체 즉시 제거 (보스 제외, 웨이브당 2회)',
     buy(engine) {
       const target = engine.enemies
         .filter(e => !e.dead && !e.reachedEnd && !e.isBoss)
@@ -25,15 +28,15 @@ const ShopItems = [
     }
   },
   {
-    key: 'evacuate', name: '대피시키기', emoji: '🌀', cost: 140,
-    desc: '필드에서 체력이 가장 낮은 적 20%를 즉시 처치 (필드 정리용)',
+    key: 'evacuate', name: '대피시키기', emoji: '🌀', cost: 100, perWaveCost: 10, perWave: 1,
+    desc: '체력 비율 하위 15% 즉시 처치 (최대 10마리, 웨이브당 1회)',
     buy(engine) {
       // v27-46: 거의 안 쓰이던 블리자드(슬로우) 대체 - 이 게임의 핵심 압박인 "필드 누적"에
       // 직접 대응하는 아이템으로 교체 (요청10 - 쓸만한 상점 아이템 브레인스토밍)
       const alive = engine.enemies.filter(e => !e.dead && !e.reachedEnd && !e.isBoss);
       if (!alive.length) { engine.spawnFloatingText('대피시킬 적이 없습니다', engine.camera.x, engine.camera.y - (engine.height/2 - 80)/engine.camera.zoom, '#888'); return; }
       alive.sort((a, b) => (a.hp / a.maxHp) - (b.hp / b.maxHp)); // 체력비율 낮은 순
-      const n = Math.max(1, Math.round(alive.length * 0.2));
+      const n = Math.min(10, Math.max(1, Math.round(alive.length * 0.15)));
       for (let i = 0; i < n; i++) alive[i].takeDamage(alive[i].maxHp * 10, 'special');
       if (window.AoeBurst) engine.particles.push(new AoeBurst(engine.camera.x, engine.camera.y, Math.max(engine.width, engine.height)*0.6/engine.camera.zoom, '#9575cd'));
       engine.spawnFloatingText(`🌀 대피 완료! ${n}마리 정리`, engine.camera.x, engine.camera.y - (engine.height/2 - 80)/engine.camera.zoom, '#9575cd');
@@ -85,8 +88,18 @@ const ShopItems = [
     }
   },
   {
+    // v28 (설계서 §5): 랜덤 합성에 '선택'을 한 번 끼워넣는 아이템 - 운 + 판단
+    key: 'luckycoin', name: '행운의 동전', emoji: '🪙', cost: 300,
+    desc: '다음 랜덤 합성 결과를 2개 중에서 고름 (여러 개 모아둘 수 있음)',
+    buy(engine) {
+      engine._luckyCoins = (engine._luckyCoins || 0) + 1;
+      window.app?.renderStorageStrip?.();
+      engine.spawnFloatingText(`🪙 행운의 동전 ${engine._luckyCoins}개 보유`, engine.camera.x, engine.camera.y - (engine.height/2 - 80)/engine.camera.zoom, '#ffd60a');
+    }
+  },
+  {
     key: 'rarecandy', name: '이상한사탕', emoji: '🍬', cost: 2500, oneTime: true,
-    desc: '3성(에픽) 타워 1개를 레전드로 진화 (게임당 1회만 사용 가능) - 후반 전략용 고가 아이템',
+    desc: '3성(에픽) 타워 1개를 랜덤 레전드로 진화 (게임당 1회) - 후반 전략용 고가 아이템',
     buy(engine) {
       // v27 fix: 아무 등급이나 무한정 되던 걸 3성(epic) 한정 + 1회용으로 변경 (안 그러면 도배해서 다 5성 만들어버림)
       const gachaSlots = engine.towerSlots.filter(s => s.occupied && s.tower?._gachaId && s.tower.def?.grade === 'epic');
@@ -96,7 +109,9 @@ const ShopItems = [
       }
       const slot = gachaSlots[Math.floor(Math.random() * gachaSlots.length)];
       const t = slot.tower;
-      const evoId = window.MERGE_EVOLUTION?.[t._gachaId];
+      // v28: 확정 진화 → 랜덤 레전드 (랜타디 감성, 특정 레전드 고정 획득 방지)
+      const legendPool = window.GRADE_POOLS?.legend || [];
+      const evoId = legendPool[Math.floor(Math.random() * legendPool.length)];
       const evoDef = evoId ? window.GachaTowerDefs?.[evoId] : null;
       if (evoDef) {
         const evoTower = window._createGachaTower(evoDef, slot.x, slot.y, engine);

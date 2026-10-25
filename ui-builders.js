@@ -38,20 +38,11 @@ Object.assign(App.prototype, {
       scroll.appendChild(btn);
     }
 
-    // v27-45: 합체 후보 힌트 (요청1) - 현재 2개 보유중인 타워가 있으면 표시해서 "한 개 더 뽑으면 합체"를 미리 알림
-    if (this.engine) {
-      const counts = {};
-      for (const s of this.engine.towerSlots) {
-        if (s.occupied && s.tower?._gachaId) counts[s.tower._gachaId] = (counts[s.tower._gachaId] || 0) + 1;
-      }
-      const closeToMerge = Object.entries(counts).filter(([id, c]) => c === 2).map(([id]) => window.GachaTowerDefs?.[id]?.name).filter(Boolean);
-      if (closeToMerge.length > 0) {
-        const hint = document.createElement('div');
-        hint.style.cssText = 'display:flex;align-items:center;padding:0 8px;font-size:10px;color:#06d6a0;white-space:nowrap;flex-shrink:0;';
-        hint.textContent = `🔗 ${closeToMerge.slice(0,3).join(', ')} 1개 더 뽑으면 합체!`;
-        scroll.appendChild(hint);
-      }
-    }
+    // v28: 보관함 스트립 (합성 버튼 + 보관 중인 포켓몬) - 기존 '1개 더 뽑으면 합체' 힌트를 대체
+    const strip = document.createElement('div');
+    strip.id = 'storage-strip';
+    strip.className = 'storage-strip';
+    scroll.appendChild(strip);
 
     // 구분선
     const sep = document.createElement('div');
@@ -84,6 +75,7 @@ Object.assign(App.prototype, {
     this.els.towerBar.appendChild(scroll);
     this._towerBarScroll = scroll;
     this.refreshPullButtons();
+    this.renderStorageStrip && this.renderStorageStrip();
   },
 
   syncTowerPanel() {
@@ -108,13 +100,12 @@ Object.assign(App.prototype, {
       const sameSlots = this.engine.towerSlots.filter(s => s.occupied && s.tower?._gachaId === t._gachaId);
       const sameCount = sameSlots.length;
       const canMerge = sameCount >= 3;
-      const evolveId = window.MERGE_EVOLUTION?.[t._gachaId];
+      const evolveId = [].concat(window.MERGE_EVOLUTION?.[t._gachaId] || [])[0];
       const evolveDef = evolveId ? window.GachaTowerDefs?.[evolveId] : null;
       const synergyInfo = t.synergyBonus > 0
         ? `<span style="color:#ffd60a;font-size:10px">⚡시너지 +${t.synergyBonus}</span>`
         : `<span style="color:#888;font-size:10px" title="같은 타입 타워를 150px 이내에 배치하면 데미지 시너지가 붙습니다">⚡시너지 없음 (150px 이내 같은 타입 배치시 발동)</span>`;
-      const refundCosts = {normal:35, rare:84, epic:140, legend:240, unique:420};
-      const refund = refundCosts[def.grade] || 35;
+      const refund = (window.SELL_VALUE || {})[def.grade] || 40; // v28: 판매가 단일 기준
 
       // v27: 스탯 옆 (+%) 강화 표시 + 다음 강화 힌트
       const dmgPct = Math.round(((t.buffDmgMul||1) - 1) * 100);
@@ -141,7 +132,7 @@ Object.assign(App.prototype, {
       const teMul = window.typeEffectiveness && t.target ? window.typeEffectiveness(def.type, t.target.typeTag) : 1;
       const breakdown = `
         <div style="font-size:9.5px;color:#999;margin-top:4px;line-height:1.5;border-top:1px dashed rgba(255,255,255,0.1);padding-top:3px;">
-          📐 데미지 breakdown: 기본${def.damage}${t.synergyBonus>0?`+시너지${t.synergyBonus}`:''}
+          📐 데미지 breakdown: 기본${def.damage}${t.flatDmg>0?`+강화${Math.round(t.flatDmg)}`:''}
           × 타입강화${(t.buffDmgMul||1).toFixed(2)}
           × 숙련도${(t.masteryMul||1).toFixed(2)}
           ${teMul!==1?`× 상성${teMul.toFixed(1)}`:''}
@@ -167,9 +158,31 @@ Object.assign(App.prototype, {
           ${canMerge
             ? `<button class="tp-btn tp-upgrade" data-action="merge">✨ 합치기 진화!</button>`
             : `<button class="tp-btn tp-maxed" disabled>합치기 ${sameCount}/3</button>`}
+          <button class="tp-btn" data-action="recall" style="background:linear-gradient(135deg,#7c4dff,#4527a0)">🎒 회수</button>
+          ${window.canUseTM && window.canUseTM(t) ? `<button class="tp-btn" data-action="tm" style="background:linear-gradient(135deg,#00b4d8,#0077b6)" title="태그 1개를 랜덤으로 배움 (타워당 1회)">💿 기술머신 ${window.TM_COST}g</button>` : ''}
           <button class="tp-btn tp-sell" data-action="sell">💸 +${refund}g</button>
         </div>
       `;
+      // v28: 필드 타워를 보관함으로 회수 (무료) - 합성 재료로 쓰거나 자리 재배치용
+      panel.querySelector('[data-action="recall"]')?.addEventListener('click', () => {
+        this.engine.towers = this.engine.towers.filter(x => x !== t);
+        const slot = this.engine.towerSlots[slotIdx];
+        if (slot) { slot.occupied = false; slot.tower = null; }
+        if (window.applyTowerSynergies) window.applyTowerSynergies(this.engine.towers);
+        this.engine.selectedTower = null;
+        panel.remove();
+        this._addToStorage([{ ...def, _starLevel: 1 }]);
+        this.showWaveAnnounce(`🎒 ${def.name} 보관함으로`, '#c084fc');
+      });
+
+      // v28 세션D: 기술머신 - 에픽·레전드에 랜덤 태그 1개 (회수해도 유지)
+      panel.querySelector('[data-action="tm"]')?.addEventListener('click', () => {
+        if (!this.engine.spendGold(window.TM_COST)) { this.showWaveAnnounce('💰 골드가 부족해요', '#ff6b6b'); return; }
+        const tag = window.applyTM(t);
+        this.engine.spawnFloatingText(`💿 ${window.DEX_TAGS[tag]} 습득!`, t.x, t.y - 36, '#4cc9f0');
+        this.SFX && this.SFX.play && this.SFX.play('merge');
+        panel.remove(); this.engine.selectedTower = null;
+      });
 
       panel.querySelector('[data-action="merge"]')?.addEventListener('click', () => {
         const allSameSlots = this.engine.towerSlots.filter(s => s.occupied && s.tower?._gachaId === t._gachaId);
@@ -182,15 +195,15 @@ Object.assign(App.prototype, {
           this.engine.towers = this.engine.towers.filter(x => x !== mergeSlots[i].tower);
           mergeSlots[i].occupied = false; mergeSlots[i].tower = null;
         }
-        const evoTower = window._createGachaTower(evolveDef, currentSlot.x, currentSlot.y, this.engine);
+        let evoPick; const evoTower = window._createGachaTower((evoPick = window.GachaTowerDefs[window.getEvolutionId(t._gachaId)] || evolveDef), currentSlot.x, currentSlot.y, this.engine);
         evoTower._evolveGlowTimer = 1.2; // v27-5: 합체진화 연출 (item1)
         this.engine.towers = this.engine.towers.filter(x => x !== currentSlot.tower);
         this.engine.towers.push(evoTower);
         currentSlot.tower = evoTower;
         this.engine.selectedTower = evoTower;
         if (window.applyTowerSynergies) window.applyTowerSynergies(this.engine.towers);
-        const evoGrade = window.GRADES[evolveDef.grade];
-        this.engine.spawnFloatingText(`✨ ${evolveDef.name}!`, currentSlot.x, currentSlot.y-40, evoGrade.color);
+        const evoGrade = window.GRADES[evoPick.grade];
+        this.engine.spawnFloatingText(`✨ ${evoPick.name}!`, currentSlot.x, currentSlot.y-40, evoGrade.color);
         this.engine.particles.push(new BurstRing(currentSlot.x, currentSlot.y, 70, evoGrade.color));
         this.engine.triggerScreenShake(6, 0.25);
         if (this.missionTracker) { this.missionTracker.stats.mergeCount++; this.missionTracker.check(); }
@@ -367,8 +380,11 @@ Object.assign(App.prototype, {
         <span style="font-size:8px;color:#ffd60a">💰${nextUpg.cost}</span>
         <span style="font-size:7px;color:#888">${dotsStr}</span>
       `;
-      const buffLabel = {dmg:'데미지', range:'사거리', speed:'공속', slow:'슬로우', poison:'독', chain:'연쇄', target:'타겟수', all:'전체'}[nextUpg.buff] || nextUpg.buff;
-      const valStr = typeof nextUpg.val === 'number' && nextUpg.val < 1 ? `+${Math.round(nextUpg.val*100)}%` : `+${nextUpg.val}`;
+      // v28: 등급별 절대값 + % 구조 안내
+      const F = window.TYPE_FLAT_PER_TIER || {};
+      const k = nextUpg.flat || 0;
+      const buffLabel = '데미지';
+      const valStr = `노말+${F.normal*k} 레어+${F.rare*k} 에픽+${F.epic*k} 레전드+${F.legend*k}${nextUpg.val ? ` (+${Math.round(nextUpg.val*100)}%)` : ''}`;
       btn.title = (showBadge && typeKey === topType ? '👑 가장 많이 투자한 속성\n' : '') + `${nextUpg.label}: 💰${nextUpg.cost} (${buffLabel} ${valStr})`;
       btn.addEventListener('click', () => {
         if (!this.engine) return;
@@ -429,62 +445,62 @@ Object.assign(App.prototype, {
     }
   },
 
+  // v28 세션 C: 3갈래 × 4단계 스킬트리 화면 (모바일에서도 설명이 보이도록 노드 안에 표시)
   openSkillTree(hero) {
-    const existing = document.querySelector('.skilltree-overlay');
-    if (existing) existing.remove();
-
-    const overlay = document.createElement('div');
-    overlay.className = 'skilltree-overlay';
-
-    const title = document.createElement('div');
-    title.className = 'skilltree-title';
-    title.innerHTML = `${hero.skin.emoji} ${hero.name} 스킬트리 <span class="sp-badge">SP: ${hero.skillPoints}</span>`;
-    overlay.appendChild(title);
-
+    document.querySelector('.skilltree-overlay')?.remove();
     const tree = window.SkillTrees[hero.id];
-    if (tree) {
-      const grid = document.createElement('div');
-      grid.className = 'skilltree-grid';
-
-      for (let row = 0; row < 4; row++) {
-        for (let col = 0; col < 3; col++) {
-          const node = tree.nodes.find(n => n.col === col && n.row === row);
-          const cell = document.createElement('div');
-          if (node) {
-            const isUnlocked = hero.unlockedSkills.has(node.id);
-            const canUnlock = !isUnlocked && hero.skillPoints >= node.cost &&
-                              (!node.requires || hero.unlockedSkills.has(node.requires));
-            cell.className = `st-node ${isUnlocked ? 'unlocked' : ''} ${canUnlock ? 'available' : ''} ${!isUnlocked && !canUnlock ? 'locked' : ''}`;
-            cell.innerHTML = `
-              <div class="st-emoji">${node.emoji}</div>
-              <div class="st-name">${node.name}</div>
-              <div class="st-cost">${isUnlocked ? '✅' : `💎${node.cost}`}</div>
-            `;
-            cell.title = node.desc;
-            if (canUnlock) {
-              cell.addEventListener('click', () => {
-                if (hero.unlockSkillNode(node.id, this.engine)) {
-                  this.openSkillTree(hero); // 새로고침
-                  this.buildHeroSkillBar();
-                }
-              });
-            }
-          } else {
-            cell.className = 'st-node empty';
-          }
-          grid.appendChild(cell);
-        }
-      }
-      overlay.appendChild(grid);
-    }
-
-    const closeBtn = document.createElement('button');
-    closeBtn.className = 'skin-picker-close';
-    closeBtn.textContent = '닫기';
-    closeBtn.addEventListener('click', () => overlay.remove());
-    overlay.appendChild(closeBtn);
-
+    if (!tree) return;
+    const overlay = document.createElement('div');
+    overlay.className = 'skilltree-overlay st2';
     document.getElementById('game-screen').appendChild(overlay);
+    const EVO_NAMES = { flareon:'부스터', jolteon:'쥬피썬더', vaporeon:'샤미드' };
+
+    const render = () => {
+      const spent = [...hero.unlockedSkills].reduce((a, id) => a + (tree.nodes.find(n => n.id === id)?.cost || 0), 0);
+      const cols = tree.branches.map((b, bi) => {
+        const match = b.evo && hero.evolved === b.evo;
+        const head = `<div class="st2-head" style="--bc:${b.color}">
+            <div class="st2-bname">${b.emoji} ${b.name}</div>
+            ${b.evo ? `<div class="st2-evo ${match ? 'on' : ''}">${match ? '✨ 진화 일치 ×1.5' : EVO_NAMES[b.evo] + ' 진화 시 ×1.5'}</div>` : ''}
+          </div>`;
+        const nodes = tree.nodes.filter(n => n.branch === bi).sort((a, b) => a.tier - b.tier).map(n => {
+          const have = hero.unlockedSkills.has(n.id);
+          const reqOk = !n.requires || hero.unlockedSkills.has(n.requires);
+          const can = !have && reqOk && hero.skillPoints >= n.cost;
+          const cls = have ? 'have' : can ? 'can' : reqOk ? 'poor' : 'lock';
+          return `<button class="st2-node ${cls} ${n.tier === 4 ? 'cap' : ''}" data-id="${n.id}" style="--bc:${b.color}">
+              <div class="st2-top"><span class="st2-emoji">${n.emoji}</span><span class="st2-cost">${have ? '✓' : n.cost + 'SP'}</span></div>
+              <div class="st2-name">${n.name}</div>
+              <div class="st2-desc">${n.desc.replace('[캡스톤] ', '')}</div>
+            </button>`;
+        }).join('<div class="st2-link"></div>');
+        return `<div class="st2-col">${head}${nodes}</div>`;
+      }).join('');
+      overlay.innerHTML = `
+        <div class="st2-bar">
+          <div class="st2-title">${hero.skin.emoji} ${hero.name} 스킬트리</div>
+          <div class="sp-badge">SP ${hero.skillPoints}</div>
+          <button class="mg-x" data-act="close">✕</button>
+        </div>
+        <div class="st2-sub">Lv${hero.level} · 사용 ${spent}SP · 만렙까지 총 25SP → 갈래 2개 반 선택 · ${hero.def.passive || ''}</div>
+        <div class="st2-grid">${cols}</div>`;
+      overlay.querySelector('[data-act="close"]').onclick = () => overlay.remove();
+      overlay.querySelectorAll('.st2-node').forEach(el => el.onclick = () => {
+        const n = tree.nodes.find(x => x.id === el.dataset.id);
+        if (hero.unlockedSkills.has(n.id)) return;
+        if (n.requires && !hero.unlockedSkills.has(n.requires)) {
+          const req = tree.nodes.find(x => x.id === n.requires);
+          this.showWaveAnnounce(`🔒 먼저 '${req.name}'을(를) 찍어야 해요`, '#ff6b6b'); return;
+        }
+        if (hero.skillPoints < n.cost) { this.showWaveAnnounce(`SP가 부족해요 (${n.cost}SP 필요)`, '#ff6b6b'); return; }
+        if (hero.unlockSkillNode(n.id, this.engine)) {
+          this.SFX.play('skill');
+          render();
+          this.buildHeroSkillBar();
+        }
+      });
+    };
+    render();
   },
 
   _onMissionComplete(mission) {
@@ -523,13 +539,14 @@ Object.assign(App.prototype, {
       const info = window.TYPES?.[typeKey];
       const lv = window.TypeUpgradeLevels?.[typeKey] || 0;
       let mul = 1;
-      for (let i = 0; i < lv; i++) mul *= (1 + window.getTypeUpgradeAt(typeKey, i).val);
+      let flatTiers = 0;
+      for (let i = 0; i < lv; i++) { const u = window.getTypeUpgradeAt(typeKey, i); mul *= (1 + u.val); flatTiers += (u.flat || 0); }
       const towerCount = this.engine.towers.filter(t => t.def?.type === typeKey).length;
       const row = document.createElement('div');
       row.className = 'mission-item';
       row.innerHTML = `
         <div>${info?.emoji || ''} ${info?.name || typeKey} (타워 ${towerCount}개)</div>
-        <div style="color:#ffd60a">데미지 x${mul.toFixed(2)} (강화 ${lv}단계)</div>
+        <div style="color:#ffd60a">레어 기준 +${Math.round((window.TYPE_FLAT_PER_TIER?.rare||5)*flatTiers)} · x${mul.toFixed(2)} (강화 ${lv}단계)</div>
       `;
       list.appendChild(row);
     }
@@ -574,7 +591,7 @@ Object.assign(App.prototype, {
 
     if (window.MERGE_EVOLUTION && window.GachaTowerDefs) {
       for (const fromId in window.MERGE_EVOLUTION) {
-        const toId = window.MERGE_EVOLUTION[fromId];
+        const toId = [].concat(window.MERGE_EVOLUTION[fromId])[0];
         const fromDef = window.GachaTowerDefs[fromId];
         const toDef = window.GachaTowerDefs[toId];
         if (!fromDef || !toDef) continue;
@@ -703,14 +720,15 @@ Object.assign(App.prototype, {
     bar.appendChild(divider);
     for (const item of window.ShopItems) {
       const cost = window.shopItemCost(item, this.engine);
-      const used = item.oneTime && this.engine._oneTimeUsed?.[item.key];
+      const waveUses = (this.engine._shopWaveUses || {})[item.key] || 0;
+      const used = (item.oneTime && this.engine._oneTimeUsed?.[item.key]) || (item.perWave && waveUses >= item.perWave);
       const btn = document.createElement('button');
       btn.className = 'shop-bar-btn';
       btn.disabled = used || this.engine.gold < cost;
       btn.innerHTML = used
         ? `<span style="opacity:0.4">${item.emoji}</span><span style="font-size:8px;color:#888">사용완료</span>`
         : `<span>${item.emoji}</span><span style="font-size:8px;color:#ffd60a">💰${cost}</span>`;
-      btn.title = used ? `${item.name}: 이미 사용함 (게임당 1회)` : `${item.name}: ${item.desc}`;
+      btn.title = used ? `${item.name}: ${item.perWave ? '이번 웨이브 사용 완료' : '이미 사용함 (게임당 1회)'}` : `${item.name}: ${item.desc}`;
       btn.addEventListener('click', () => {
         if (used) return;
         if (!this.engine.spendGold(cost)) {
@@ -724,6 +742,7 @@ Object.assign(App.prototype, {
           return;
         }
         if (item.scaling) this.engine._shopBuyCount[item.key] = (this.engine._shopBuyCount[item.key] || 0) + 1;
+        if (item.perWave) { if (!this.engine._shopWaveUses) this.engine._shopWaveUses = {}; this.engine._shopWaveUses[item.key] = (this.engine._shopWaveUses[item.key] || 0) + 1; }
         if (item.oneTime) {
           if (!this.engine._oneTimeUsed) this.engine._oneTimeUsed = {};
           this.engine._oneTimeUsed[item.key] = true;

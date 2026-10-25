@@ -67,9 +67,9 @@ function generateWave(n) {
   }
 
   // 웨이브가 진행될수록 더 많이, 더 빽빽하게 스폰 (계속 돌면서 잡는 느낌). cycle이 늘수록(90웨이브 이후 반복) 한번 더 강화
-  let enemyCount = Math.round(20 + n * 1.3 + cycle * 20); // v27-39: 선형계수 4.6→1.3 대폭 하향 (요청4 - wave44에 이미 228마리로 계산되어 단일 웨이브가 필드상한을 넘어서던 근본 문제)
+  let enemyCount = Math.min(140, Math.round(18 + n * 1.0)) + cycle * 10; // v28 (설계서 §2): 18+웨이브, 최대 140 (+90 이후 사이클당 10) // v27-39: 선형계수 4.6→1.3 대폭 하향 (요청4 - wave44에 이미 228마리로 계산되어 단일 웨이브가 필드상한을 넘어서던 근본 문제)
   if (window.app?.engine?._runTrait?.key === 'swarm') enemyCount = Math.round(enemyCount * 1.25);
-  const baseInterval = Math.max(0.26, 0.85 - n * 0.014);
+  const baseInterval = Math.max(0.30, 0.85 - n * 0.014); // v28: 최소 간격 0.30초
   const streams = 1 + Math.min(4, Math.floor(n / 6));
 
   const arr = [];
@@ -693,11 +693,8 @@ class App {
     const slotIdx = this.engine.selectedSlotIdx;
     // v27-44: 슬롯을 선택 안 했어도 뽑을 수 있게 허용 - 결과는 보관함으로 감 (요청2 - 먼저 뽑고 나중에 배치)
     // 단, "점유된 슬롯을 선택한 채로" 뽑으려는 건 실수일 가능성이 높아서 계속 막음.
-    const noSlotSelected = slotIdx === null;
-    if (!noSlotSelected && this.engine.towerSlots[slotIdx]?.occupied) {
-      this.showWaveAnnounce('빈 슬롯을 먼저 클릭하세요! 🎯', '#ffd60a');
-      return;
-    }
+    // v28: 빈 슬롯을 선택한 상태면 바로 배치, 아니면(미선택/점유 슬롯) 보관함으로 - 막지 않음
+    const noSlotSelected = slotIdx === null || !!this.engine.towerSlots[slotIdx]?.occupied;
 
     const cost = pullKey === 'ten' ? window.PULL_COSTS.ten : window.PULL_COSTS[pullKey];
     if (!this.engine.spendGold(cost)) {
@@ -742,13 +739,12 @@ class App {
     const towerDef = window.rollTower(pullKey);
     if (noSlotSelected) {
       // v27-44: 슬롯 없이 뽑았으면 보관함으로 (요청2)
-      if (!this._inventory) this._inventory = [];
-      this._inventory.push(towerDef);
-      this.showWaveAnnounce(`${towerDef.emoji} ${towerDef.name} 획득! (보관함에 저장됨)`, '#4fc3f7');
-      this._refreshInventoryBtn && this._refreshInventoryBtn();
-      return;
+      this._addToStorage([towerDef]);
+      const gg = window.GRADES?.[towerDef.grade];
+      this.showWaveAnnounce(`${towerDef.emoji} ${towerDef.name} 획득! → 🎒보관함`, gg?.color || '#4fc3f7');
+    } else {
+      this._placePulledTower(towerDef, slotIdx);
     }
-    this._placePulledTower(towerDef, slotIdx);
 
     // 뽑기 등급 팝업 + 효과음
     const gradeSound = {normal:'pull_normal', rare:'pull_rare', epic:'pull_epic', legend:'pull_epic', unique:'merge'};
@@ -775,11 +771,10 @@ class App {
     }
     // v27-5: 합체 힌트 (요청) - 뽑은 직후 동일 타워 보유수 체크해서 알려줌
     if (this.engine) {
-      const sameCount = this.engine.towerSlots.filter(s => s.occupied && s.tower?._gachaId === towerDef.id).length;
-      if (sameCount === 3) {
-        setTimeout(() => this.showWaveAnnounce(`🧬 ${towerDef.emoji} ${towerDef.name} 3개 모임! 합체 가능해요`, '#06d6a0'), 900);
-      } else if (sameCount === 2) {
-        setTimeout(() => this.showWaveAnnounce(`🧬 ${towerDef.emoji} ${towerDef.name} 1개만 더 모으면 합체!`, '#ffd60a'), 900);
+      // v28: 필드 + 보관함 합산
+      const sameCount = this._allMaterials(true).filter(m => m.def.id === towerDef.id).length;
+      if (sameCount === 3 && window.MERGE_EVOLUTION[towerDef.id]) {
+        setTimeout(() => this.showWaveAnnounce(`🧬 ${towerDef.emoji} ${towerDef.name} 3마리! 합성 연구소에서 확정 진화 가능`, '#06d6a0'), 900);
       }
     }
 
@@ -825,145 +820,41 @@ class App {
   }
 
   _showTenPullResult(results, slotIdx) {
-    // 모든 10개를 보관함에 추가 + 팝업으로 보여줌
-    if (!this._inventory) this._inventory = [];
-    this._inventory.push(...results);
-
+    // v28 버그수정: 예전엔 결과를 보관함에 넣고, 카드 선택/닫기 때 또 넣어서 같은 포켓몬이 2배로 쌓였음.
+    // 이제 보관함에 1번만 넣고, 카드를 탭하면 (빈 슬롯이 선택돼 있을 때) 보관함에서 꺼내 배치.
+    this._addToStorage(results);
+    const canPlace = slotIdx !== null && slotIdx !== undefined && !this.engine.towerSlots[slotIdx]?.occupied;
     const overlay = document.createElement('div');
     overlay.className = 'tenpull-overlay';
-
     const title = document.createElement('div');
     title.className = 'skilltree-title';
-    title.innerHTML = `🌟 10연 뽑기 — 배치할 타워 선택 (나머지→보관함)`;
+    title.textContent = canPlace ? '🌟 10연 뽑기 — 하나를 탭하면 선택한 슬롯에 배치 (나머지는 보관함)' : '🌟 10연 뽑기 — 전부 보관함에 들어갔어요';
     overlay.appendChild(title);
-
     const grid = document.createElement('div');
     grid.className = 'tenpull-grid';
-
-    for (const def of results) {
+    const order = window.MERGE_ORDER;
+    for (const def of results.slice().sort((a, b) => order.indexOf(b.grade) - order.indexOf(a.grade))) {
       const grade = window.GRADES[def.grade];
       const card = document.createElement('div');
       card.className = `tenpull-card grade-${def.grade}`;
       card.style.borderColor = grade.color;
       card.style.boxShadow = `0 0 12px ${grade.glow}`;
-      // v27-5: 합체 힌트 뱃지 (요청) - 보드에 배치된 것 + 보관함(이번 10연 포함) 합산
-      const boardCount = this.engine ? this.engine.towerSlots.filter(s => s.occupied && s.tower?._gachaId === def.id).length : 0;
-      const invCount = (this._inventory || []).filter(x => x.id === def.id).length;
-      const totalCount = boardCount + invCount;
-      const mergeBadge = totalCount >= 3
-        ? '<div style="position:absolute;top:2px;right:2px;font-size:9px;color:#06d6a0;background:rgba(0,0,0,0.6);border-radius:6px;padding:1px 4px;">🧬합체가능</div>'
-        : totalCount === 2
-        ? '<div style="position:absolute;top:2px;right:2px;font-size:9px;color:#ffd60a;background:rgba(0,0,0,0.6);border-radius:6px;padding:1px 4px;">🧬1개더</div>'
-        : '';
-      card.style.position = 'relative';
-      card.innerHTML = `
-        ${mergeBadge}
-        <div class="tp-emoji">${def.emoji}</div>
-        <div class="tp-name" style="color:${grade.color}">${def.name}</div>
-        <div class="tp-grade">${'★'.repeat(grade.stars)}</div>
-        <div class="tp-grade-name">${grade.name}</div>
-      `;
-      card.style.cursor = 'pointer';
-      card.title = '클릭해서 배치';
-      card.addEventListener('click', () => {
-        overlay.remove();
-        this.engine.selectedSlotIdx = slotIdx;
-        this._placePulledTower(def, slotIdx);
-        const gd = window.GRADES?.[def.grade];
-        this.showWaveAnnounce(`${def.emoji} ${def.name} 배치!`, gd?.color||'#ffd60a');
-        const others = results.filter(r => r !== def);
-        this._inventory.push(...others);
-        this._refreshInventoryBtn();
-      });
+      card.innerHTML = `<div class="tp-emoji">${def.emoji}</div><div class="tp-name" style="color:${grade.color}">${def.name}</div><div class="tp-grade">${'★'.repeat(grade.stars)}</div><div class="tp-grade-name">${grade.name}</div>`;
+      if (canPlace) card.addEventListener('click', () => { overlay.remove(); this._placeFromStorage(def.id, slotIdx); });
       grid.appendChild(card);
     }
     overlay.appendChild(grid);
-
     const closeBtn = document.createElement('button');
     closeBtn.className = 'skin-picker-close';
-    closeBtn.textContent = '전부 보관함에 넣기';
-    closeBtn.addEventListener('click', () => {
-      overlay.remove();
-      this._inventory.push(...results);
-      this._refreshInventoryBtn();
-    });
-    overlay.appendChild(closeBtn);
-    document.getElementById('game-screen').appendChild(overlay);
-
-    if (this.missionTracker) {
-      for (const def of results) {
-        if (def.grade !== 'normal') this.missionTracker.stats.totalRareCount++;
-        if (['epic','legend','unique'].includes(def.grade)) this.missionTracker.stats.totalEpicCount++;
-        if (['legend','unique'].includes(def.grade)) this.missionTracker.stats.totalLegendCount++;
-        if (def.grade === 'unique') this.missionTracker.stats.totalUniqueCount++;
-      }
-      this.missionTracker.stats.tenPullCount++;
-      this.missionTracker.check();
-    }
-  }
-
-  _refreshInventoryBtn() {
-    // 보관함 버튼 (타워바 맨 앞) 업데이트
-    let invBtn = document.getElementById('inventory-btn');
-    if (!invBtn) {
-      invBtn = document.createElement('button');
-      invBtn.id = 'inventory-btn';
-      invBtn.className = 'tower-btn';
-      invBtn.style.cssText = 'border-color:rgba(255,214,10,0.5);background:rgba(255,214,10,0.1);';
-      if (this._towerBarScroll) this._towerBarScroll.prepend(invBtn);
-    }
-    const count = this._inventory ? this._inventory.length : 0;
-    invBtn.innerHTML = `
-      <span class="tower-btn-emoji">🎒</span>
-      <span class="tower-btn-name" style="color:#ffd60a">보관함</span>
-      <span class="tower-btn-cost">${count}개</span>
-    `;
-    invBtn.style.display = count > 0 ? '' : 'none';
-    invBtn.onclick = () => this._openInventory();
-  }
-
-  _openInventory() {
-    const slotIdx = this.engine?.selectedSlotIdx;
-    if (slotIdx === null || slotIdx === undefined || this.engine.towerSlots[slotIdx]?.occupied) {
-      this.showWaveAnnounce('빈 슬롯을 먼저 클릭하세요!', '#ffd60a');
-      return;
-    }
-    const overlay = document.createElement('div');
-    overlay.className = 'tenpull-overlay';
-    overlay.innerHTML = `<div class="skilltree-title">🎒 보관함 — 배치할 타워를 선택하세요</div>`;
-    const grid = document.createElement('div');
-    grid.className = 'tenpull-grid';
-
-    (this._inventory || []).forEach((def, idx) => {
-      const grade = window.GRADES[def.grade];
-      const card = document.createElement('div');
-      card.className = `tenpull-card grade-${def.grade}`;
-      card.style.borderColor = grade.color;
-      card.style.boxShadow = `0 0 10px ${grade.glow}`;
-      card.innerHTML = `
-        <div class="tp-emoji">${def.emoji}</div>
-        <div class="tp-name" style="color:${grade.color}">${def.name}</div>
-        <div class="tp-grade">${'★'.repeat(grade.stars)}</div>
-        <div class="tp-grade-name">${grade.name}</div>
-      `;
-      card.addEventListener('click', () => {
-        this._inventory.splice(idx, 1);
-        overlay.remove();
-        this._placePulledTower(def, slotIdx);
-        this.showWaveAnnounce(`${def.emoji} ${def.name} 배치!`, grade.color);
-        this._refreshInventoryBtn();
-      });
-      grid.appendChild(card);
-    });
-
-    overlay.appendChild(grid);
-    const closeBtn = document.createElement('button');
-    closeBtn.className = 'skin-picker-close';
-    closeBtn.textContent = '닫기';
+    closeBtn.textContent = '확인';
     closeBtn.addEventListener('click', () => overlay.remove());
     overlay.appendChild(closeBtn);
     document.getElementById('game-screen').appendChild(overlay);
   }
+
+  // v28: 예전 보관함 버튼/목록은 하단 보관함 스트립(storage.js)으로 대체 - 기존 호출 호환용
+  _refreshInventoryBtn() { this.renderStorageStrip && this.renderStorageStrip(); }
+  _openInventory() { this.openMergePanel && this.openMergePanel(); }
 
   selectHeroToPlace(heroId, btnEl) {
     if (!this.engine) return;
@@ -1081,6 +972,8 @@ class App {
     // v27: 새 게임 시작시 타입강화 레벨 초기화 (이전 판 값이 남아있던 버그 방지)
     if (window.TypeUpgradeLevels) { for (const t in window.TypeUpgradeLevels) window.TypeUpgradeLevels[t] = 0; }
 
+    // v28 버그수정: 보관함이 판마다 초기화되지 않아 이전 판 타워가 다음 판으로 넘어오고 있었음
+    this._storageReset();
     // 미션 트래커 초기화
     this.missionTracker = new MissionTracker();
     this.missionTracker.onComplete = (mission) => this._onMissionComplete(mission);
@@ -1175,6 +1068,13 @@ class App {
       this._recordKingKill(); // v27-17: 왕 처치 기록 갤러리 (요청4)
     };
     this.engine.onWaveComplete = (wave, bonus, timedOut) => {
+      // v28: 토게피 '황금알' - N웨이브마다 무료 프리미엄 뽑기
+      const every = this.engine._freePullEvery || 0;
+      if (every > 0 && wave % every === 0) {
+        const d = window.rollTower('premium');
+        this._addToStorage([d]);
+        setTimeout(() => this.showWaveAnnounce(`🥚 황금알! ${d.emoji} ${d.name} 획득 → 🎒`, '#ffd60a'), 700);
+      }
       if (hudTimer) hudTimer.style.display = 'none';
       this.els.btnWave.disabled = false;
       if (!timedOut) this.SFX.play('wave_clear');
@@ -1272,16 +1172,17 @@ class App {
     const origUpdate = this.engine.update.bind(this.engine);
     this.engine.update = () => {
       origUpdate();
+      // v28: 영웅 update는 engine.update가 이미 하고 있음 - 여기서 또 돌리면 스킬쿨/스탯이 2배속으로
+      // 도는 버그였음 (v27-58 복구). 시뮬레이션 부분은 매 서브스텝, DOM 갱신은 프레임당 1회만.
+      if (this.engine.state === 'wave' || this.engine.state === 'idle') this.spellMgr.update(this.engine.dt);
+      if (this.engine._bossSummonCooldown > 0) this.engine._bossSummonCooldown -= this.engine.dt;
+      if (this.engine.state === 'wave') this._waveTimer += this.engine.dt;
+      if (this.engine._isLastSubstep === false) return;
       if (this.engine.state === 'wave' || this.engine.state === 'idle') {
-        for (const h of this.engine.heroes) h.update(this.engine.dt, this.engine);
-        this.spellMgr.update(this.engine.dt);
         this.updateSpellBarUI();
         this.updateHeroSkillBarUI();
       }
-      if (this.engine._bossSummonCooldown > 0) {
-        this.engine._bossSummonCooldown -= this.engine.dt;
-        this._updateBossSummonUI();
-      }
+      if (this.engine._bossSummonCooldown > 0) this._updateBossSummonUI();
       // v27-46: 논리 해상도를 고정하는 방식으로 바뀌면서, 이 감시는 "진짜 방향전환"(세로↔가로)일 때만
       // 필요함 - 단순 창 크기 조절은 이제 게임 로직에 영향을 주지 않아야 하므로 의도적으로 무시함.
       this._dimCheckTimer = (this._dimCheckTimer || 0) + this.engine.dt;
@@ -1335,7 +1236,6 @@ class App {
       }
       // 웨이브 진행 중 타이머 + 남은 적 표시
       if (this.engine.state === 'wave') {
-        this._waveTimer += this.engine.dt;
         this._updateWaveHUD();
       } else {
         this._waveTimer = 0;
@@ -1344,11 +1244,8 @@ class App {
       }
     };
 
-    const origDraw = this.engine.draw.bind(this.engine);
-    this.engine.draw = () => {
-      origDraw();
-      for (const h of this.engine.heroes) h.draw(this.engine.ctx);
-    };
+    // v28: 영웅은 engine.draw()가 카메라 변환 안에서 이미 그림. 여기서 카메라 밖(화면좌표)에 한 번 더
+    // 그리던 코드가 "영웅이 2마리로 보이는" 원인이었음 (v27-58 복구) - 래퍼 제거.
 
     const origPlace = this.engine.placeTower.bind(this.engine);
     this.engine.placeTower = (TowerClass, slotIdx) => {
@@ -1402,6 +1299,13 @@ class App {
       }
       origTap(sx, sy);
       const selIdx = this.engine.selectedSlotIdx;
+      // v28: 보관함에서 고른 포켓몬을 들고 있으면, 탭한 빈 슬롯에 바로 배치
+      if (this._placingId && selIdx !== null && !this.engine.towerSlots[selIdx].occupied) {
+        this._placeFromStorage(this._placingId, selIdx);
+        document.querySelectorAll('.gacha-btn').forEach(b => b.classList.remove('slot-ready'));
+        this.syncTowerPanel();
+        return;
+      }
       if (selIdx !== null && !this.engine.towerSlots[selIdx].occupied) {
         document.querySelectorAll('.gacha-btn').forEach(b => b.classList.add('slot-ready'));
         this.showWaveAnnounce('🎯 뽑기 버튼을 클릭!', '#4cc9f0');
@@ -2061,6 +1965,7 @@ function initTitleCanvas() {
     if (!document.getElementById('title-screen')?.classList.contains('active')) return;
     requestAnimationFrame(loop);
     frame++;
+    if (frame % 2 === 1) return; // v28: 타이틀은 장식용이라 30fps (방치 시 배터리 절약)
 
     W = canvas.clientWidth; H = canvas.clientHeight;
     if (canvas.width !== W || canvas.height !== H) { canvas.width=W; canvas.height=H; }
@@ -2071,7 +1976,7 @@ function initTitleCanvas() {
 
     // 성운 orb
     for (const o of orbs) {
-      o.phase += o.speed;
+      o.phase += o.speed * 2;
       const pulse = Math.sin(o.phase) * 0.15 + 0.85;
       const g = ctx.createRadialGradient(o.x,o.y,0,o.x,o.y,o.r*pulse);
       g.addColorStop(0, o.color + '12');
@@ -2083,7 +1988,7 @@ function initTitleCanvas() {
 
     // 파티클
     for (const p of particles) {
-      p.x += p.vx * 0.016; p.y += p.vy * 0.016;
+      p.x += p.vx * 0.032; p.y += p.vy * 0.032;
       p.rot += p.spin;
       if (p.y < -30) { p.y = H + 10; p.x = Math.random()*W; }
 
@@ -2095,8 +2000,10 @@ function initTitleCanvas() {
         ctx.textAlign='center'; ctx.textBaseline='middle';
         ctx.fillText(p.emoji, 0, 0);
       } else {
-        ctx.fillStyle = p.color;
-        ctx.shadowColor = p.color; ctx.shadowBlur = 8;
+        ctx.fillStyle = p.color; // shadowBlur 대신 반투명 큰 원으로 글로우 (저비용)
+        ctx.globalAlpha *= 0.35;
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r*2.2, 0, Math.PI*2); ctx.fill();
+        ctx.globalAlpha /= 0.35;
         ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI*2); ctx.fill();
       }
       ctx.restore();

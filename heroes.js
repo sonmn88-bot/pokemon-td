@@ -28,70 +28,74 @@ const SkinDefs = {
   },
 };
 
-// ===== 스킬트리 정의 =====
-// 3x3 트리, 레벨업시 포인트 1개 획득
-// 노드 구조: { id, name, emoji, desc, cost(포인트), requires(id), type, value }
+// ===== 스킬트리 정의 (v28 세션 C · 설계서 §6) =====
+// 영웅마다 3갈래 × 4단계. 단계 비용 1/2/3/4 → 갈래당 10SP. 만렙(25)까지 SP 총 25 → 2갈래 반만 찍을 수 있음.
+// 같은 갈래의 이전 단계를 찍어야 다음 단계가 열림 (4단계 = 캡스톤, 갈래 완주 보상).
+// fx: 효과 키 → 값 (Hero._skillVal로 합산). 설명(desc)과 실제 효과가 반드시 일치해야 함.
+// 이브이: 갈래의 evo가 선택한 진화와 같으면 그 갈래 수치 효과 ×1.5.
+function _tree(branches, rows) {
+  const nodes = [];
+  rows.forEach((row, b) => row.forEach((n, t) => nodes.push({
+    ...n, branch: b, col: b, row: t, tier: t + 1, cost: t + 1,
+    requires: t > 0 ? row[t - 1].id : null, evo: branches[b].evo || null,
+  })));
+  return { branches, nodes };
+}
+
 const SkillTrees = {
-  // ===== 피카츄 (전기 딜러) - 포켓몬덱스: 전기쥐, 볼트태클, 철벽, 전기충격 =====
-  pikachu: {
-    nodes: [
-      // Row 0 - 기본기
-      {id:'jolt1',   name:'전기충격',  emoji:'⚡', desc:'기본공격 데미지 +18%', cost:1, requires:null, col:0, row:0, type:'atkDmg', value:0.18},
-      {id:'volt1',   name:'볼트',      emoji:'🔵', desc:'기본공격 사거리 +15%', cost:1, requires:null, col:1, row:0, type:'atkRange', value:0.15},
-      {id:'swift1',  name:'전광석화',  emoji:'💨', desc:'공격속도 +20%',         cost:1, requires:null, col:2, row:0, type:'fireRate', value:0.20},
-      // Row 1
-      {id:'para2',   name:'마비분말',  emoji:'🌀', desc:'기본공격 스턴 확률 +25%',cost:1, requires:'jolt1', col:0, row:1, type:'atkDmg', value:0.14},
-      {id:'crit2',   name:'크리티컬',  emoji:'💥', desc:'30% 확률 2.5배 크리',   cost:1, requires:'volt1', col:1, row:1, type:'crit', value:{chance:0.30, mul:2.5}},
-      {id:'aoe2',    name:'방전',      emoji:'🌩️', desc:'100만볼트 범위 +50%',   cost:1, requires:'swift1', col:2, row:1, type:'skillRange', value:0.50},
-      // Row 2
-      {id:'thunder3',name:'천둥',      emoji:'⛈️', desc:'20% 확률 번개 소환(광역)',cost:2, requires:'para2', col:0, row:2, type:'lightning', value:0.20},
-      {id:'raichu3', name:'라이츄화',  emoji:'⭐', desc:'기본공격 체인 번개 3연쇄',cost:2, requires:'crit2', col:1, row:2, type:'chainAtk', value:3},
-      {id:'overload3',name:'오버로드', emoji:'🔮', desc:'모든 스킬 쿨다운 -35%',  cost:2, requires:'aoe2',  col:2, row:2, type:'cdReduce', value:0.35},
-      // Row 3
-      {id:'iron4',   name:'철벽',      emoji:'🛡️', desc:'스턴 지속시간 +0.5초 추가', cost:2, requires:'thunder3', col:0, row:3, type:'atkDmg', value:0.10},
-      {id:'volt4',   name:'볼트태클',  emoji:'💫', desc:'기본공격 후 폭발(소형 광역)',cost:2, requires:'raichu3',  col:1, row:3, type:'atkDmg', value:0.16},
-      {id:'cd4',     name:'전기구슬',  emoji:'🟡', desc:'전광석화 쿨다운 -5초',   cost:2, requires:'overload3', col:2, row:3, type:'cdReduce', value:0.10},
-    ]
-  },
+  // ⚡ 피카츄 — 전기 몰빵 캐리
+  pikachu: _tree(
+    [{ name:'번개딜', emoji:'⚡', color:'#ffd600' }, { name:'전기군단', emoji:'🔋', color:'#ffb300' }, { name:'감전제어', emoji:'🌀', color:'#4fc3f7' }],
+    [
+      [ { id:'pk_crit',  name:'급소', emoji:'💥', desc:'기본공격 25% 확률로 2.2배 크리티컬', fx:{critChance:0.25, critMul:0.2} },
+        { id:'pk_chain', name:'연쇄번개', emoji:'⛓️', desc:'기본공격이 주변 적 2명에게 튕김(70%)', fx:{chainAtk:2} },
+        { id:'pk_bolt',  name:'낙뢰', emoji:'🌩️', desc:'기본공격 20% 확률로 광역 번개(60%·짧은 스턴)', fx:{lightning:0.20} },
+        { id:'pk_cap1',  name:'뇌격', emoji:'⚡', desc:'[캡스톤] 100만볼트가 0.6초 뒤 한 번 더 터짐', fx:{thunderDouble:1} } ],
+      [ { id:'pk_spd',   name:'과충전', emoji:'🔌', desc:'전기 타워 공격속도 +12%', fx:{elecSpeed:0.12} },
+        { id:'pk_rng',   name:'전자기장', emoji:'📡', desc:'전기 타워 사거리 +12%', fx:{elecRange:0.12} },
+        { id:'pk_edmg',  name:'고전압', emoji:'🔆', desc:'전기 타워 공격력 +15%', fx:{elecDmg:0.15} },
+        { id:'pk_cap2',  name:'충전', emoji:'🔋', desc:'[캡스톤] 전기 타워 5개마다 모든 타워 공격력 +5%', fx:{chargeAll:0.05} } ],
+      [ { id:'pk_stun',  name:'마비', emoji:'😵', desc:'기본공격·100만볼트 스턴 +0.3초', fx:{stunPlus:0.3} },
+        { id:'pk_field', name:'감속장', emoji:'🧲', desc:'100만볼트 맞은 적 3초간 40% 감속', fx:{voltSlow:0.4} },
+        { id:'pk_cd',    name:'오버로드', emoji:'⏱️', desc:'모든 스킬 쿨다운 -25%', fx:{cdReduce:0.25} },
+        { id:'pk_cap3',  name:'정전', emoji:'🌑', desc:'[캡스톤] 100만볼트가 보스도 1.5초 확정 스턴', fx:{bossStun:1.5} } ],
+    ]),
 
-  // ===== 토게피 (행운/지원) - 포켓몬덱스: 메트로놈, 행복의알, 소원별, 요정바람 =====
-  togepi: {
-    nodes: [
-      // Row 0
-      {id:'luck1',   name:'행운',     emoji:'🍀', desc:'골드 획득 +20%',          cost:1, requires:null, col:0, row:0, type:'goldBonus', value:0.20},
-      {id:'fairy1',  name:'요정바람', emoji:'🌸', desc:'기본공격 데미지 +15%',     cost:1, requires:null, col:1, row:0, type:'atkDmg', value:0.15},
-      {id:'cd1',     name:'응원',     emoji:'📣', desc:'스킬 쿨다운 -25%',         cost:1, requires:null, col:2, row:0, type:'cdReduce', value:0.25},
-      // Row 1
-      {id:'jackpot2',name:'잭팟',     emoji:'🎰', desc:'킬시 8% 확률 추가 +15g',  cost:1, requires:'luck1',  col:0, row:1, type:'goldBonus', value:0.10},
-      {id:'egg2',    name:'행복의알', emoji:'🥚', desc:'공격력 +12%',     cost:1, requires:'fairy1', col:1, row:1, type:'atkDmg', value:0.12},
-      {id:'wish2',   name:'소원별',   emoji:'🌠', desc:'사거리 +10%',           cost:1, requires:'cd1',    col:2, row:1, type:'atkRange', value:0.10},
-      // Row 2
-      {id:'charm3',  name:'매혹',     emoji:'💕', desc:'주변 적 이동속도 영구-10%',cost:2, requires:'jackpot2',col:0, row:2, type:'atkDmg', value:0.12},
-      {id:'dazzle3', name:'눈부심',   emoji:'✨', desc:'행복의알 데미지 이펙트 추가',cost:2, requires:'egg2',   col:1, row:2, type:'atkDmg', value:0.10},
-      {id:'togetic3',name:'토게틱화', emoji:'🦋', desc:'사거리 +20%, 공격속도 +20%',cost:2, requires:'wish2',  col:2, row:2, type:'atkRange', value:0.20},
-      // Row 3
-      {id:'gold4',   name:'황금알',   emoji:'💰', desc:'웨이브 보상 골드 +60%',    cost:2, requires:'charm3',  col:0, row:3, type:'goldBonus', value:0.30},
-      {id:'metro4',  name:'메트로놈+',emoji:'🎲', desc:'메트로놈 효과 2배 강화',   cost:2, requires:'dazzle3', col:1, row:3, type:'atkDmg', value:0.16},
-      {id:'harmony4',name:'조화',     emoji:'🌟', desc:'모든 영웅 스킬 쿨다운 공유 -20%',cost:2, requires:'togetic3',col:2, row:3, type:'cdReduce', value:0.20},
-    ]
-  }
-};
+  // 🥚 토게피 — 행운 · 경제
+  togepi: _tree(
+    [{ name:'경제', emoji:'💰', color:'#ffd60a' }, { name:'행운합성', emoji:'🍀', color:'#06d6a0' }, { name:'응원', emoji:'📣', color:'#f48fb1' }],
+    [
+      [ { id:'tg_gold',  name:'행운', emoji:'🍀', desc:'모든 골드 획득 +15%', fx:{goldBonus:0.15} },
+        { id:'tg_int',   name:'저축', emoji:'🏦', desc:'이자 상한 +10 (최대 45)', fx:{interestCap:10} },
+        { id:'tg_wave',  name:'보너스', emoji:'🎁', desc:'웨이브 클리어 보너스 +50%', fx:{waveBonus:0.5} },
+        { id:'tg_cap1',  name:'황금알', emoji:'🥚', desc:'[캡스톤] 15웨이브마다 무료 프리미엄 뽑기 1회', fx:{freePull:15} } ],
+      [ { id:'tg_pity',  name:'직감', emoji:'🔮', desc:'숨은 천장 강화 (안 나온 계열 가중치 1.5→2.5배)', fx:{pityBoost:1.0} },
+        { id:'tg_coin',  name:'동전 수집', emoji:'🪙', desc:'행운의 동전 가격 -50%', fx:{coinDiscount:0.5} },
+        { id:'tg_jump',  name:'대박', emoji:'🎰', desc:'노말·레어 랜덤 합성 시 2등급 상승 확률 +3%p', fx:{jump:0.03} },
+        { id:'tg_cap2',  name:'기적', emoji:'🌈', desc:'[캡스톤] 뮤 레시피에서 레전드 1개를 에픽 3개로 대체 가능', fx:{miracle:1} } ],
+      [ { id:'tg_dur',   name:'긴 응원', emoji:'⏳', desc:'행복의알 지속시간 +4초', fx:{eggDur:4} },
+        { id:'tg_pow',   name:'열띤 응원', emoji:'📣', desc:'행복의알 공격력 효과 +10%p', fx:{eggPower:0.10} },
+        { id:'tg_metro', name:'더블 메트로놈', emoji:'🎲', desc:'메트로놈이 서로 다른 효과 2개를 동시에 발동', fx:{metroDouble:1} },
+        { id:'tg_cap3',  name:'축복', emoji:'✨', desc:'[캡스톤] 행복의알 동안 모든 타워 공격속도 +20%', fx:{eggSpeed:0.20} } ],
+    ]),
 
-SkillTrees.eevee = {
-  nodes: [
-    {id:'ev_dmg1',  name:'몸통박치기', emoji:'⭐', desc:'기본공격 데미지 +15%',   cost:1, requires:null, col:0, row:0, type:'atkDmg', value:0.15},
-    {id:'ev_rng1',  name:'예민한감각', emoji:'👁️', desc:'기본공격 사거리 +16%',   cost:1, requires:null, col:1, row:0, type:'atkRange', value:0.16},
-    {id:'ev_spd1',  name:'기민함',   emoji:'💨', desc:'공격속도 +18%',           cost:1, requires:null, col:2, row:0, type:'fireRate', value:0.18},
-    {id:'ev_crit2', name:'약점포착', emoji:'💥', desc:'25% 확률 2.2배 크리',      cost:1, requires:'ev_dmg1', col:0, row:1, type:'crit', value:{chance:0.25, mul:2.2}},
-    {id:'ev_skr2',  name:'집중',     emoji:'🔵', desc:'스킬 범위 +45%',          cost:1, requires:'ev_rng1', col:1, row:1, type:'skillRange', value:0.45},
-    {id:'ev_cd2',   name:'순응',     emoji:'⏱️', desc:'모든 스킬 쿨다운 -20%',   cost:1, requires:'ev_spd1', col:2, row:1, type:'cdReduce', value:0.20},
-    {id:'ev_glb3',  name:'유대',     emoji:'💗', desc:'타워 전체 데미지 +10%',    cost:2, requires:'ev_crit2', col:0, row:2, type:'globalDmg', value:0.10},
-    {id:'ev_multi3',name:'다재다능', emoji:'🌈', desc:'기본공격 2타겟 동시 공격', cost:2, requires:'ev_skr2', col:1, row:2, type:'multiTarget', value:2},
-    {id:'ev_life3', name:'적응력',   emoji:'🌈', desc:'공격력 +14%',          cost:2, requires:'ev_cd2', col:2, row:2, type:'atkDmg', value:0.14},
-    {id:'ev_final4',name:'진화의빛', emoji:'✨', desc:'모든 스킬 쿨다운 -35%',    cost:2, requires:'ev_glb3', col:0, row:3, type:'cdReduce', value:0.35},
-    {id:'ev_king4', name:'베테랑',   emoji:'👑', desc:'기본공격 데미지 +25%',     cost:2, requires:'ev_multi3', col:1, row:3, type:'atkDmg', value:0.25},
-    {id:'ev_tank4', name:'수호본능', emoji:'🛡️', desc:'전체 타워 데미지 +8%',          cost:2, requires:'ev_life3', col:2, row:3, type:'globalDmg', value:0.08},
-  ]
+  // 🦊 이브이 — 진화 분기. 고른 진화와 같은 갈래는 효과 ×1.5
+  eevee: _tree(
+    [{ name:'불꽃', emoji:'🔥', color:'#ff5722', evo:'flareon' }, { name:'전기', emoji:'⚡', color:'#ffd600', evo:'jolteon' }, { name:'물', emoji:'💧', color:'#29b6f6', evo:'vaporeon' }],
+    [
+      [ { id:'ev_f1',  name:'열정', emoji:'🔥', desc:'기본공격 데미지 +15%', fx:{atkDmg:0.15} },
+        { id:'ev_f2',  name:'불꽃 송곳니', emoji:'💥', desc:'기본공격 20% 확률로 2배 크리티컬', fx:{critChance:0.20} },
+        { id:'ev_f3',  name:'열풍', emoji:'🌪️', desc:'적응 스킬 데미지 +60%', fx:{adaptDmg:0.6} },
+        { id:'ev_fc',  name:'부스터 각성', emoji:'☄️', desc:'[캡스톤] 다재다능 중 기본공격이 광역(60px·60%)', fx:{burstSplash:1} } ],
+      [ { id:'ev_j1',  name:'기민함', emoji:'💨', desc:'기본공격 속도 +18%', fx:{fireRate:0.18} },
+        { id:'ev_j2',  name:'방전', emoji:'⛓️', desc:'기본공격이 주변 적 2명에게 튕김(70%)', fx:{chainAtk:2} },
+        { id:'ev_j3',  name:'지구력', emoji:'⏳', desc:'다재다능 지속시간 +3초', fx:{burstDur:3} },
+        { id:'ev_jc',  name:'쥬피썬더 각성', emoji:'⚡', desc:'[캡스톤] 다재다능 쿨다운 -40%', fx:{burstCd:0.4} } ],
+      [ { id:'ev_v1',  name:'물대포', emoji:'💧', desc:'기본공격이 적을 1.5초간 30% 감속', fx:{atkSlow:0.3} },
+        { id:'ev_v2',  name:'파도', emoji:'🌊', desc:'적응 스킬 범위 +40%', fx:{skillRange:0.4} },
+        { id:'ev_v3',  name:'치유의 물', emoji:'💠', desc:'모든 타워 공격력 +8%', fx:{globalDmg:0.08} },
+        { id:'ev_vc',  name:'샤미드 각성', emoji:'🫧', desc:'[캡스톤] 적응에 맞은 적은 5초간 받는 피해 +20%', fx:{vulnerable:0.2} } ],
+    ]),
 };
 
 // ===== 영웅 기본 정의 =====
@@ -99,7 +103,7 @@ const HeroDefs = {
   pikachu: {
     id:'pikachu', name:'피카츄', baseColor:'#ffd600',
     role:'전기 딜러',
-    passive:'전기 타워 데미지 +15%',
+    passive:'전기 타워 1개당 전기 타워 공격력 +2% (최대 30%) · 라이츄: +3% (최대 45%)',
     evolution:{ level:15, options:[
       // v27-60: 데미지 특화로 통일(다른 강화 요소는 패시브 쪽에서 담당)
       { id:'raichu', name:'라이츄', color:'#ff9800', dmgMul:1.35, rangeMul:1.15, fireRateMul:1.0 },
@@ -110,34 +114,28 @@ const HeroDefs = {
       projColor:'#fff176', projEmoji:'⚡', dmgType:'special',
       status:{type:'stun', duration:0.15},
     },
-    passiveApply(engine, hero) {
-      // v27-49 버그수정: 실존하지 않는 'voltorb' 타워 id를 체크하고 있어서 이 패시브가 완전히
-      // 죽어있었음 (요청4 - "피카츄로 하면 유독 어렵다"의 진짜 원인). 리자몽/거북왕처럼 타입 기준으로 수정.
-      // v27-60: "전기 포켓몬을 많이 모으면 강해지는 전략"으로 - 전기 타워 수에 비례해 추가 보너스
-      // (진화(라이츄) 전엔 소폭, 진화 후엔 더 크게 - 몰빵 전략이 진화 이후 확실히 보상받도록)
-      const electricCount = engine.towers.filter(t => t.def?.type === 'electric').length;
-      const perTower = hero.evolved ? 0.035 : 0.02;
-      const stackBonus = Math.min(electricCount * perTower, hero.evolved ? 0.70 : 0.30); // 상한선
-      const dmgMul = 1.15 + stackBonus + (hero ? hero._skillVal('passiveRange', 0) : 0);
-      for (const t of engine.towers) {
-        if (t.def?.type === 'electric') t.buffDmgMul = Math.max(t.buffDmgMul||1, dmgMul);
-      }
-    },
+    // v28: 패시브는 Hero._applyAura()에서 타워 전용 배율(_heroDmgMul 등)로 매 프레임 계산 (덮어쓰기 버그 방지)
+    passiveApply(engine, hero) {},
     skills:[
       {
         name:'100만볼트', emoji:'⚡', baseCooldown:28,
         desc:'범위 내 모든 적에게 전기 데미지 + 감전',
-        cast(hero, engine) {
+        cast(hero, engine, recast) {
           // v27-60: 레벨만 반영하던 고정 데미지 → 오토어택 데미지(타입강화/진화 다 반영됨) 비례로 변경
           const r = (140 + hero.level * 10) * (1 + hero._skillVal('skillRange', 0));
           const dmg = hero.attackDamage * 1.8;
+          const stun = 0.9 + hero._skillVal('stunPlus', 0);
+          const slow = hero._skillVal('voltSlow', 0), bossStun = hero._skillVal('bossStun', 0);
           for (const e of engine.enemies) {
             if (e.dead||e.reachedEnd) continue;
             if (Math.hypot(e.x-hero.x,e.y-hero.y) <= r) {
               e.takeDamage(dmg, 'special');
-              e.applyStatus('stun', 0.9, 0);
+              e.applyStatus('stun', stun, 0);
+              if (slow) e.applyStatus('slow', 3, 1 - slow);
+              if (bossStun && e.isBoss) e.stunned = Math.max(e.stunned || 0, bossStun); // 정전: 면역 무시
             }
           }
+          if (!recast && hero._skillVal('thunderDouble', 0)) hero._recastTimer = 0.6; // 뇌격
           engine.particles.push(new AoeBurst(hero.x, hero.y, r, '#fff176'));
           engine.spawnFloatingText('⚡100만볼트!', hero.x, hero.y-32, '#ffeb3b');
         }
@@ -165,7 +163,7 @@ const HeroDefs = {
   togepi: {
     id:'togepi', name:'토게피', baseColor:'#fff9c4',
     role:'서포터 / 행운',
-    passive:'전체 타워 데미지 소폭 증가 + 골드 보너스',
+    passive:'골드 획득 +10% · 이자 상한 +5 · 토게틱: 노말·레어 합성 10% 확률 2등급 상승',
     evolution:{ level:15, options:[
       // v27-60: 서포터 역할에 맞게 한 스탯 몰빵 대신 고르게 - 대신 패시브/스킬(행복의알) 쪽이 진짜 힘
       { id:'togetic', name:'토게틱', color:'#f8bbd0', dmgMul:1.15, rangeMul:1.35, fireRateMul:1.10 },
@@ -176,19 +174,24 @@ const HeroDefs = {
       projColor:'#fff59d', projEmoji:'✨', dmgType:'special',
     },
     passiveApply(engine, hero) {
-      // v27-49 버그수정: "피격 반사 데미지"가 실제로는 아무데도 체크되지 않는 죽은 플래그였음
-      // (요청4 - 영웅 밸런스 재검토 중 발견). 다른 영웅들(뮤츠/이브이)처럼 실제 작동하는 전체
-      // 소폭 데미지 보너스로 교체.
-      const mul = 1.08 + (hero ? hero._skillVal('passiveRange', 0) : 0);
-      for (const t of engine.towers) t.buffDmgMul = Math.max(t.buffDmgMul || 1, mul);
-      engine._togepiGoldMul = 1 + (hero ? hero._skillVal('goldBonus', 0) : 0);
+      // v28 (설계서 §6): 직접 화력은 최하, 대신 경제·합성 운 담당
+      engine._togepiGoldMul = 1.10 + hero._skillVal('goldBonus', 0);
+      engine._interestCapBonus = 5 + hero._skillVal('interestCap', 0);
+      engine._waveBonusMul = 1 + hero._skillVal('waveBonus', 0);
+      engine._mergeJumpChance = (hero.evolved === 'togetic' ? 0.10 : 0) + hero._skillVal('jump', 0);
+      engine._pityWeight = 1.5 + hero._skillVal('pityBoost', 0);
+      engine._coinDiscount = hero._skillVal('coinDiscount', 0);
+      engine._miracle = hero._skillVal('miracle', 0) > 0;
+      engine._freePullEvery = hero._skillVal('freePull', 0);
     },
     skills:[
       {
         name:'메트로놈', emoji:'🎲', baseCooldown:33,
         desc:'랜덤 대형 효과 발동',
         cast(hero, engine) {
-          const roll = Math.floor(Math.random() * 4);
+          // v28: 더블 메트로놈 노드면 서로 다른 효과 2개 동시 발동
+          const rolls = [0,1,2,3].sort(() => Math.random() - 0.5).slice(0, hero._skillVal('metroDouble', 0) ? 2 : 1);
+          for (const roll of rolls) {
           if (roll === 0) {
             const dmg = hero.attackDamage * 1.6; // v27-60: 고정값 → 오토어택 비례로 통일
             for (const e of engine.enemies) { if (!e.dead&&!e.reachedEnd) e.takeDamage(dmg,'special'); }
@@ -200,24 +203,26 @@ const HeroDefs = {
             for (const e of engine.enemies) { if (!e.dead&&!e.reachedEnd) e.applyStatus('stun',1.5,0); }
             engine.spawnFloatingText('🎲전체 스턴!', hero.x, hero.y-32, '#ba68c8');
           } else {
-            engine.gold += 50 + hero.level * 10;
-            engine.onGoldChange && engine.onGoldChange(engine.gold);
+            engine.addGold(50 + hero.level * 10);
             engine.spawnFloatingText(`🎲골드 획득! +${50+hero.level*10}g`, hero.x, hero.y-32, '#ffd60a');
+          }
           }
         }
       },
       {
         name:'행복의알', emoji:'🥚', baseCooldown:36,
-        desc:'모든 타워 데미지 증가 (레벨에 비례, 8초)',
+        desc:'모든 타워 공격력 +25~40% (레벨 비례, 8초)',
         cast(hero, engine) {
           // v27-29 버그수정: buffDmgMul(영구필드)에 직접 곱하고 타이머 해제 로직이 아예 없어서,
           // 쿨다운 24초마다 재사용할 때마다 데미지가 영구적으로 복리 누적되고 있었음(요청 - 지속피해
           // 원인 재검토 결과 발견. 셋 중 쿨다운이 제일 짧아 가장 심각했을 가능성). 임시배율 필드로 교체.
           // v27-60: 고정 +25%는 레벨을 올려도 안 세지는 유일한 스킬이었음 - 레벨 비례로 변경(Lv1=+25%, Lv25=+40%)
-          const mul = 1 + 0.25 + hero.level * 0.006;
+          const mul = 1 + 0.25 + hero.level * 0.006 + hero._skillVal('eggPower', 0);
+          const dur = 8 + hero._skillVal('eggDur', 0), spd = hero._skillVal('eggSpeed', 0);
           for (const t of engine.towers) {
             t._tempDmgMul = mul;
-            t._pokecenterTimer = 8; // 타워 update()의 만료처리 로직 재사용
+            if (spd) t._tempSpeedMul = 1 + spd; // 축복
+            t._pokecenterTimer = dur; // 타워 update()의 만료처리 로직 재사용
           }
           engine.spawnFloatingText('🥚행복의알!', hero.x, hero.y-32, '#fff59d');
         }
@@ -231,7 +236,7 @@ const HeroDefs = {
 HeroDefs.eevee = {
   id:'eevee', name:'이브이', baseColor:'#a1887f',
   role:'만능형 (진화로 특화)',
-  passive:'모든 타워 데미지 +5%',
+  passive:'모든 타워 공격력 +5% · Lv12에 3갈래 진화 (같은 갈래 스킬트리 효과 ×1.5)',
   attack:{
     baseRange:116, baseDamage:7, baseFireRate:0.95,
     rangePerLevel:6, damagePerLevel:2,
@@ -244,10 +249,7 @@ HeroDefs.eevee = {
     { id:'jolteon',  name:'쥬피썬더', color:'#ffd600', dmgMul:1.10, rangeMul:1.05, fireRateMul:1.45, focus:'전기(공속 특화)' },
     { id:'flareon',  name:'부스터',   color:'#ff5722', dmgMul:1.45, rangeMul:1.05, fireRateMul:1.00, focus:'불(데미지 특화)' },
   ]},
-  passiveApply(engine, hero) {
-    const mul = 1.05 + (hero ? hero._skillVal('passiveRange', 0) : 0);
-    for (const t of engine.towers) t.buffDmgMul = Math.max(t.buffDmgMul || 1, mul);
-  },
+  passiveApply(engine, hero) {}, // v28: Hero._applyAura()에서 처리
   skills:[
     {
       name:'적응', emoji:'🌀', baseCooldown:28,
@@ -260,12 +262,14 @@ HeroDefs.eevee = {
         if (hero.evolved === 'vaporeon') { dmgMul = 1.2; slowDur = 4.0; slowFactor = 0.65; }      // 물: 슬로우 서포터
         else if (hero.evolved === 'flareon') { dmgMul = 2.0; slowDur = 1.5; slowFactor = 0.30; }   // 불: 데미지 특화
         // 쥬피썬더는 기본값 유지 (공속 특화는 오토어택 fireRateMul로 이미 충분히 반영됨)
-        const dmg = hero.attackDamage * dmgMul;
+        const dmg = hero.attackDamage * dmgMul * (1 + hero._skillVal('adaptDmg', 0));
+        const vuln = hero._skillVal('vulnerable', 0);
         for (const e of engine.enemies) {
           if (e.dead||e.reachedEnd) continue;
           if (Math.hypot(e.x-hero.x,e.y-hero.y) <= r) {
             e.takeDamage(dmg, 'special');
             e.applyStatus('slow', slowDur, slowFactor);
+            if (vuln) { e._vulnTimer = 5; e._vulnMul = 1 + vuln; } // 샤미드 각성
           }
         }
         engine.particles.push(new AoeBurst(hero.x, hero.y, r, hero._evoColor || '#a1887f'));
@@ -279,7 +283,7 @@ HeroDefs.eevee = {
       name:'다재다능', emoji:'🌈', baseCooldown:32,
       desc:'짧은 시간 데미지+공속+사거리 대폭 상승',
       cast(hero, engine) {
-        hero._burstTimer = 4 + hero.level * 0.12; // 레벨이 오를수록 지속시간도 늘어남
+        hero._burstTimer = 4 + hero.level * 0.12 + hero._skillVal('burstDur', 0); // 레벨이 오를수록 지속시간도 늘어남
         engine.particles.push(new AoeBurst(hero.x, hero.y, 60, hero._evoColor || '#ce93d8'));
         engine.spawnFloatingText('🌈다재다능!', hero.x, hero.y-32, '#ce93d8');
       }
@@ -341,7 +345,7 @@ class Hero {
     const level = window.TypeUpgradeLevels[type] || 0;
     let mul = 1;
     for (let i = 0; i < level; i++) {
-      mul *= (1 + window.getTypeUpgradeAt(type, i).val); // v27-10: 항상 데미지 반영으로 통일
+      { const u = window.getTypeUpgradeAt(type, i); mul *= (1 + (u.heroVal ?? u.val)); } // v28: 영웅은 heroVal(단계당 15%, 무한 6%)
     }
     return mul;
   }
@@ -355,23 +359,45 @@ class Hero {
   }
 
   // 스킬트리 값 합산
+  // v28: 노드 fx 합산. 이브이는 고른 진화와 같은 갈래 노드의 수치 효과 ×1.5 (플래그형 효과는 그대로)
+  // (예전엔 크리티컬 노드 값이 객체라 합산에서 통째로 무시돼 크리티컬이 아예 안 터지던 버그가 있었음)
   _skillVal(type, defaultVal = 0) {
     const tree = SkillTrees[this.id];
     if (!tree) return defaultVal;
     let total = defaultVal;
     for (const nodeId of this.unlockedSkills) {
       const node = tree.nodes.find(n => n.id === nodeId);
-      if (node && node.type === type) {
-        if (typeof node.value === 'number') total += node.value;
-      }
+      const v = node?.fx?.[type];
+      if (typeof v !== 'number') continue;
+      const boosted = node.evo && node.evo === this.evolved && !['thunderDouble','burstSplash','metroDouble','miracle','freePull'].includes(type);
+      total += boosted ? v * 1.5 : v;
     }
     return total;
   }
 
   _skillCd(idx) {
     const base = this.def.skills[idx].baseCooldown;
-    const reduce = this._skillVal('cdReduce', 0);
-    return base * (1 - reduce);
+    let reduce = this._skillVal('cdReduce', 0);
+    if (this.id === 'eevee' && idx === 1) reduce += this._skillVal('burstCd', 0); // 쥬피썬더 각성
+    return base * Math.max(0.3, 1 - reduce);
+  }
+
+  // v28: 영웅이 타워에 주는 효과를 '전용 배율'로 매 프레임 새로 계산 → 덮어쓰기/누적 버그 원천 차단
+  // (예전엔 패시브가 tower.buffDmgMul을 max()로 덮어써서 타입강화 효과가 지워지거나 영구 누적됐음)
+  _applyAura(engine) {
+    const elecCount = engine.towers.filter(t => t.def?.type === 'electric').length;
+    const isPika = this.id === 'pikachu';
+    const per = this.evolved ? 0.03 : 0.02, cap = this.evolved ? 0.45 : 0.30;
+    const allDmg = (this.id === 'eevee' ? 0.05 : 0) + this._skillVal('globalDmg', 0)
+                 + Math.floor(elecCount / 5) * this._skillVal('chargeAll', 0);
+    const eDmg = (isPika ? Math.min(cap, elecCount * per) : 0) + this._skillVal('elecDmg', 0);
+    const eSpd = this._skillVal('elecSpeed', 0), eRng = this._skillVal('elecRange', 0);
+    for (const t of engine.towers) {
+      const elec = t.def?.type === 'electric';
+      t._heroDmgMul = 1 + allDmg + (elec ? eDmg : 0);
+      t._heroSpeedMul = 1 + (elec ? eSpd : 0);
+      t._heroRangeMul = 1 + (elec ? eRng : 0);
+    }
   }
 
   unlockSkillNode(nodeId, engine) {
@@ -467,9 +493,9 @@ class Hero {
     if (!a || !this.attackTarget) return;
     let dmg = this.attackDamage;
     let isCrit = false;
-    const critChance = this._skillVal('crit', null);
-    if (critChance && typeof critChance === 'object' && Math.random() < critChance.chance) {
-      dmg *= critChance.mul;
+    const critChance = this._skillVal('critChance', 0);
+    if (critChance > 0 && Math.random() < critChance) {
+      dmg *= 2 + this._skillVal('critMul', 0);
       isCrit = true;
     }
     // 스킬트리: lightning (가끔 번개소환)
@@ -485,12 +511,16 @@ class Hero {
       }
     }
     // 스킬트리: chainAtk (체인번개)
-    const chainAtk = this._skillVal('chainAtk', 0);
+    const chainAtk = Math.round(this._skillVal('chainAtk', 0));
+    let status = a.status ? {...a.status} : null;
+    if (status && status.type === 'stun') status.duration += this._skillVal('stunPlus', 0); // 마비
+    const atkSlow = this._skillVal('atkSlow', 0);
+    if (atkSlow > 0) status = { type:'slow', duration:1.5, factor: 1 - Math.min(0.5, atkSlow) }; // 물대포
+    const splash = (this._burstTimer > 0 && this._skillVal('burstSplash', 0)) ? 60 : 0; // 부스터 각성
     const proj = new Projectile(this.x, this.y, this.attackTarget, {
       engine, speed:440, damage:dmg, color:a.projColor, size:6,
       dmgType:a.dmgType||'special', emoji:a.projEmoji,
-      status:a.status ? {...a.status} : null,
-      chain: chainAtk || 0, chainRange: 140,
+      status, chain: chainAtk || 0, chainRange: 140, splash,
     });
     engine.projectiles.push(proj);
     if (isCrit) engine.spawnFloatingText(`💥크리!`, this.attackTarget.x, this.attackTarget.y-20, '#ff6b6b');
@@ -510,13 +540,11 @@ class Hero {
 
   update(dt, engine) {
     this.def.passiveApply(engine, this);
-    // v27-49 버그수정: 여러 영웅의 스킬트리에 'globalDmg'(전체타워 데미지) 노드가 7개나 있는데
-    // 전부 아무데도 안 읽혀서 죽어있었음 (요청4 - 영웅 재점검 중 발견). 여기서 일괄 적용.
-    const gDmg = this._skillVal('globalDmg', 0);
-    if (gDmg > 0) for (const t of engine.towers) t.buffDmgMul = Math.max(t.buffDmgMul || 1, 1 + gDmg);
-    // v27-49: 'multiTarget'(멀티스케일 등)도 동일하게 죽어있었음 - 기본공격 데미지 보너스로 대체 적용
-    const mTarget = this._skillVal('multiTarget', 0);
-    if (mTarget > 0) this._multiTargetDmgBonus = mTarget * 0.08; // 노드값(타겟수)에 비례한 데미지 보너스로 근사
+    this._applyAura(engine);
+    if (this._recastTimer > 0) { // 뇌격: 100만볼트 재발동
+      this._recastTimer -= dt;
+      if (this._recastTimer <= 0) this.def.skills[0].cast(this, engine, true);
+    }
 
     for (let i = 0; i < this.cooldowns.length; i++) {
       if (this.cooldowns[i] > 0) this.cooldowns[i] -= dt;

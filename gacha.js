@@ -435,12 +435,19 @@ window.FLAVOR_TEXT = FLAVOR_TEXT;
 // v27-59: 데미지는 등급 구분 없이 똑같이 46%로 깎여서 노말/레어가 절대값이 너무 작아지고(5~10대),
 // 유니크가 레전드랑 DPS가 거의 안 갈리는 문제가 있었음 (요청: "합쳐서 등급 올리는 의미가 느껴지게").
 // 등급별로 다른 배율을 줘서 등급이 오를수록 격차가 더 크게 벌어지도록 재설계.
-const GRADE_DMG_MUL = { normal:0.65, rare:0.80, epic:1.00, legend:1.15, unique:2.30 };
-for (const id in GachaTowerDefs) {
-  const d = GachaTowerDefs[id];
-  d.damage   = Math.round(d.damage * (GRADE_DMG_MUL[d.grade] || 0.46) * 10) / 10;
-  d.fireRate = Math.round(d.fireRate * 0.68 * 100) / 100;
-  d.range    = Math.round(d.range * 0.72);
+// v28 (설계서 §4): 등급별 '평균 기본 데미지'를 절대값 목표에 맞춤 (단계당 약 2.5배).
+// 같은 등급 안의 상대 차이(종마다 다른 개성)는 그대로 유지하고 평균만 목표로 스케일.
+const GRADE_BASE_DMG = { normal:8, rare:20, epic:50, legend:120, unique:280 };
+{
+  const sum = {}, cnt = {};
+  for (const id in GachaTowerDefs) { const g = GachaTowerDefs[id].grade; sum[g] = (sum[g]||0) + GachaTowerDefs[id].damage; cnt[g] = (cnt[g]||0) + 1; }
+  for (const id in GachaTowerDefs) {
+    const d = GachaTowerDefs[id];
+    const avg = sum[d.grade] / cnt[d.grade];
+    d.damage   = Math.round(d.damage * (GRADE_BASE_DMG[d.grade] / avg) * 10) / 10;
+    d.fireRate = Math.round(d.fireRate * 0.68 * 100) / 100;
+    d.range    = Math.round(d.range * 0.72);
+  }
 }
 // v27-59 버그수정: 파이어(moltres)만 기본 공속이 3.0으로 다른 레전드(1.3~2.0)보다 훨씬 빨라서
 // 혼자 유니크보다 DPS가 세지는 이상치였음 - 다른 레전드 수준으로 조정
@@ -498,10 +505,59 @@ const MERGE_EVOLUTION = {
   gyarados:'articuno',   lapras:'articuno',       aerodactyl:'zapdos',
   dragonair:'dragonite', venusaur:'articuno',
   pidgeot:'zapdos',      vileplume:'articuno',    haunter:'gengar',
-  // 레전드 3개 → 유니크
-  articuno:'mew',        zapdos:'mewtwo',         moltres:'mew',
-  dragonite:'mewtwo',    gengar:'mew',
+  // v28: 레전드 3개 → 유니크 확정 경로 제거 - 유니크는 레시피(RECIPES) 전용 (설계서 §3)
 };
+
+// ===== v28 (설계서 §3): 랜덤 합성 · 레시피 =====
+// 같은 등급 아무거나 3개 → 다음 등급 랜덤 (랜타디 방식). 유니크는 랜덤으로 절대 안 나옴.
+const NEXT_GRADE = { normal:'rare', rare:'epic', epic:'legend' };
+const MERGE_ORDER = ['normal','rare','epic','legend','unique'];
+// 숨은 천장: 같은 계열(역할군, 없으면 타입)이 3연속 나오면 다른 계열 가중치 ×1.5 (겉보기엔 완전 랜덤)
+function _pityKey(def) { return def.role || def.type; }
+function rollRandomMerge(grade, state = {}) {
+  let target = NEXT_GRADE[grade];
+  if (!target) return null;
+  // 토게틱 등 '2등급 상승' 훅 (노말·레어 합성에만, 결과 상한 레전드)
+  if (state.jumpChance && (grade === 'normal' || grade === 'rare') && Math.random() < state.jumpChance) {
+    target = NEXT_GRADE[target] || target;
+    state.jumped = true;
+  }
+  const pool = GRADE_POOLS[target] || [];
+  const hist = state.history || (state.history = []);
+  const locked = hist.length >= 3 && hist.slice(-3).every(k => k === hist[hist.length - 1]) ? hist[hist.length - 1] : null;
+  const pw = state.pityWeight || 1.5; // 토게피 '직감' 노드면 2.5
+  const tw = (window.DEX_TYPE_W && window.DEX_TYPE_W[target]) || {};
+  const weights = pool.map(id => ((locked && _pityKey(GachaTowerDefs[id]) !== locked) ? pw : 1) * (tw[id] || 1));
+  let r = Math.random() * weights.reduce((a, b) => a + b, 0), id = pool[pool.length - 1];
+  for (let k = 0; k < pool.length; k++) { r -= weights[k]; if (r <= 0) { id = pool[k]; break; } }
+  const def = GachaTowerDefs[id];
+  hist.push(_pityKey(def)); if (hist.length > 6) hist.shift();
+  return { ...def, _starLevel: 1 };
+}
+// 유니크 레시피 - items: 재료 후보 배열(def 목록). pick(items)는 소모할 재료 인덱스 배열 또는 null
+const RECIPES = [
+  { id:'mew', name:'뮤', emoji:'💗', cost:0,
+    desc:'서로 다른 레전드 3종',
+    pick(items, opts = {}) {
+      const seen = new Set(), idx = [];
+      items.forEach((d, i) => { if (d.grade === 'legend' && !seen.has(d.id) && idx.length < 3) { seen.add(d.id); idx.push(i); } });
+      if (idx.length === 3) return idx;
+      // 토게피 '기적': 서로 다른 레전드 2종 + 에픽 3개로도 가능
+      if (opts.miracle && idx.length === 2) {
+        const epics = []; items.forEach((d, i) => { if (d.grade === 'epic' && epics.length < 3) epics.push(i); });
+        if (epics.length === 3) return [...idx, ...epics];
+      }
+      return null;
+    } },
+  { id:'mewtwo', name:'뮤츠', emoji:'🔮', cost:2000,
+    desc:'뮤 + 레전드 아무거나 2 + 2000골드',
+    pick(items) {
+      const mew = items.findIndex(d => d.id === 'mew');
+      if (mew < 0) return null;
+      const legs = []; items.forEach((d, i) => { if (d.grade === 'legend' && legs.length < 2) legs.push(i); });
+      return legs.length === 2 ? [mew, ...legs] : null;
+    } },
+];
 
 // ===== 뽑기 함수 =====
 function rollGrade(tableKey) {
@@ -514,23 +570,25 @@ function rollGrade(tableKey) {
 function rollTower(tableKey) {
   const grade = rollGrade(tableKey);
   const pool = GRADE_POOLS[grade];
-  const id = pool[Math.floor(Math.random()*pool.length)];
+  // v28 세션D: 타입 균등 (pokedex.js의 DEX_TYPE_W) - 타입을 먼저 고르고 그 안에서 종 선택
+  const tw = (window.DEX_TYPE_W && window.DEX_TYPE_W[grade]) || {};
+  let r = Math.random() * pool.reduce((a, id) => a + (tw[id] || 1), 0), id = pool[pool.length - 1];
+  for (const k of pool) { r -= (tw[k] || 1); if (r <= 0) { id = k; break; } }
   return {...GachaTowerDefs[id], _starLevel:1};
 }
 
 // v27: 이미 구매한 타입강화를 새 타워 생성시점에 소급 적용 (이게 없어서 업그레이드가 안 먹는 것처럼 보였음)
 function _computeTypeBuffMuls(type) {
   const level = TypeUpgradeLevels[type] || 0;
-  let dmg = 1, range = 1, speed = 1;
+  let dmg = 1, range = 1, speed = 1, flatTiers = 0;
   // v27-10: 요청 반영 - 어떤 타입/단계를 올리든 항상 데미지가 오르도록 통일 (기존엔 물=사거리만, 전기=공속만 식으로
   // 타입에 따라 데미지가 전혀 안 오르는 경우가 있어서 "속성 업글했는데 공격력이 안 오른다"는 혼란이 있었음)
   for (let i = 0; i < level; i++) {
     const u = getTypeUpgradeAt(type, i); // v27-4: 무한티어 대응 (5단계 이후도 소급적용)
-    dmg *= (1 + u.val);                                  // 항상 데미지 적용
-    if (u.buff === 'range' || u.buff === 'all') range *= (1 + u.val); // 추가로 사거리도
-    if (u.buff === 'speed' || u.buff === 'all') speed *= (1 + u.val); // 추가로 공속도
+    dmg *= (1 + u.val);
+    flatTiers += (u.flat || 0);
   }
-  return { dmg, range, speed };
+  return { dmg, range, speed, flatTiers };
 }
 
 // ===== 타워 생성 =====
@@ -544,14 +602,15 @@ function _createGachaTower(def, x, y, engine) {
     name:def.name, level:1, path:null, totalSpent:0,
     cooldown:0, fireFlash:0, _rotAngle:0, _bobPhase: Math.random()*Math.PI*2,
     synergyBonus:0, buffRangeMul:muls.range, buffDmgMul:muls.dmg, _shopSpeedMul:muls.speed, target:null, masteryMul,
+    flatDmg:(TYPE_FLAT_PER_TIER[def.grade]||2)*muls.flatTiers, // v28: 이미 산 타입강화 소급 적용
     _tempDmgMul:1, _pokecenterTimer:0, _auraDmgMul:1, // v27-29: 임시버프+오라 전용 필드 (영구곱연산 버그 수정)
-    get range(){ return (def.range+(this.synergyBonus*2))*Math.min(this.buffRangeMul, BUFF_CAPS.range); },
+    get range(){ return (def.range+(this.synergyBonus*2))*Math.min(this.buffRangeMul, BUFF_CAPS.range)*(this._heroRangeMul||1); },
     get damage(){
-      const base = (def.damage+this.synergyBonus)*Math.min(this.buffDmgMul, BUFF_CAPS.damage)*this.masteryMul*(this._tempDmgMul||1)*(this._auraDmgMul||1);
+      const base = (def.damage+this.synergyBonus+(this.flatDmg||0))*Math.min(this.buffDmgMul, BUFF_CAPS.damage)*this.masteryMul*(this._tempDmgMul||1)*(this._auraDmgMul||1)*(this._heroDmgMul||1);
       const mul = window.typeEffectiveness ? window.typeEffectiveness(def.type, this.target && this.target.typeTag) : 1;
       return base * mul;
     },
-    get fireRate(){ return def.fireRate*Math.min(this._shopSpeedMul||1, BUFF_CAPS.speed)*(this._tempSpeedMul||1); },
+    get fireRate(){ return def.fireRate*Math.min(this._shopSpeedMul||1, BUFF_CAPS.speed)*(this._tempSpeedMul||1)*(this._heroSpeedMul||1); },
     upgradeCost(){ return null; },
     findTarget(enemies){
       // v27-62 최적화: Math.hypot(제곱근)을 거리² 비교로 대체 - 결과는 완전히 동일하고 sqrt 비용만 제거
@@ -769,25 +828,28 @@ function applyTowerSynergies(towers) {
       const a=towers[i],b=towers[j];
       if(!a.def||!b.def) continue;
       const dist = Math.hypot(a.x-b.x,a.y-b.y);
-      if(a.def.id==='clefairy' && dist<130) b._auraDmgMul=Math.max(b._auraDmgMul,1.10);
-      if(b.def.id==='clefairy' && dist<130) a._auraDmgMul=Math.max(a._auraDmgMul,1.10);
-      if(a.def.id==='clefable' && dist<150) b._auraDmgMul=Math.max(b._auraDmgMul,1.25);
-      if(b.def.id==='clefable' && dist<150) a._auraDmgMul=Math.max(a._auraDmgMul,1.25);
+      // v28 세션D: '지원' 역할 포켓몬 전부 오라 (등급별 +15~40%, 반경 150, 중첩 안 됨 - 가장 큰 것만)
+      if (dist >= 150) continue;
+      const aw = window.DEX_TEMPLATE && window.DEX_TEMPLATE.supportAura;
+      if (aw && a.def.role==='support' && !a.def._signature) b._auraDmgMul=Math.max(b._auraDmgMul,1+aw[a.def.grade]);
+      if (aw && b.def.role==='support' && !b.def._signature) a._auraDmgMul=Math.max(a._auraDmgMul,1+aw[b.def.grade]);
     }
   }
 }
 
 // ===== 타입 업그레이드 (6종, v27: 3단계 -> 5단계 확장 + 가격 상향) =====
-const TypeUpgrades = {
-  // v27-51: "슬로우/연쇄/독/타겟수" 라벨이 실제로는 효과가 없이 그냥 데미지만 오르고 있었음
-  // (이름표만 잘못 붙어있던 문제) - 실제 효과 구현 대신 이름을 실제 효과(데미지)에 맞게 통일 (요청1)
-  fire:     [{cost:220,label:'불꽃 강화 1',buff:'dmg',val:0.21},{cost:480,label:'불꽃 강화 2',buff:'dmg',val:0.24},{cost:900,label:'불꽃 강화 3',buff:'dmg',val:0.27},{cost:1500,label:'불꽃 강화 4',buff:'dmg',val:0.3},{cost:2400,label:'대화염',buff:'dmg',val:0.42}],
-  water:    [{cost:220,label:'물 강화 1',buff:'range',val:0.18},{cost:480,label:'물 강화 2',buff:'dmg',val:0.20},{cost:900,label:'물 강화 3',buff:'range',val:0.225},{cost:1500,label:'물 강화 4',buff:'dmg',val:0.25},{cost:2400,label:'대해일',buff:'range',val:0.33}],
-  electric: [{cost:220,label:'전기 강화 1',buff:'speed',val:0.195},{cost:480,label:'전기 강화 2',buff:'dmg',val:0.25},{cost:900,label:'전기 강화 3',buff:'speed',val:0.225},{cost:1500,label:'전기 강화 4',buff:'dmg',val:0.25},{cost:2400,label:'초전도',buff:'speed',val:0.33}],
-  grass:    [{cost:220,label:'풀 강화 1',buff:'dmg',val:0.20},{cost:480,label:'풀 강화 2',buff:'range',val:0.195},{cost:900,label:'풀 강화 3',buff:'dmg',val:0.23},{cost:1500,label:'풀 강화 4',buff:'range',val:0.195},{cost:2400,label:'대자연',buff:'dmg',val:0.33}],
-  psychic:  [{cost:220,label:'에스퍼 강화 1',buff:'dmg',val:0.20},{cost:480,label:'에스퍼 강화 2',buff:'dmg',val:0.24},{cost:900,label:'에스퍼 강화 3',buff:'dmg',val:0.24},{cost:1500,label:'에스퍼 강화 4',buff:'dmg',val:0.27},{cost:2400,label:'초능력',buff:'dmg',val:0.40}],
-  normal:   [{cost:180,label:'노말 강화 1',buff:'speed',val:0.135},{cost:360,label:'노말 강화 2',buff:'dmg',val:0.135},{cost:700,label:'노말 강화 3',buff:'speed',val:0.165},{cost:1200,label:'노말 강화 4',buff:'dmg',val:0.165},{cost:2000,label:'만능',buff:'all',val:0.135}],
-};
+// v28 (설계서 §5): % 곱연산 → '등급별 절대값 + 6%'. 노말(8뎀)도 올리면 확실히 체감되고,
+// 무한강화는 선형이라 후반 화력 폭주를 막음. flat = 등급별 고정치 배수, val = 타워 %, heroVal = 영웅 %.
+const TYPE_FLAT_PER_TIER = { normal:2, rare:5, epic:12, legend:28, unique:65 };
+const _TU_COSTS = [200, 450, 850, 1400, 2200];
+const _TU_NAMES = { fire:'대화염', water:'대해일', electric:'초전도', grass:'대자연', psychic:'초능력', normal:'만능' };
+const _TU_KR = { fire:'불꽃', water:'물', electric:'전기', grass:'풀', psychic:'에스퍼', normal:'노말' };
+const TypeUpgrades = {};
+for (const t of ['fire','water','electric','grass','psychic','normal']) {
+  TypeUpgrades[t] = _TU_COSTS.map((cost, i) => ({
+    cost, label: i === 4 ? _TU_NAMES[t] : `${_TU_KR[t]} 강화 ${i+1}`, buff:'dmg', flat:1, val:0.06, heroVal:0.15,
+  }));
+}
 // 타입별 업그레이드 레벨 추적
 const TypeUpgradeLevels = {};
 for(const t in TypeUpgrades) TypeUpgradeLevels[t]=0;
@@ -803,10 +865,9 @@ function getTypeUpgradeAt(type, level) {
   // 투자가 갈수록 무의미해지고 있었음 (요청: "1500원쯤 되면 올리기 힘든데 그만큼 세지지도 않음").
   // 효과값 감쇠를 없애서 비싸지는 만큼 확실히 강해지도록 함 (전략적 몰빵 투자가 실제로 유효해짐).
   return {
-    cost: Math.round(last.cost * Math.pow(1.5, extra)),
+    cost: Math.round(last.cost * Math.pow(1.45, extra)),
     label: `${TYPES[type].name} 초월강화 ${extra}`,
-    buff: last.buff,
-    val: last.val,
+    buff: 'dmg', flat: 0.5, val: 0, heroVal: 0.06, // v28: 선형 (고정치 절반만, % 없음)
   };
 }
 
@@ -820,8 +881,7 @@ function applyTypeUpgrade(type, engine) {
   for(const t of engine.towers){
     if(!t.def||t.def.type!==type) continue;
     t.buffDmgMul=(t.buffDmgMul||1)*(1+upg.val);
-    if(upg.buff==='range'||upg.buff==='all') t.buffRangeMul=(t.buffRangeMul||1)*(1+upg.val);
-    if(upg.buff==='speed'||upg.buff==='all') t._shopSpeedMul=(t._shopSpeedMul||1)*(1+upg.val);
+    t.flatDmg=(t.flatDmg||0)+(TYPE_FLAT_PER_TIER[t.def.grade]||2)*upg.flat; // v28: 등급별 절대값
     if(window.AoeBurst) engine.particles.push(new AoeBurst(t.x,t.y,44,color));
     t._typeGlowColor = color; t._typeGlowTimer = 1.6; // 잠시 색깔 테두리로 강조
   }
@@ -932,10 +992,13 @@ window._createGachaTower=_createGachaTower;
 window.MissionDefs=MissionDefs;
 window.MissionTracker=MissionTracker;
 window.MERGE_EVOLUTION=MERGE_EVOLUTION;
+window.SELL_VALUE={ normal:40, rare:110, epic:300, legend:800, unique:2000 }; // v28: 판매가 단일 기준 (패널·엔진·합성연구소 공통)
+window.NEXT_GRADE=NEXT_GRADE; window.MERGE_ORDER=MERGE_ORDER; window.rollRandomMerge=rollRandomMerge; window.RECIPES=RECIPES;
 window.TypeUpgrades=TypeUpgrades;
 window.TypeUpgradeLevels=TypeUpgradeLevels;
 window.applyTypeUpgrade=applyTypeUpgrade;
 window.getTypeUpgradeAt=getTypeUpgradeAt;
+window.TYPE_FLAT_PER_TIER=TYPE_FLAT_PER_TIER;
 window.applyTowerSynergies=applyTowerSynergies;
 window.SYNERGY_PAIRS=SYNERGY_PAIRS;
 
@@ -944,7 +1007,7 @@ function checkMerge(towers, towerSlots, engine) {
   for(const slot of towerSlots){ if(!slot.occupied||!slot.tower) continue; const id=slot.tower._gachaId; if(!id) continue; if(!counts[id]) counts[id]=[]; counts[id].push(slot); }
   for(const id in counts){
     if(counts[id].length>=3){
-      const slots=counts[id].slice(0,3); const evoId=MERGE_EVOLUTION[id];
+      const slots=counts[id].slice(0,3); const evoId=window.getEvolutionId?getEvolutionId(id):MERGE_EVOLUTION[id];
       if(!evoId||!GachaTowerDefs[evoId]) continue;
       const evoDef=GachaTowerDefs[evoId]; const targetSlot=slots[0];
       for(let i=1;i<3;i++){ const s=slots[i]; engine.towers=engine.towers.filter(t=>t!==s.tower); s.occupied=false; s.tower=null; }

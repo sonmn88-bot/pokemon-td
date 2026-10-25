@@ -1,4 +1,4 @@
-const CACHE = 'pokemon-td-v29';
+const CACHE = 'pokemon-td-v30';
 const ASSETS = [
   '/pokemon-td/',
   '/pokemon-td/index.html',
@@ -10,10 +10,12 @@ const ASSETS = [
   '/pokemon-td/heroes.js',
   '/pokemon-td/shop.js',
   '/pokemon-td/gacha.js',
+  '/pokemon-td/pokedex.js',
   '/pokemon-td/main.js',
   '/pokemon-td/leaderboard.js',
   '/pokemon-td/firebase-config.js',
   '/pokemon-td/ui-builders.js',
+  '/pokemon-td/storage.js',
   '/pokemon-td/sprites.js',
   '/pokemon-td/manifest.json',
 ];

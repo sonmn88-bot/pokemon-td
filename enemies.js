@@ -72,7 +72,7 @@ const EnemyTypes = {
   },
   jigglypuff: {
     type: 'normal',
-    name: '질퍽이',   emoji: '🔴',
+    name: '푸린',     emoji: '🎤',
     hp: 244, speed: 52, reward: 1, size: 22,
     color: '#f48fb1',
     special: 'poisonImmune',
@@ -98,7 +98,7 @@ const EnemyTypes = {
   // ─── 6~10웨이브 ───
   phantump: {
     type: 'grass',
-    name: '팬텀',     emoji: '🌲',
+    name: '나목령',   emoji: '🌲',
     hp: 406, speed: 43, reward: 2, size: 24,
     color: '#5d4037',
     special: 'regen',    // 초당 HP 5 재생
@@ -123,7 +123,7 @@ const EnemyTypes = {
   // ─── 11~15웨이브 ───
   weezing: {
     type: 'fire',
-    name: '또가스',   emoji: '💨',
+    name: '또도가스', emoji: '☁️',
     hp: 304, speed: 52, reward: 2, size: 26,
     color: '#78909c',
     special: 'explode',  // 사망 시 범위 데미지
@@ -176,7 +176,7 @@ const EnemyTypes = {
   },
   koffing: {
     type: 'psychic',
-    name: '또도가스', emoji: '☁️',
+    name: '또가스',   emoji: '💨',
     hp: 203, speed: 48, reward: 1, size: 20,
     color: '#90a4ae',
     special: 'poisonAura',  // 주변 적 면역 부여(단순화: 자기 자신만 면역 적용은 poisonImmune로 처리)
@@ -207,7 +207,7 @@ const EnemyTypes = {
   },
   electrode: {
     type: 'electric',
-    name: '마그넷',   emoji: '🔴',
+    name: '붐볼',     emoji: '🔴',
     hp: 223, speed: 125, reward: 1, size: 20,
     color: '#e53935',
     special: 'explode',
@@ -350,6 +350,7 @@ class Enemy {
     if (this.poisoned > 0) this.poisoned -= dt;
     if (this._burnCooldown > 0) this._burnCooldown -= dt;
     if (this._spawnGraceTimer > 0) this._spawnGraceTimer -= dt; // v27-34: 보스 스폰유예 감소
+    if (this._vulnTimer > 0) this._vulnTimer -= dt; // v28: 샤미드 각성 (받는 피해 증가)
     if (this._poisonCooldown > 0) this._poisonCooldown -= dt;
 
     // 재생
@@ -398,6 +399,16 @@ class Enemy {
     let dmg = amount;
     if (this.def.special === 'ghost' && type === 'physical') dmg *= 0.5;
     if (this.def.special === 'armor' && type === 'physical') dmg *= 0.1;
+    // v28 (설계서 §2): 방어력 - 타격당 고정 차감, 최소 15%는 들어감. 스플래시·화상·독·연쇄 부가타는
+    // 방어 50%만 적용 (저데미지 부가타가 0이 되는 것 방지). 막혔으면 데미지 숫자를 회색으로 → 합성 필요 신호.
+    if (this._vulnTimer > 0) dmg *= (this._vulnMul || 1);
+    let armored = false;
+    if (this.armor > 0 && type !== 'true') { // 'true' = 방어무시 태그
+      const a = (type === 'splash' || type === 'fire' || type === 'poison') ? this.armor * 0.5 : this.armor;
+      const after = Math.max(dmg * 0.15, dmg - a);
+      armored = after <= dmg * 0.15 + 1e-6;
+      dmg = after;
+    }
     // v27-34: 보스 스폰 유예기간 - 등장 직후 순삭 방지용 안전장치 (요청: 원인불문 최소 생존시간 보장)
     if (this._spawnGraceTimer > 0) dmg *= 0.15; // v27-35: 60%감소로도 부족해서 85%감소로 대폭 강화
 
@@ -419,10 +430,10 @@ class Enemy {
     this.flashTimer = 0.1;
 
     // v27-7: 데미지 숫자 표시 (요청1 - 지금까지 전혀 없었음). DOT 미세틱(0.x 데미지)은 스팸 방지로 제외
-    if (dmg >= 1 && this.engine?.spawnFloatingText) {
+    if ((dmg >= 1 || armored) && this.engine?.spawnFloatingText) {
       const size = dmg >= 30 ? 15 : dmg >= 10 ? 12 : 10;
-      const color = dmg >= 30 ? '#ff5252' : dmg >= 10 ? '#ffd60a' : '#fff';
-      this.engine.spawnFloatingText(`-${Math.round(dmg)}`, this.x + (Math.random()*16-8), this.y - 14, color, { fontSize: size, life: 0.5 });
+      const color = armored ? '#8a8f99' : dmg >= 30 ? '#ff5252' : dmg >= 10 ? '#ffd60a' : '#fff';
+      this.engine.spawnFloatingText(armored ? '🛡' : `-${Math.round(dmg)}`, this.x + (Math.random()*16-8), this.y - 14, color, { fontSize: size, life: 0.5 });
     }
 
     // 분노 (갸라도스)

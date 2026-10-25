@@ -212,9 +212,23 @@ class GameEngine {
     if (!this.running) return;
     const raw = Math.min((ts - this.lastTime) / 1000, 0.05);
     this.lastTime = ts;
-    this.dt = raw * this.speedMul;
-    this.update();
-    this.draw();
+    // v28: 서브스텝 시뮬레이션 (3배속 끊김의 근본수정, v27-62 복구) - 배속을 dt에 한 번에 곱하면
+    // 한 프레임에 이동거리가 3배가 되어 뚝뚝 끊겨보임. 최대 1/50초 단위로 잘게 쪼개서 여러 번 실행.
+    const total = raw * this.speedMul;
+    const MAX_STEP = 1 / 50;
+    let remaining = total;
+    while (remaining > 0.0001) {
+      this.dt = Math.min(remaining, MAX_STEP);
+      remaining -= this.dt;
+      this._isLastSubstep = remaining <= 0.0001; // main.js의 UI 갱신은 마지막 서브스텝에서만
+      this.update();
+    }
+    this.dt = total;
+    // 유휴 절전: idle + 필드에 아무것도 없으면 렌더링 절반(≈30fps)
+    const isQuiet = this.state === 'idle' && this.enemies.length === 0 &&
+                    this.projectiles.length === 0 && this.particles.length === 0;
+    this._frameSkip = (this._frameSkip || 0) + 1;
+    if (!isQuiet || this._frameSkip % 2 === 0) this.draw();
     requestAnimationFrame(t=>this.loop(t));
   }
 
@@ -229,7 +243,13 @@ class GameEngine {
       this.deployPoints = Math.min(this.maxDeployPoints, this.deployPoints + this.deployRegenRate * this.dt);
       // 웨이브 제한시간 (시간 내 전멸 못 시키면 남은 적 수만큼 라이프 손실)
       this.waveTimeRemaining -= this.dt;
-      this.onWaveTimerChange && this.onWaveTimerChange(Math.max(0, this.waveTimeRemaining), this.waveTimeLimit);
+      this._waveElapsed = (this._waveElapsed || 0) + this.dt;
+      // DOM 갱신은 초당 4회로 제한 (서브스텝마다 DOM을 건드리면 모바일 부담)
+      this._timerUiAcc = (this._timerUiAcc || 0) + this.dt;
+      if (this._timerUiAcc >= 0.25) {
+        this._timerUiAcc = 0;
+        this.onWaveTimerChange && this.onWaveTimerChange(Math.max(0, this.waveTimeRemaining), this.waveTimeLimit);
+      }
       if (this.waveTimeRemaining <= 0) this.timeoutWave();
     }
 
@@ -309,7 +329,8 @@ class GameEngine {
       }
     }
     if (enemy._isKing) this.onKingDefeated && this.onKingDefeated();
-    const baseReward = enemy.reward;
+    // v28 (설계서 §5): 킬 골드가 웨이브에 따라 성장 (기본보상 × (1 + 웨이브/30))
+    const baseReward = Math.max(1, Math.round(enemy.reward * (1 + this.currentWave / 30)));
     const traitGoldMul = this._runTrait?.key === 'goldBoom' ? 1.2 : 1;
     const effectiveGoldMul = this._globalGoldMul * (this._goldenTimeActive ? this._goldenTimeGoldMul : 1) * traitGoldMul;
     const bonus = Math.floor(baseReward * (effectiveGoldMul - 1));
@@ -378,12 +399,21 @@ class GameEngine {
       // v27-20: 백로그 상한을 완전히 제거 (요청3) - 예전엔 70개 넘으면 "곧 나올 것"들이 통째로 삭제돼서
       // 스킵을 아무리 많이 해도 결국 몬스터 상당수가 영원히 안 나오는 사실상 무료스킵이 되고 있었음.
       // 이제 몇 번을 스킵하든 큐에 있는 몬스터는 전부 나중에라도 반드시 나옵니다 (밀린 만큼 필드가 위험해짐 - 의도된 페널티).
+      // v28: 삭제 없이 + 최소 간격 강제 (v27-61 복구) - 밀린 큐가 동시에 '스폰 가능' 상태가 되어
+      // 한꺼번에 쏟아지며 게임오버되던 문제 방지. 아무리 밀려도 0.12초 간격보다 촘촘해지지 않음.
+      merged.sort((a, b) => a.delay - b.delay);
+      const MIN_GAP = 0.12;
+      for (let i = 1; i < merged.length; i++) {
+        if (merged[i].delay < merged[i-1].delay + MIN_GAP) merged[i].delay = merged[i-1].delay + MIN_GAP;
+      }
       this.spawnQueue = merged;
     } else {
       this.spawnQueue = [...waveData];
       this.spawnTimer = 0;
     }
     this.activeSpawns = this.spawnQueue.length;
+    this._waveElapsed = 0;
+    this._shopWaveUses = {}; // v28: 상점 웨이브당 사용 횟수 초기화
     this.waveTimeRemaining = timeLimit || this.waveTimeLimit;
     this.onWaveChange && this.onWaveChange(this.currentWave, this.totalWaves);
     this.onWaveTimerChange && this.onWaveTimerChange(this.waveTimeRemaining, this.waveTimeRemaining);
@@ -397,6 +427,7 @@ class GameEngine {
   timeoutWave() {
     if (this.state !== 'wave') return;
     this.state = 'idle';
+    this._payInterest(false); // v28: 시간초과/스킵으로 넘어가도 이자는 지급 (웨이브 보너스는 없음)
     this.onWaveTimerChange && this.onWaveTimerChange(0, this.waveTimeLimit);
     this.onWaveTimeout && this.onWaveTimeout(0, this.enemies.length);
     this.onWaveComplete && this.onWaveComplete(this.currentWave, 0, true);
@@ -426,17 +457,18 @@ class GameEngine {
     // v27-5: 웨이브 진행에 따른 연속 체력 스케일링 (기존엔 티어 전환/사이클 외엔 몹 자체 체력이 안 늘었음)
     // v27-11: 90웨이브 이후(왕 처치 후 무한강화) 체력 스케일링을 훨씬 가파르게 - 기존엔 웨이브 220에서도
     // 3.94배 수준이라 계속 도배해서 잡을 수 있었음. 이제 90 이후로는 복합 성장으로 훨씬 위협적이게.
-    if (!item.isKing && !item.bossTier && this.currentWave > 10) {
-      let waveHpMul = 1 + (this.currentWave - 10) * 0.014;
-      if (this.currentWave > 90) {
-        // v27-19: 왕 이후 난이도가 계속 너무 쉬웠음(95웨이브에도 무난히 클리어) - 지수적으로 훨씬 가파르게
-        const post = this.currentWave - 90;
-        waveHpMul *= Math.pow(1.22, post);
-      }
+    // v28 (설계서 §2): 몹 체력을 플레이어 화력과 같은 모양(지수)으로. 기존엔 90웨이브까지 선형(+1.4%)이라
+    // 곱연산으로 성장하는 타워 화력을 못 따라가서 "너무 쉬워지는" 근본 원인이었음.
+    // 초반(5웨이브까지)은 기존과 동일하게 유지 - 1~2성 구간의 아슬아슬함은 그대로.
+    if (!item.isKing && !item.bossTier) {
+      let waveHpMul = Math.pow(1.045, Math.max(0, this.currentWave - 5));
+      if (this.currentWave > 90) waveHpMul *= Math.pow(1.07, this.currentWave - 90) / Math.pow(1.045, this.currentWave - 90);
       if (this._runTrait?.key === 'swarm') waveHpMul *= 0.88;
       enemy.maxHp = Math.round(enemy.maxHp * waveHpMul);
       enemy.hp = enemy.maxHp;
     }
+    // v28: 방어력 (타격당 고정 차감) - 등급 격차를 실제로 체감되게 만드는 핵심 장치
+    enemy.armor = Math.floor(this.currentWave / 6);
 
     // v27-5: 이벤트웨이브 배율 (요청: 초반 다채로움) - 왕/보스는 제외
     if (!item.isKing && !item.bossTier) {
@@ -508,21 +540,33 @@ class GameEngine {
 
   waveCleared() {
     this.state = 'idle';
-    let bonus = 1 + Math.min(this.currentWave, 60) * 0.22; // v27-31: 요청대로 초반 골드 추가 하향 (아슬아슬하게)
+    // v28 (설계서 §5): 웨이브 클리어 보너스 10 + 웨이브×1.5 (최대 150). 위험보너스는 이자와 역할이
+    // 겹쳐서 제거 (단순화).
+    let bonus = Math.round(Math.min(150, Math.round(10 + this.currentWave * 1.5)) * (this._waveBonusMul || 1));
     if (this._nextWaveGoldMul) { bonus = Math.round(bonus * this._nextWaveGoldMul); this._nextWaveGoldMul = null; }
-    // v27-5: 위험보너스 (item D) - 필드에 120마리 이상 쌓인 채로 웨이브를 넘기면 리스크 감수 보상
-    let riskBonus = 0;
-    if ((this._peakFieldCount || 0) >= 120) {
-      riskBonus = Math.round(bonus * 0.5);
-      this.spawnFloatingText(`🔥 위험 보너스! +${riskBonus}g`, this.camera.x, this.camera.y - (this.height/2 - 110)/this.camera.zoom, '#ff6b6b');
-    }
     this._peakFieldCount = 0;
-    this.addGold(bonus + riskBonus);
+    this.addGold(bonus);
+    const interest = this._payInterest(true);
     this.score = Math.round(this.currentWave * 12 + (this.killScore || 0));
     this.onScoreChange && this.onScoreChange(this.score);
-    this.onWaveComplete && this.onWaveComplete(this.currentWave, bonus + riskBonus, false);
+    this.onWaveComplete && this.onWaveComplete(this.currentWave, bonus + interest, false);
     if (!this.endless && this.currentWave >= this.totalWaves) this.triggerVictory();
     else this.onStateChange && this.onStateChange('idle');
+  }
+
+  // v28: 이자 (설계서 §5) - 웨이브가 끝날 때 보유 골드 10당 1골드, 상한 30(+영웅 보너스, 최대 45).
+  // "지금 뽑을까, 모아서 이자 받을까"를 매 웨이브 고민하게 만드는 장치. 클리어/시간초과 둘 다 지급.
+  _payInterest(cleared) {
+    // 스킵 연타로 이자만 빼먹는 것 방지: 시간초과/스킵은 웨이브가 20초 이상 진행됐을 때만 지급
+    if (!cleared && (this._waveElapsed || 0) < 20) return 0;
+    const cap = Math.min(45, 30 + (this._interestCapBonus || 0));
+    const interest = Math.min(cap, Math.floor(this.gold / 10));
+    if (interest > 0) {
+      this.gold = Math.round(this.gold + interest); // 이자는 골드 배율(토게피 등) 미적용
+      this.onGoldChange && this.onGoldChange(this.gold);
+      this.spawnFloatingText(`🏦 이자 +${interest}g`, this.camera.x, this.camera.y - (this.height/2 - 110)/this.camera.zoom, '#06d6a0');
+    }
+    return interest;
   }
 
   // ===== GOLD / LIVES =====
@@ -588,8 +632,7 @@ class GameEngine {
     // v27-46 버그수정: totalSpent가 초기화만 되고 어디서도 증가하지 않아서 판매 환불이 항상 0골드였음
     // (요청8 - "1성/2성 팔았을 때 돈이 너무 적게 들어오는지 체크해봐" → 사실은 0원이었음).
     // 정확한 지출 이력 추적 대신, 신뢰성 있는 등급 기반 고정 판매가로 교체.
-    const SELL_VALUE = { normal: 60, rare: 180, epic: 500, legend: 1400, unique: 3500 };
-    const refund = SELL_VALUE[t.def?.grade] || 50;
+    const refund = (window.SELL_VALUE || {})[t.def?.grade] || 40; // v28: 판매가 단일 기준
     this.addGold(refund);
     this.spawnFloatingText(`+${refund}g`, slot.x, slot.y, '#06d6a0');
     this.towers = this.towers.filter(x=>x!==t);
@@ -617,21 +660,27 @@ class GameEngine {
       ctx.translate((Math.random()-0.5)*s, (Math.random()-0.5)*s);
     }
 
-    this._drawBgCached(ctx);
-    this.drawPaths(ctx);
+    this._drawBgCached(ctx); // v28: 경로(drawPaths)는 정적이라 배경 캐시에 함께 구움 (매 프레임 X)
     this.drawSlots(ctx);
 
-    for (const t of this.towers) t.draw(ctx);
+    // v28: 뷰포트 컬링 (v27-62 복구) - 카메라 밖 개체는 안 그림
+    const cullMargin = 80;
+    const viewHalfW = this.width / 2 / this.camera.zoom + cullMargin;
+    const viewHalfH = this.height / 2 / this.camera.zoom + cullMargin;
+    const cx = this.camera.x, cy = this.camera.y;
+    const inView = (o) => Math.abs(o.x - cx) <= viewHalfW && Math.abs(o.y - cy) <= viewHalfH;
+
+    for (const t of this.towers) if (inView(t)) t.draw(ctx);
     for (const h of this.heroes) h.draw(ctx);
 
-    // Y순 정렬
-    const sorted = [...this.enemies].sort((a,b)=>a.y-b.y);
-    for (const e of sorted) e.draw(ctx);
+    // Y순 정렬 (제자리 정렬 - 매 프레임 배열 복사 제거)
+    this.enemies.sort((a,b)=>a.y-b.y);
+    for (const e of this.enemies) if (inView(e)) e.draw(ctx);
 
-    for (const p of this.projectiles) p.draw(ctx);
+    for (const p of this.projectiles) if (inView(p)) p.draw(ctx);
     // v27-47: RedFlash(전체화면 빨간 비네트)는 스크린 좌표 기준이라 카메라 변환 밖에서 그려야 함
     // (안에서 그리면 카메라 위치/줌에 따라 화면을 제대로 못 덮는 버그가 생김)
-    for (const p of this.particles) if (!(p instanceof RedFlash)) p.draw(ctx);
+    for (const p of this.particles) if (!(p instanceof RedFlash) && (p.x === undefined || inView(p))) p.draw(ctx);
 
     if (this.selectedTower) this._drawRange(ctx, this.selectedTower);
     if (this.selectedSlotIdx !== null && this.selectedTowerType) this._drawPreview(ctx);
@@ -643,6 +692,45 @@ class GameEngine {
 
     // v27-47: 보스 HP바는 화면 상단 고정 UI라서 카메라 변환 밖(화면좌표)에서 그림
     if (this.activeBoss) this._drawBossBar(ctx);
+  }
+
+  // v28: 텍스처 여러 장을 모자이크로 합쳐(일부 반전) 반복 티를 줄인 CanvasPattern. 로딩 전엔 null.
+  _getMosaicPattern(ctx, key, urls, worldTileSize) {
+    if (!this._texCache) this._texCache = {};
+    const cacheKey = key + '_' + worldTileSize;
+    let entry = this._texCache[cacheKey];
+    if (!entry) {
+      entry = { images: [], loaded: 0, ready: false, pattern: null };
+      urls.forEach((u, i) => {
+        const im = new Image();
+        im.onload = () => { if (++entry.loaded === urls.length) { entry.ready = true; this._bgDirty = true; } };
+        im.src = u;
+        entry.images[i] = im;
+      });
+      this._texCache[cacheKey] = entry;
+    }
+    if (!entry.ready) return null;
+    if (!entry.pattern) {
+      const sz = entry.images[0].naturalWidth || 512;
+      const cols = entry.images.length >= 2 ? 2 : 1;
+      const rows = Math.ceil(entry.images.length / cols);
+      const mc = document.createElement('canvas');
+      mc.width = sz * cols; mc.height = sz * rows;
+      const mctx = mc.getContext('2d');
+      entry.images.forEach((im, i) => {
+        const x0 = (i % cols) * sz, y0 = Math.floor(i / cols) * sz;
+        const fx = (i * 7) % 3 === 0, fy = (i * 11) % 4 === 0;
+        mctx.save();
+        mctx.translate(x0 + (fx ? sz : 0), y0 + (fy ? sz : 0));
+        mctx.scale(fx ? -1 : 1, fy ? -1 : 1);
+        mctx.drawImage(im, 0, 0, sz, sz);
+        mctx.restore();
+      });
+      const pat = ctx.createPattern(mc, 'repeat');
+      if (pat && pat.setTransform) { try { pat.setTransform(new DOMMatrix().scale(worldTileSize / sz)); } catch (e) {} }
+      entry.pattern = pat;
+    }
+    return entry.pattern;
   }
 
   _drawBgCached(ctx) {
@@ -659,8 +747,14 @@ class GameEngine {
       const bctx = bc.getContext('2d');
       const map = this.currentMap;
 
-      // 배경 이미지 있으면 사용, 없으면 단색
-      if (map.bgImage) {
+      // v28: 반복 타일 텍스처(잔디/용암) 우선 - 모자이크 패턴 (v27-58 복구)
+      if (map.bgTextures) {
+        const pat = this._getMosaicPattern(bctx, map.name + '_bg', map.bgTextures, map.bgTileSize || 300);
+        bctx.fillStyle = pat || map.bgColor;
+        bctx.fillRect(0, 0, this.worldWidth, this.worldHeight);
+        bctx.fillStyle = 'rgba(0,0,0,0.30)'; // 게임 톤(어두운)과 어우러지게
+        bctx.fillRect(0, 0, this.worldWidth, this.worldHeight);
+      } else if (map.bgImage) {
         if (!this._bgImg || this._bgImg._src !== map.bgImage) {
           const im = new Image();
           im._src = map.bgImage;
@@ -691,6 +785,7 @@ class GameEngine {
 
       // 맵별 이모지/장식 오버레이
       if (map.drawBg) map.drawBg(bctx, this.worldWidth, this.worldHeight);
+      this.drawPaths(bctx); // v28: 정적인 경로를 캐시에 1회만 그림
       this._bgCanvas = bc; this._bgDirty = false;
     }
     ctx.drawImage(this._bgCanvas, 0, 0);
@@ -715,8 +810,13 @@ class GameEngine {
       for (let i=1;i<path.length;i++) ctx.lineTo(path[i].x,path[i].y);
       ctx.stroke(); ctx.restore();
 
-      // 경로 본체
-      ctx.save(); ctx.strokeStyle=map.pathColor;
+      // 경로 본체 - 텍스처(흙/벽돌/돌) 있으면 패턴으로
+      let pathFill = map.pathColor;
+      if (map.pathTextures) {
+        const ppat = this._getMosaicPattern(ctx, map.name + '_path', map.pathTextures, map.pathTileSize || 40);
+        if (ppat) pathFill = ppat;
+      }
+      ctx.save(); ctx.strokeStyle=pathFill;
       ctx.lineWidth=pw; ctx.lineCap='round'; ctx.lineJoin='round';
       ctx.beginPath(); ctx.moveTo(path[0].x,path[0].y);
       for (let i=1;i<path.length;i++) ctx.lineTo(path[i].x,path[i].y);
@@ -757,9 +857,13 @@ class GameEngine {
   }
 
   drawSlots(ctx) {
+    const margin = 40;
+    const halfW = this.width / 2 / this.camera.zoom + margin;
+    const halfH = this.height / 2 / this.camera.zoom + margin;
     for (let i=0; i<this.towerSlots.length; i++) {
       const s = this.towerSlots[i];
       if (s.occupied) continue;
+      if (Math.abs(s.x - this.camera.x) > halfW || Math.abs(s.y - this.camera.y) > halfH) continue;
       const isHL = this.selectedTowerType !== null;
       const isHov = this.selectedSlotIdx === i;
       const isMouseHover = this.hoveredSlotIdx === i && !isHov; // v27-49: 데스크탑 마우스 호버 표시 (배치모드 하이라이트와 안 겹치게)

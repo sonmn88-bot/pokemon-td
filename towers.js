@@ -103,7 +103,7 @@ class Projectile {
       for (const e of this.engine.enemies) {
         if (e === enemy || e.dead || e.reachedEnd) continue;
         if (Math.hypot(e.x - enemy.x, e.y - enemy.y) < this.splash) {
-          e.takeDamage(this.damage * 0.6, this.dmgType);
+          e.takeDamage(this.damage * 0.6, 'splash'); // v28: 부가타는 방어 50%
           if (this.status && (!['stun','freeze'].includes(this.status.type) || Math.random() < 0.35)) e.applyStatus(this.status.type, this.status.duration * 0.6, this.status.factor);
         }
       }
@@ -125,7 +125,7 @@ class Projectile {
     if (!nearest) return;
     nearest._chainedBy = this;
     this.engine.particles.push(new ChainBolt(from.x, from.y, nearest.x, nearest.y));
-    nearest.takeDamage(this.damage * 0.7, this.dmgType);
+    nearest.takeDamage(this.damage * 0.7, 'splash'); // v28: 연쇄도 부가타
     if (this.status && (!['stun','freeze'].includes(this.status.type) || Math.random() < 0.35)) nearest.applyStatus(this.status.type, this.status.duration, this.status.factor);
     this._doChain(nearest, rem - 1);
   }
