@@ -595,8 +595,7 @@ function _computeTypeBuffMuls(type) {
 function _createGachaTower(def, x, y, engine) {
   const muls = _computeTypeBuffMuls(def.type);
   // v27-5: 숙련도 (item2) - 같은 포켓몬을 중복으로 뽑을수록 그 포켓몬 전용 데미지 보너스 (합체 안 해도 저등급이 계속 쓸모 있어짐)
-  const masteryLv = (engine && engine._masteryLevel && engine._masteryLevel[def.id]) || 0;
-  const masteryMul = 1 + Math.min(20, masteryLv) * 0.02; // 중복 1개당 +2%, 최대 +40%(20중복)
+  const masteryMul = 1; // v28 세션E: 숙련도 제거 (151종이라 같은 종 중복이 드묾 - 확정진화가 대체)
   const t = {
     x, y, _gachaId:def.id, def,
     name:def.name, level:1, path:null, totalSpent:0,
@@ -694,7 +693,7 @@ function _createGachaTower(def, x, y, engine) {
         ctx.setLineDash([]); ctx.restore();
       }
       // v27-17: 숙련도 각성(20/20 마스터) 오라 (요청1) - 무지개링과 겹쳐도 구분되게 바깥쪽 큰 링으로
-      if(this.masteryMul >= 1.4){ // 20중복 = 1+20*0.02 = 1.4
+      if(false){ // v28 세션E: 숙련도 제거 // 20중복 = 1+20*0.02 = 1.4
         ctx.save(); const hue2=(Date.now()*0.08+120)%360;
         // v27-62 최적화: shadowBlur 제거 - 반투명 굵은 링으로 글로우 대체
         ctx.strokeStyle=`hsla(${hue2},90%,70%,0.25)`; ctx.lineWidth=4;
@@ -891,47 +890,20 @@ function applyTypeUpgrade(type, engine) {
 
 // ===== 미션 =====
 const MissionDefs = [
-  {id:'first_rare',  name:'레어 수집가',    desc:'레어 타워 3개 뽑기',       reward:10,  condition:(s)=>s.totalRareCount>=3},
-  {id:'first_epic',  name:'에픽 수집가',  desc:'에픽 타워 3개 뽑기',       reward:20, condition:(s)=>s.totalEpicCount>=3},
-  {id:'first_legend',name:'레전드!',     desc:'레전드 타워 뽑기',     reward:300, condition:(s)=>s.totalLegendCount>=1},
-  {id:'first_unique',name:'유니크!',     desc:'유니크 타워 뽑기',     reward:500, condition:(s)=>s.totalUniqueCount>=1},
-  {id:'first_merge', name:'첫 합치기!',  desc:'합치기로 진화',         reward:15, condition:(s)=>s.mergeCount>=1},
-  {id:'merge5',      name:'합치기 장인', desc:'합치기 5회',            reward:200, condition:(s)=>s.mergeCount>=5},
-  {id:'combo10',     name:'콤보 20!',   desc:'콤보 20 달성',          reward:10,  condition:(s)=>s.maxCombo>=20},
-  {id:'combo30',     name:'콤보 마스터',desc:'콤보 30 달성',           reward:200, condition:(s)=>s.maxCombo>=30},
-  {id:'wave5',       name:'웨이브 8',   desc:'웨이브 8 클리어',       reward:15, condition:(s)=>s.wavesCleared>=8},
-  {id:'wave10',      name:'웨이브 10',  desc:'웨이브 10 클리어',      reward:60, condition:(s)=>s.wavesCleared>=10},
-  {id:'boss1',       name:'보스 처치',  desc:'보스 처치',              reward:250, condition:(s)=>s.bossKills>=1},
-  {id:'bosssummon1', name:'첫 소환!',   desc:'보스 소환 버튼으로 보스 1회 소환', reward:20, condition:(s)=>(s.bossSummons||0)>=1},
-  {id:'bosssummon10',name:'소환술사',   desc:'보스 소환 10회',          reward:400, condition:(s)=>(s.bossSummons||0)>=10},
-  {id:'wave90',      name:'3존 완주',   desc:'웨이브 90 도달 (엔드리스 3존 순환 완료)', reward:600, condition:(s)=>s.wavesCleared>=90},
-  {id:'type_fire',   name:'불꽃 마스터',desc:'불꽃 타입 업그레이드 3단계',reward:300,condition:(s)=>(s.typeUpgrades?.fire||0)>=3},
-  {id:'type_water',  name:'물 마스터',  desc:'물 타입 업그레이드 3단계',  reward:300,condition:(s)=>(s.typeUpgrades?.water||0)>=3},
-  {id:'towers8',     name:'군대 집결',  desc:'타워 14개 배치',          reward:20, condition:(s)=>s.maxTowersDeployed>=14},
-  {id:'ten_pull',    name:'10연 도전',  desc:'10연 뽑기 1회',          reward:15, condition:(s)=>s.tenPullCount>=1},
-  {id:'perfect5',    name:'완벽한 방어',desc:'시간초과 없이 웨이브 5 클리어',reward:20,condition:(s)=>s.wavesCleared>=5&&!s.timeouts},
-  {id:'shadow_hunt', name:'흑화 사냥꾼',desc:'흑화(골드 엘리트) 5마리 처치',reward:70,condition:(s)=>(s.eliteGoldKills||0)>=5},
-  {id:'hero_evolve',name:'진화의 순간',desc:'영웅을 진화시키기',        reward:70, condition:(s)=>!!s.heroEvolved},
-  {id:'hard_clear',  name:'하드 정복자',desc:'하드 난이도 웨이브 10 클리어',reward:150,condition:(s)=>(s.hardWavesCleared||0)>=10},
-  // v27-5: 전체모으기 미션 + 추가 다양화 (요청: 미션 더 다채롭게)
-  {id:'collect_normal', name:'노멀 도감 완성', desc:'노멀 등급 전체 모으기', reward:90,
-    condition:(s)=>window.GRADE_POOLS.normal.every(id=>s.collectedIds.has(id))},
-  {id:'collect_rare',   name:'레어 도감 완성', desc:'레어 등급 전체 모으기', reward:150,
-    condition:(s)=>window.GRADE_POOLS.rare.every(id=>s.collectedIds.has(id))},
-  {id:'collect_epic',   name:'에픽 도감 완성', desc:'에픽 등급 전체 모으기', reward:220,
-    condition:(s)=>window.GRADE_POOLS.epic.every(id=>s.collectedIds.has(id))},
-  {id:'collect_legend', name:'레전드 도감 완성', desc:'레전드 등급 전체 모으기', reward:320,
-    condition:(s)=>window.GRADE_POOLS.legend.every(id=>s.collectedIds.has(id))},
-  {id:'collect_mew',    name:'환상의 포켓몬', desc:'합치기 전용 뮤(mew) 획득', reward:180,
-    condition:(s)=>s.collectedIds.has('mew')},
-  {id:'type_all5',   name:'만능 조련사', desc:'6개 타입 모두 강화 1단계 이상', reward:130,
+  // v28 세션E: 30개 → 12개 (합성 · 등급 · 웨이브 이정표 · 영웅/강화). 보상은 이번 판 골드만 (영구 성장 없음)
+  {id:'first_merge', name:'첫 합성',       desc:'합성 연구소에서 합성 1회',        reward:30,  condition:(s)=>s.mergeCount>=1},
+  {id:'merge5',      name:'합성 장인',     desc:'합성 5회',                        reward:150, condition:(s)=>s.mergeCount>=5},
+  {id:'first_epic',  name:'에픽 등장',     desc:'에픽 포켓몬 획득',                reward:60,  condition:(s)=>s.totalEpicCount>=1},
+  {id:'first_legend',name:'전설의 시작',   desc:'레전드 포켓몬 획득',              reward:300, condition:(s)=>s.totalLegendCount>=1},
+  {id:'collect_mew', name:'환상의 포켓몬', desc:'레시피로 뮤 획득',                reward:500, condition:(s)=>s.collectedIds.has('mew')},
+  {id:'hero_evolve', name:'진화의 순간',   desc:'영웅 진화',                       reward:100, condition:(s)=>!!s.heroEvolved},
+  {id:'type_all5',   name:'만능 조련사',   desc:'6개 타입 모두 강화 1단계 이상',   reward:150,
     condition:(s)=>Object.keys(window.TypeUpgrades||{}).every(t=>(s.typeUpgrades?.[t]||0)>=1)},
-  {id:'wave150',     name:'무한의 도전자', desc:'왕 처치 후 웨이브 150 도달', reward:300, condition:(s)=>s.wavesCleared>=150},
-  {id:'gold2000',    name:'대부호', desc:'누적 골드 2000 획득', reward:80, condition:(s)=>(s.totalGoldEarned||0)>=2000},
-  {id:'score1000',   name:'점수 1000 돌파', desc:'점수 1000 달성', reward:100, condition:(s)=>(s.maxScore||0)>=1000},
-  // v27-5: 초반 유도미션 (요청C) - 초반에 할 일을 만들어줌
-  {id:'early_deploy', name:'초반 러시', desc:'웨이브 3 이내에 타워 6개 배치', reward:50, condition:(s)=>!!s.earlyDeploy4},
-  {id:'first_synergy', name:'첫 궁합', desc:'타워 시너지 첫 발동 (같은/궁합 타입 150px 이내 배치)', reward:100, condition:(s)=>!!s.firstSynergy},
+  {id:'boss1',       name:'보스 사냥',     desc:'보스 처치',                       reward:200, condition:(s)=>s.bossKills>=1},
+  {id:'wave10',      name:'웨이브 10',     desc:'웨이브 10 클리어',                reward:80,  condition:(s)=>s.wavesCleared>=10},
+  {id:'wave30',      name:'웨이브 30',     desc:'웨이브 30 클리어',                reward:250, condition:(s)=>s.wavesCleared>=30},
+  {id:'wave60',      name:'웨이브 60',     desc:'웨이브 60 클리어',                reward:500, condition:(s)=>s.wavesCleared>=60},
+  {id:'wave90',      name:'3존 완주',      desc:'웨이브 90 도달',                  reward:800, condition:(s)=>s.wavesCleared>=90},
 ];
 
 class MissionTracker {
@@ -941,7 +913,6 @@ class MissionTracker {
   }
   update(engine){
     this.stats.maxTowersDeployed=Math.max(this.stats.maxTowersDeployed,engine.towers.length);
-    if(engine.comboCount>this.stats.maxCombo) this.stats.maxCombo=engine.comboCount;
   }
   check(){ for(const m of MissionDefs){ if(!this.completed.has(m.id)&&m.condition(this.stats)){ this.completed.add(m.id); this.onComplete&&this.onComplete(m); } } }
 }

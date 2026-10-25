@@ -872,7 +872,7 @@ html, body {
   #hero-skill-bar { bottom:calc(var(--bar-h) + 40px); gap:4px; }
   .hero-skills-group { padding:3px 6px; gap:4px; }
   .skill-btn { width:30px; height:30px; }
-  #boss-summon-bar { bottom:calc(var(--bar-h) + 78px) !important; left:4px !important; transform:scale(0.8); transform-origin:left bottom; }
+  #boss-summon-bar { bottom:calc(var(--bar-h) + 6px) !important; left:4px !important; transform:scale(0.8); transform-origin:left bottom; }
   #spell-bar { top:calc(var(--hud-h) + 3px); }
   .spell-btn { padding:2px 5px; }
   #hud-top { height:var(--hud-h,44px); }
@@ -1064,3 +1064,64 @@ html, body {
 .st2-name { font-size:11.5px; font-weight:800; }
 .st2-desc { font-size:9.5px; color:#b8c0d8; line-height:1.35; }
 @media (max-width:420px) { .st2-desc { font-size:9px; } .st2-node { padding:7px 5px; } }
+
+/* ===== v28 세션 E: 디자인 토큰 (등급·타입 색 단일화) ===== */
+:root {
+  --g-normal:#9e9e9e; --g-rare:#4fc3f7; --g-epic:#ce93d8; --g-legend:#ffd60a; --g-unique:#ff6b6b;
+  --t-fire:#ff5722; --t-water:#29b6f6; --t-grass:#66bb6a; --t-electric:#ffd600; --t-psychic:#ba68c8; --t-normal:#bdbdbd;
+  --sp-1:4px; --sp-2:8px; --sp-3:16px;
+  --sheet-bg:rgba(10,14,26,0.97);
+}
+/* 상시 노출 타입강화바가 빠진 만큼 위젯들을 아래로 */
+#hero-skill-bar { bottom:calc(var(--bar-h) + 10px); }
+@media (max-height:430px) { #hero-skill-bar { bottom:calc(var(--bar-h) + 6px); } }
+
+/* 필드 게이지 (0~200) */
+#hud-field { gap:6px; }
+.fg-bar { width:44px; height:6px; border-radius:3px; background:rgba(255,255,255,0.12); overflow:hidden; display:inline-block; }
+.fg-bar i { display:block; height:100%; width:0; background:var(--accent-grn); border-radius:3px; transition:width .3s, background .3s; }
+@media (max-width:560px) { .fg-bar { width:30px; } }
+
+/* 하단 🛠 강화 버튼 */
+.upg-open-btn { position:relative; border-color:rgba(76,201,240,0.45) !important; min-width:54px; }
+.upg-open-btn.active { background:rgba(76,201,240,0.22) !important; border-color:var(--accent-blu) !important; }
+.upg-open-btn.has-dot::after { content:''; position:absolute; top:4px; right:4px; width:8px; height:8px; border-radius:50%;
+  background:var(--accent-yel); box-shadow:0 0 6px var(--accent-yel); }
+@media (max-width:560px) { .upg-open-btn { width:50px !important; min-width:0; padding:5px 2px !important; } .upg-open-btn .tower-btn-cost { display:none; } }
+
+/* 강화 시트 (아래에서 올라오는 서랍 - 게임은 계속 진행) */
+#upgrade-sheet {
+  position:absolute; left:0; right:0; bottom:var(--bar-h); z-index:25;
+  max-height:min(52vh, 420px); overflow-y:auto; overscroll-behavior:contain; touch-action:pan-y;
+  background:var(--sheet-bg); border-top:1px solid rgba(76,201,240,0.3);
+  border-radius:var(--radius-lg) var(--radius-lg) 0 0; padding:var(--sp-2) var(--sp-3) var(--sp-3);
+  box-shadow:0 -8px 30px rgba(0,0,0,0.55);
+  transform:translateY(110%); transition:transform .22s cubic-bezier(.2,.8,.2,1); visibility:hidden;
+}
+#upgrade-sheet.open { transform:translateY(0); visibility:visible; }
+.us-head { display:flex; justify-content:space-between; align-items:center; font-weight:900; font-size:14px; padding:2px 0 6px; position:sticky; top:-8px; background:var(--sheet-bg); z-index:1; }
+.us-close { background:rgba(255,255,255,0.08); border:1px solid var(--border); color:#fff; width:30px; height:30px; border-radius:50%; font-size:14px; cursor:pointer; }
+.us-label { font-size:12px; font-weight:800; color:var(--accent-blu); margin:8px 0 6px; }
+.us-label small { font-weight:400; color:var(--text-mid); font-size:10px; margin-left:4px; }
+.us-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:var(--sp-2); }
+.us-card { --c:var(--accent-yel); display:grid; grid-template-columns:1fr auto; gap:2px 6px; text-align:left; padding:8px 10px;
+  border-radius:12px; border:1.5px solid color-mix(in srgb, var(--c) 45%, transparent); background:var(--bg-card); color:#fff; cursor:pointer; transition:transform .1s; }
+.us-card:active { transform:scale(0.96); }
+.us-card:disabled { opacity:0.42; cursor:not-allowed; }
+.us-card b { grid-column:1 / -1; font-size:13px; color:var(--c); }
+.us-card.shop b { color:#fff; }
+.us-lv { font-size:10px; color:var(--text-mid); font-weight:700; margin-left:2px; }
+.us-desc { grid-column:1 / -1; font-size:10px; color:#b8c0d8; line-height:1.35; }
+.us-meta { font-size:10px; color:var(--text-mid); align-self:end; }
+.us-cost { font-size:12px; font-weight:800; color:var(--accent-yel); align-self:end; }
+@media (max-width:420px) { .us-grid { grid-template-columns:1fr 1fr; } .us-card { padding:7px 8px; } .us-card b { font-size:12px; } }
+@media (max-height:430px) { #upgrade-sheet { max-height:62vh; } }
+/* 일시정지 메뉴 ('← 맵' 버튼 대체) */
+#btn-back { display:none !important; }
+.pause-overlay { position:absolute; inset:0; z-index:60; background:rgba(4,6,14,0.72); display:flex; align-items:center; justify-content:center; backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px); }
+.po-card { background:var(--bg-panel); border:1px solid rgba(76,201,240,0.3); border-radius:var(--radius-lg); padding:20px 22px; display:flex; flex-direction:column; gap:10px; min-width:220px; }
+.po-title { font-weight:900; font-size:17px; text-align:center; margin-bottom:4px; }
+.po-btn { padding:12px; border-radius:12px; border:none; font-size:15px; font-weight:800; cursor:pointer; color:#fff; background:rgba(255,255,255,0.08); }
+.po-btn.go { background:linear-gradient(135deg,#06d6a0,#0abf8a); }
+.po-btn:active { transform:scale(0.96); }
+@media (min-width:760px) { .us-types { grid-template-columns:repeat(6, 1fr); } .us-shop { grid-template-columns:repeat(4, 1fr); } }

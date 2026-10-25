@@ -253,15 +253,6 @@ class GameEngine {
       if (this.waveTimeRemaining <= 0) this.timeoutWave();
     }
 
-    // 콤보 타이머
-    if (this.comboCount > 0) {
-      this.comboTimer -= this.dt;
-      if (this.comboTimer <= 0) {
-        this.comboCount = 0;
-        this.comboMul = 1;
-        this.onComboChange && this.onComboChange(0, 1);
-      }
-    }
 
     // 적 이동 (순환 트랙 - 더 이상 '도착'으로 라이프를 잃지 않음, 시간 내 처치해야 함)
     for (let i = this.enemies.length - 1; i >= 0; i--) {
@@ -340,19 +331,6 @@ class GameEngine {
     this.addGold(baseReward + bonus + bountyBonus);
     this.spawnFloatingText(`+${baseReward + bonus}g`, enemy.x, enemy.y - 10, '#ffd60a');
 
-    // v27-16: 처치 다양성 스트릭 보너스 (요청3) - 다른 종류의 몹을 연속으로 잡으면 보상
-    if (enemy.typeId !== this._lastKilledType) {
-      this._varietyStreak = (this._varietyStreak || 0) + 1;
-    } else {
-      this._varietyStreak = 1;
-    }
-    this._lastKilledType = enemy.typeId;
-    if ([5, 10, 15, 20].includes(this._varietyStreak)) {
-      const varietyBonus = this._varietyStreak * 4;
-      this.addGold(varietyBonus);
-      this.spawnFloatingText(`🎯 다양성 스트릭 ${this._varietyStreak}! +${varietyBonus}g`, enemy.x, enemy.y - 50, '#4fc3f7');
-    }
-
     // v27-4: 점수 공식 (item 13,19) - 생존이 지배적, 킬은 보너스 수준
     // 일반킬 1-3(엘리트는 조금 더), 미니보스 25, 일반보스 80, 왕 120
     let killScore = 1;
@@ -363,21 +341,6 @@ class GameEngine {
     this.killScore = (this.killScore || 0) + killScore;
     this.score = Math.round(this.currentWave * 12 + this.killScore);
     this.onScoreChange && this.onScoreChange(this.score);
-
-    // 콤보 시스템
-    this.comboCount++;
-    this.comboTimer = this.comboMaxTime;
-    this.comboMul = Math.min(3.0, 1 + (this.comboCount - 1) * 0.1);
-    this.onComboChange && this.onComboChange(this.comboCount, this.comboMul);
-
-    if (this.comboCount >= 5) {
-      this.particles.push(new ComboFlash(enemy.x, enemy.y, this.comboCount));
-    }
-    // v27-6: 콤보 마일스톤 문구 (요청3, 딱 3번만 - 스팸 방지)
-    const comboQuips = { 20: '멋진데?!', 35: '완벽한 흐름!', 50: '전설적이야!' };
-    if (comboQuips[this.comboCount]) {
-      this.spawnFloatingText(comboQuips[this.comboCount], enemy.x, enemy.y - 40, '#ffd60a', { fontSize: 16, life: 1.3 });
-    }
 
     // 영웅 경험치
     for (const h of this.heroes) {
@@ -869,36 +832,48 @@ class GameEngine {
       const isMouseHover = this.hoveredSlotIdx === i && !isHov; // v27-49: 데스크탑 마우스 호버 표시 (배치모드 하이라이트와 안 겹치게)
 
       ctx.save();
-      // 바닥 그림자
-      ctx.beginPath(); ctx.arc(s.x, s.y+3, 22, 0, Math.PI*2);
-      ctx.fillStyle='rgba(0,0,0,0.35)'; ctx.fill();
-
-      ctx.beginPath(); ctx.arc(s.x, s.y, 21, 0, Math.PI*2);
+      // v28 세션E: 빈 슬롯 = '돌 받침대' (미리 구워둔 스프라이트 1장을 drawImage - 매 프레임 그라디언트 생성 없음)
+      ctx.drawImage(this._getPedestal(), s.x - 26, s.y - 22, 52, 52);
+      ctx.beginPath(); ctx.ellipse(s.x, s.y, 20, 15, 0, 0, Math.PI*2);
       if (isHov) {
-        const g=ctx.createRadialGradient(s.x,s.y-3,2,s.x,s.y,21);
-        g.addColorStop(0,'rgba(76,201,240,0.6)'); g.addColorStop(1,'rgba(76,201,240,0.1)');
-        ctx.fillStyle=g; ctx.strokeStyle='#4cc9f0'; ctx.lineWidth=2.5;
-        ctx.shadowColor='#4cc9f0'; ctx.shadowBlur=16;
+        ctx.fillStyle='rgba(76,201,240,0.35)'; ctx.strokeStyle='#4cc9f0'; ctx.lineWidth=2.5;
+        ctx.fill(); ctx.stroke();
       } else if (isMouseHover) {
-        // v27-49: 요청 - "마우스 갖다대면 눌러도 되는걸 느낄 수 있게" 파란 테두리로 표시
-        ctx.fillStyle='rgba(76,201,240,0.22)'; ctx.strokeStyle='rgba(76,201,240,0.75)'; ctx.lineWidth=2;
+        ctx.fillStyle='rgba(76,201,240,0.18)'; ctx.strokeStyle='rgba(76,201,240,0.75)'; ctx.lineWidth=2;
+        ctx.fill(); ctx.stroke();
       } else if (isHL) {
-        ctx.fillStyle='rgba(255,255,255,0.10)'; ctx.strokeStyle='rgba(255,255,255,0.40)'; ctx.lineWidth=1;
-      } else {
-        ctx.fillStyle='rgba(70,50,30,0.18)'; ctx.strokeStyle='rgba(180,130,60,0.22)'; ctx.lineWidth=1;
+        ctx.strokeStyle='rgba(255,255,255,0.55)'; ctx.lineWidth=1.5; ctx.stroke();
       }
-      ctx.fill(); ctx.stroke();
 
       // + 아이콘
       ctx.shadowBlur=0;
-      ctx.strokeStyle=isHov?'#4cc9f0':(isHL?'rgba(255,255,255,0.8)':'rgba(200,160,80,0.55)');
+      ctx.strokeStyle=isHov?'#4cc9f0':(isHL?'rgba(255,255,255,0.85)':'rgba(255,255,255,0.28)');
       ctx.lineWidth=isHov?2.5:1.5; ctx.lineCap='round';
       ctx.beginPath();
-      ctx.moveTo(s.x-9,s.y); ctx.lineTo(s.x+9,s.y);
-      ctx.moveTo(s.x,s.y-9); ctx.lineTo(s.x,s.y+9);
+      ctx.moveTo(s.x-6,s.y); ctx.lineTo(s.x+6,s.y);
+      ctx.moveTo(s.x,s.y-6); ctx.lineTo(s.x,s.y+6);
       ctx.stroke();
       ctx.restore();
     }
+  }
+
+  // 돌 받침대 스프라이트 (한 번만 생성, 3배 해상도로 구워 줌해도 선명)
+  _getPedestal() {
+    if (this._pedestal) return this._pedestal;
+    const S = 3, c = document.createElement('canvas'); c.width = c.height = 52 * S;
+    const g = c.getContext('2d'); g.scale(S, S);
+    const cx = 26, cy = 22;
+    g.fillStyle = 'rgba(0,0,0,0.38)'; g.beginPath(); g.ellipse(cx, cy + 9, 23, 13, 0, 0, Math.PI*2); g.fill(); // 그림자
+    g.fillStyle = '#5b5348'; g.beginPath(); g.ellipse(cx, cy + 5, 22, 15, 0, 0, Math.PI*2); g.fill();          // 옆면
+    const top = g.createLinearGradient(0, cy - 16, 0, cy + 14);
+    top.addColorStop(0, '#b9b0a2'); top.addColorStop(1, '#857b6d');
+    g.fillStyle = top; g.beginPath(); g.ellipse(cx, cy, 22, 15, 0, 0, Math.PI*2); g.fill();                    // 윗면
+    g.strokeStyle = 'rgba(255,255,255,0.25)'; g.lineWidth = 1; g.stroke();
+    g.fillStyle = 'rgba(0,0,0,0.12)'; g.beginPath(); g.ellipse(cx, cy, 15, 9.5, 0, 0, Math.PI*2); g.fill();     // 안쪽 오목
+    g.strokeStyle = 'rgba(60,50,40,0.35)'; g.lineWidth = 0.8;                                                  // 돌 금
+    g.beginPath(); g.moveTo(cx - 17, cy - 4); g.lineTo(cx - 11, cy - 1); g.lineTo(cx - 13, cy + 5); g.stroke();
+    g.beginPath(); g.moveTo(cx + 12, cy - 9); g.lineTo(cx + 16, cy - 3); g.stroke();
+    return (this._pedestal = c);
   }
 
   _drawRange(ctx, tower) {

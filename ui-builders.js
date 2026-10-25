@@ -11,6 +11,16 @@ Object.assign(App.prototype, {
     const scroll = document.createElement('div');
     scroll.className = 'tower-bar-scroll gacha-bar';
 
+    // v28 세션E: 강화 시트 열기 버튼 (타입강화+상점)
+    {
+      const ub = document.createElement('button');
+      ub.className = 'tower-btn upg-open-btn';
+      ub.innerHTML = `<span class="tower-btn-emoji">🛠</span><span class="tower-btn-name">강화</span><span class="tower-btn-cost">상점</span>`;
+      ub.title = '타입 강화 + 상점 (단축키: U)';
+      ub.addEventListener('click', () => this.toggleUpgradeSheet());
+      scroll.appendChild(ub);
+    }
+
     // 뽑기 버튼 3종 (v27 fix: cost를 여기 하드코딩하지 말고 실제 과금 기준인 PULL_COSTS에서 읽어오도록 - 안 그러면 가격 바꿀 때마다 표시랑 실제가 어긋남)
     const pulls = [
       { key:'normal',  label:'일반 뽑기',  color:'#9e9e9e', emoji:'🎰', hotkey:'1' },
@@ -102,9 +112,7 @@ Object.assign(App.prototype, {
       const canMerge = sameCount >= 3;
       const evolveId = [].concat(window.MERGE_EVOLUTION?.[t._gachaId] || [])[0];
       const evolveDef = evolveId ? window.GachaTowerDefs?.[evolveId] : null;
-      const synergyInfo = t.synergyBonus > 0
-        ? `<span style="color:#ffd60a;font-size:10px">⚡시너지 +${t.synergyBonus}</span>`
-        : `<span style="color:#888;font-size:10px" title="같은 타입 타워를 150px 이내에 배치하면 데미지 시너지가 붙습니다">⚡시너지 없음 (150px 이내 같은 타입 배치시 발동)</span>`;
+      const synergyInfo = ''; // v28 세션E: 시너지 제거됨
       const refund = (window.SELL_VALUE || {})[def.grade] || 40; // v28: 판매가 단일 기준
 
       // v27: 스탯 옆 (+%) 강화 표시 + 다음 강화 힌트
@@ -114,19 +122,13 @@ Object.assign(App.prototype, {
       const dmgTag = dmgPct !== 0 ? ` <span style="color:#4fc3f7">(+${dmgPct}%)</span>` : '';
       const rangeTag = rangePct !== 0 ? ` <span style="color:#4fc3f7">(+${rangePct}%)</span>` : '';
       const spdTag = spdPct !== 0 ? ` <span style="color:#4fc3f7">(+${spdPct}%)</span>` : '';
-      // v27-5: 숙련도 표시 (item2)
-      const masteryLv = this.engine?._masteryLevel?.[def.id] || 0;
-      const masteryTag = masteryLv > 0
-        ? (masteryLv >= 20
-            ? `<div style="font-size:10px;color:#ffd60a;margin-top:2px;font-weight:700">🌟 각성 완료! (데미지 +40%, 최대치)</div>`
-            : `<div style="font-size:10px;color:#ce93d8;margin-top:2px">⭐ 숙련도 ${Math.min(20,masteryLv)}/20 (데미지 +${Math.min(20,masteryLv)*2}%) - 같은 포켓몬 더 뽑을수록 증가</div>`)
-        : '';
+      const masteryTag = ''; // v28 세션E: 숙련도 제거
       const flavor = window.FLAVOR_TEXT?.[def.id];
       const flavorTag = flavor ? `<div style="font-size:9.5px;color:#777;font-style:italic;margin-top:3px;max-width:220px;">"${flavor}"</div>` : '';
       const tuLevel = window.TypeUpgradeLevels?.[def.type] || 0;
       const tuNext = window.TypeUpgrades?.[def.type]?.[tuLevel];
       const upgradeHint = tuNext
-        ? `<div style="font-size:10px;color:#7fe3ff;margin-top:2px">💡 하단 타입강화바에서 "${tuNext.label}"(💰${tuNext.cost}) 올리면 이 타워가 강해져요</div>`
+        ? `<div style="font-size:10px;color:#7fe3ff;margin-top:2px">💡 🛠강화 시트에서 "${tuNext.label}"(💰${tuNext.cost}) 올리면 이 타워가 강해져요</div>`
         : `<div style="font-size:10px;color:#888;margin-top:2px">💡 이 타입 강화 최대 단계 달성</div>`;
       // v27-23: 데미지 배율 breakdown (요청1) - 여러 배율이 어디서 왔는지 한눈에
       const teMul = window.typeEffectiveness && t.target ? window.typeEffectiveness(def.type, t.target.typeTag) : 1;
@@ -134,7 +136,8 @@ Object.assign(App.prototype, {
         <div style="font-size:9.5px;color:#999;margin-top:4px;line-height:1.5;border-top:1px dashed rgba(255,255,255,0.1);padding-top:3px;">
           📐 데미지 breakdown: 기본${def.damage}${t.flatDmg>0?`+강화${Math.round(t.flatDmg)}`:''}
           × 타입강화${(t.buffDmgMul||1).toFixed(2)}
-          × 숙련도${(t.masteryMul||1).toFixed(2)}
+          ${(t._auraDmgMul||1)>1?`× 지원오라${t._auraDmgMul.toFixed(2)}`:''}
+          ${(t._heroDmgMul||1)>1?`× 영웅${t._heroDmgMul.toFixed(2)}`:''}
           ${teMul!==1?`× 상성${teMul.toFixed(1)}`:''}
           = <span style="color:#ffd60a">${Math.round(t.damage)}</span>
         </div>`;
@@ -336,71 +339,71 @@ Object.assign(App.prototype, {
     }
   },
 
+  // v28 세션E: 타입강화 + 상점 → '강화 시트' 하나로 통합 (상시 노출 바 제거 → 맵이 더 넓게 보임)
+  // 시트는 게임을 멈추지 않고 열어둔 채 플레이 가능 (몬스터볼 연타 등). 닫혀 있을 땐 하단 🛠 버튼에 살 수 있음 표시만.
   buildTypeUpgradeBar() {
-    let bar = document.getElementById('type-upgrade-bar');
-    if (!bar) {
-      bar = document.createElement('div');
-      bar.id = 'type-upgrade-bar';
-      document.getElementById('game-screen').appendChild(bar);
+    document.getElementById('type-upgrade-bar')?.remove(); // 옛 상시바 잔재
+    let sheet = document.getElementById('upgrade-sheet');
+    if (!sheet) {
+      sheet = document.createElement('div');
+      sheet.id = 'upgrade-sheet';
+      sheet.innerHTML = `<div class="us-head"><span>🛠 강화 · 상점</span><button class="us-close" aria-label="닫기">✕</button></div>
+        <div class="us-label">타입 강화 <small>해당 타입 타워 전부 · 등급별 고정 데미지 + 6%</small></div>
+        <div class="us-grid us-types"></div>
+        <div class="us-label">상점 <small>웨이브마다 사용 횟수 초기화</small></div>
+        <div class="us-grid us-shop"></div>`;
+      sheet.querySelector('.us-close').onclick = () => this.toggleUpgradeSheet(false);
+      document.getElementById('game-screen').appendChild(sheet);
     }
-    bar.innerHTML = '';
-    if (!window.TypeUpgrades || !window.TYPES) return;
-
-    // v27-4: 최다 투자 속성 뱃지 계산 (item11) - 레벨이 가장 높은 타입에 표시 (1 이상이고 유일할 때만)
-    let topType = null, topLevel = 0, tieCount = 0;
-    for (const tk in window.TypeUpgrades) {
-      const lv = window.TypeUpgradeLevels?.[tk] || 0;
-      if (lv > topLevel) { topLevel = lv; topType = tk; tieCount = 1; }
-      else if (lv === topLevel && lv > 0) { tieCount++; }
-    }
-    const showBadge = topType && topLevel > 0 && tieCount === 1;
-
+    if (!window.TypeUpgrades || !window.TYPES || !this.engine) return;
+    const grid = sheet.querySelector('.us-types');
+    grid.innerHTML = '';
+    const F = window.TYPE_FLAT_PER_TIER || {};
     for (const typeKey in window.TypeUpgrades) {
       const typeInfo = window.TYPES[typeKey];
-      const maxBaseTiers = window.TypeUpgrades[typeKey].length;
       const level = window.TypeUpgradeLevels?.[typeKey] || 0;
-      // v27-4: 5단계 이후에도 숨기지 않고 무한 반복 강화로 계속 표시
-
       const nextUpg = window.getTypeUpgradeAt(typeKey, level);
-      const dotsStr = level < maxBaseTiers
-        ? '●'.repeat(level) + '○'.repeat(maxBaseTiers-level)
-        : '★'.repeat(Math.min(5, level - maxBaseTiers + 1)); // 5단계 이후는 별로 계속 누적 표시
-      const btn = document.createElement('button');
-      btn.className = 'type-upg-btn';
-      btn.dataset.typeKey = typeKey;
-      btn.style.borderColor = typeInfo.color + '60';
-      btn.style.position = 'relative';
-      if (showBadge && typeKey === topType) {
-        btn.style.boxShadow = `0 0 10px ${typeInfo.color}`;
-      }
-      btn.innerHTML = `
-        ${showBadge && typeKey === topType ? '<span style="position:absolute;top:-6px;right:-4px;font-size:11px;">👑</span>' : ''}
-        <span>${typeInfo.emoji}</span>
-        <span style="font-size:9px;color:${typeInfo.color}">${typeInfo.name}</span>
-        <span style="font-size:8px;color:#ffd60a">💰${nextUpg.cost}</span>
-        <span style="font-size:7px;color:#888">${dotsStr}</span>
-      `;
-      // v28: 등급별 절대값 + % 구조 안내
-      const F = window.TYPE_FLAT_PER_TIER || {};
       const k = nextUpg.flat || 0;
-      const buffLabel = '데미지';
-      const valStr = `노말+${F.normal*k} 레어+${F.rare*k} 에픽+${F.epic*k} 레전드+${F.legend*k}${nextUpg.val ? ` (+${Math.round(nextUpg.val*100)}%)` : ''}`;
-      btn.title = (showBadge && typeKey === topType ? '👑 가장 많이 투자한 속성\n' : '') + `${nextUpg.label}: 💰${nextUpg.cost} (${buffLabel} ${valStr})`;
+      const fieldCnt = this.engine.towers.filter(t => t.def?.type === typeKey).length;
+      const btn = document.createElement('button');
+      btn.className = 'us-card';
+      btn.style.setProperty('--c', typeInfo.color);
+      btn.disabled = this.engine.gold < nextUpg.cost;
+      btn.innerHTML = `<b>${typeInfo.emoji} ${typeInfo.name} <span class="us-lv">Lv${level}</span></b>
+        <span class="us-desc">노말+${F.normal*k} · 에픽+${F.epic*k} · +${Math.round((nextUpg.val||0)*100)}%</span>
+        <span class="us-meta">필드 ${fieldCnt}마리</span>
+        <span class="us-cost">💰${nextUpg.cost}</span>`;
+      btn.title = `${nextUpg.label}: 노말+${F.normal*k} 레어+${F.rare*k} 에픽+${F.epic*k} 레전드+${F.legend*k} (+${Math.round((nextUpg.val||0)*100)}%)`;
       btn.addEventListener('click', () => {
-        if (!this.engine) return;
         if (window.applyTypeUpgrade(typeKey, this.engine)) {
           if (!this.missionTracker.stats.typeUpgrades) this.missionTracker.stats.typeUpgrades = {};
           this.missionTracker.stats.typeUpgrades[typeKey] = (this.missionTracker.stats.typeUpgrades[typeKey]||0) + 1;
           this.missionTracker.check();
           this.SFX.play('buy');
-          this.buildTypeUpgradeBar(); // 갱신
-        } else {
-          this.showWaveAnnounce('골드 부족!', '#ff6b6b');
-        }
+          this.buildTypeUpgradeBar();
+        } else this.showWaveAnnounce('골드 부족!', '#ff6b6b');
       });
-      bar.appendChild(btn);
+      grid.appendChild(btn);
     }
-    this.buildShopBar(); // v27 fix: 상점을 별도줄 대신 타입강화바 같은 줄 옆에 이어붙임
+    this.buildShopBar();
+  },
+
+  toggleUpgradeSheet(open) {
+    const sheet = document.getElementById('upgrade-sheet');
+    if (!sheet) return;
+    const on = open === undefined ? !sheet.classList.contains('open') : open;
+    sheet.classList.toggle('open', on);
+    document.querySelector('.upg-open-btn')?.classList.toggle('active', on);
+    if (on) this.buildTypeUpgradeBar();
+  },
+
+  // 닫혀 있을 때도 '지금 살 수 있는 강화가 있다'는 점만 하단 버튼에 표시 (DOM 재생성 없이 가볍게)
+  _refreshUpgradeDot() {
+    const btn = document.querySelector('.upg-open-btn');
+    if (!btn || !this.engine || !window.TypeUpgrades) return;
+    const g = this.engine.gold;
+    const can = Object.keys(window.TypeUpgrades).some(t => g >= window.getTypeUpgradeAt(t, window.TypeUpgradeLevels?.[t] || 0).cost);
+    btn.classList.toggle('has-dot', can);
   },
 
   buildSpellBar() {
@@ -554,7 +557,6 @@ Object.assign(App.prototype, {
     totalRow.style.cssText = 'margin-top:10px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.15);font-size:12px;color:#ccc;';
     totalRow.innerHTML = `
       <div>🏰 총 배치 타워: ${this.engine.towers.length}개</div>
-      <div>🔗 현재 최고 시너지: +${this.engine._maxSynergySeen || 0}</div>
       <div>🎲 보유 종류: ${this.missionTracker?.stats?.collectedIds?.size || 0}종</div>
     `;
     list.appendChild(totalRow);
@@ -707,52 +709,141 @@ Object.assign(App.prototype, {
   },
 
   buildShopBar() {
-    // v27 fix: 별도 줄(#shop-bar) 대신 타입강화바(#type-upgrade-bar) 안에 이어붙임
-    const bar = document.getElementById('type-upgrade-bar');
-    if (!bar) return;
-    document.getElementById('shop-bar')?.remove(); // 예전 별도줄 잔재 정리
-    bar.querySelectorAll('.shop-bar-btn, .shop-bar-divider').forEach(b => b.remove());
-    if (!window.ShopItems || !this.engine) return;
+    this._refreshUpgradeDot();
+    const sheet = document.getElementById('upgrade-sheet');
+    // 시트가 닫혀 있으면 다시 그리지 않음 (골드 바뀔 때마다 호출되므로 - 모바일 부하 절약)
+    if (!sheet || !sheet.classList.contains('open') || !window.ShopItems || !this.engine) return;
+    const grid = sheet.querySelector('.us-shop');
+    // 타입강화 카드 활성/비활성만 갱신
+    sheet.querySelectorAll('.us-types .us-card').forEach((c, i) => {
+      const t = Object.keys(window.TypeUpgrades)[i];
+      c.disabled = this.engine.gold < window.getTypeUpgradeAt(t, window.TypeUpgradeLevels?.[t] || 0).cost;
+    });
     if (!this.engine._shopBuyCount) this.engine._shopBuyCount = {};
-    const divider = document.createElement('div');
-    divider.className = 'shop-bar-divider';
-    divider.style.cssText = 'flex:0 0 auto;width:1px;align-self:stretch;background:rgba(255,255,255,0.15);margin:4px 2px;';
-    bar.appendChild(divider);
+    grid.innerHTML = '';
     for (const item of window.ShopItems) {
       const cost = window.shopItemCost(item, this.engine);
       const waveUses = (this.engine._shopWaveUses || {})[item.key] || 0;
       const used = (item.oneTime && this.engine._oneTimeUsed?.[item.key]) || (item.perWave && waveUses >= item.perWave);
+      const left = item.perWave ? `${item.perWave - waveUses}/${item.perWave}회` : item.oneTime ? '1회' : '';
       const btn = document.createElement('button');
-      btn.className = 'shop-bar-btn';
+      btn.className = 'us-card shop';
       btn.disabled = used || this.engine.gold < cost;
-      btn.innerHTML = used
-        ? `<span style="opacity:0.4">${item.emoji}</span><span style="font-size:8px;color:#888">사용완료</span>`
-        : `<span>${item.emoji}</span><span style="font-size:8px;color:#ffd60a">💰${cost}</span>`;
-      btn.title = used ? `${item.name}: ${item.perWave ? '이번 웨이브 사용 완료' : '이미 사용함 (게임당 1회)'}` : `${item.name}: ${item.desc}`;
+      btn.innerHTML = `<b>${item.emoji} ${item.name}</b><span class="us-desc">${item.desc}</span>
+        <span class="us-meta">${used ? '사용 완료' : left}</span><span class="us-cost">💰${cost}</span>`;
       btn.addEventListener('click', () => {
         if (used) return;
-        if (!this.engine.spendGold(cost)) {
-          this.showWaveAnnounce('골드가 부족합니다', '#ff6b6b');
-          return;
-        }
+        if (!this.engine.spendGold(cost)) { this.showWaveAnnounce('골드가 부족합니다', '#ff6b6b'); return; }
         const result = item.buy(this.engine);
-        if (result === false) {
-          // 구매 취소 조건(예: 대상 없음) - 골드 환불
-          this.engine.addGold(cost);
-          return;
-        }
+        if (result === false) { this.engine.addGold(cost); return; } // 대상 없음 등 → 환불
         if (item.scaling) this.engine._shopBuyCount[item.key] = (this.engine._shopBuyCount[item.key] || 0) + 1;
         if (item.perWave) { if (!this.engine._shopWaveUses) this.engine._shopWaveUses = {}; this.engine._shopWaveUses[item.key] = (this.engine._shopWaveUses[item.key] || 0) + 1; }
-        if (item.oneTime) {
-          if (!this.engine._oneTimeUsed) this.engine._oneTimeUsed = {};
-          this.engine._oneTimeUsed[item.key] = true;
-        }
+        if (item.oneTime) { if (!this.engine._oneTimeUsed) this.engine._oneTimeUsed = {}; this.engine._oneTimeUsed[item.key] = true; }
         this.SFX.play('buy');
         this.showWaveAnnounce(`${item.emoji} ${item.name} 사용!`, '#06d6a0');
         this.buildShopBar();
       });
-      bar.appendChild(btn);
+      grid.appendChild(btn);
     }
+  },
+
+  // ===== v28 세션E: 결과 공유 카드 (1080×1350, 인스타 4:5) =====
+  async buildShareCard() {
+    const e = this.engine;
+    const W = 1080, H = 1350;
+    const c = document.createElement('canvas'); c.width = W; c.height = H;
+    const g = c.getContext('2d');
+    const loadImg = (src) => new Promise(res => {
+      if (!src) return res(null);
+      const im = new Image(); const to = setTimeout(() => res(null), 2500);
+      im.onload = () => { clearTimeout(to); res(im); }; im.onerror = () => { clearTimeout(to); res(null); };
+      im.src = src;
+    });
+    const rr = (x, y, w, h, r) => { g.beginPath(); g.roundRect ? g.roundRect(x, y, w, h, r) : g.rect(x, y, w, h); };
+    const font = (px, w = 800) => `${w} ${px}px "Noto Sans KR", -apple-system, sans-serif`;
+    const GR = window.GRADES, ORDER = ['unique','legend','epic','rare','normal'];
+
+    // 배경
+    const bg = g.createLinearGradient(0, 0, W, H);
+    bg.addColorStop(0, '#0b1230'); bg.addColorStop(0.55, '#1a0f3a'); bg.addColorStop(1, '#06121c');
+    g.fillStyle = bg; g.fillRect(0, 0, W, H);
+    for (let i = 0; i < 70; i++) { // 별 (고정 시드)
+      const x = (i * 397) % W, y = (i * 613) % H, r = (i % 3) + 1;
+      g.fillStyle = `rgba(255,255,255,${0.08 + (i % 5) * 0.04})`; g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill();
+    }
+    const glow = g.createRadialGradient(W / 2, 430, 40, W / 2, 430, 520);
+    glow.addColorStop(0, 'rgba(255,214,10,0.22)'); glow.addColorStop(1, 'rgba(255,214,10,0)');
+    g.fillStyle = glow; g.fillRect(0, 0, W, H);
+
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillStyle = '#ffd60a'; g.font = font(44, 900); g.fillText('POKÉMON TD', W / 2, 90);
+    g.fillStyle = 'rgba(255,255,255,0.55)'; g.font = font(28, 700);
+    const d = new Date(); g.fillText(`${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()} · 엔드리스`, W / 2, 140);
+
+    // 웨이브 (메인 숫자)
+    g.fillStyle = '#fff'; g.font = font(250, 900); g.fillText(String(e.currentWave), W / 2, 360);
+    g.fillStyle = '#4cc9f0'; g.font = font(48, 900); g.fillText('WAVE', W / 2, 510);
+    g.fillStyle = 'rgba(255,255,255,0.85)'; g.font = font(40, 800);
+    g.fillText(`🏅 ${(e.score || 0).toLocaleString()}점`, W / 2, 580);
+
+    // 영웅 + MVP 카드
+    const hero = e.heroes && e.heroes[0];
+    const heroId = hero ? (hero.evolved || hero.id) : (this.starterHero || 'pikachu');
+    const heroName = hero ? ((hero.evolved && hero.def.evolution?.options.find(o => o.id === hero.evolved)?.name) || hero.def.name) : heroId;
+    const stats = e._towerDamageStats || {};
+    const mvpId = Object.keys(stats).sort((a, b) => stats[b] - stats[a])[0];
+    const mvp = mvpId && window.GachaTowerDefs[mvpId];
+    const [heroImg, mvpImg] = await Promise.all([
+      loadImg(`assets/heroes/${heroId}.png`), loadImg(mvp && window.TowerSpriteImages[mvp.id]),
+    ]);
+    const card = (x, label, name, img, emoji, color) => {
+      rr(x, 640, 440, 250, 34); g.fillStyle = 'rgba(255,255,255,0.07)'; g.fill();
+      g.lineWidth = 3; g.strokeStyle = color; g.stroke();
+      g.textAlign = 'left'; g.fillStyle = color; g.font = font(28, 800); g.fillText(label, x + 32, 690);
+      g.fillStyle = '#fff'; g.font = font(42, 900); g.fillText(name, x + 32, 760, 230);
+      if (img) g.drawImage(img, x + 270, 680, 150, 150);
+      else { g.textAlign = 'center'; g.font = font(110, 400); g.fillText(emoji, x + 345, 760); }
+      g.textAlign = 'center';
+    };
+    card(80, '영웅', heroName, heroImg, '⚡', '#ffd60a');
+    card(560, 'MVP', mvp ? mvp.name : '-', mvpImg, mvp ? mvp.emoji : '❔', mvp ? GR[mvp.grade].color : '#888');
+
+    // 덱 6마리 (필드에서 등급 높은 순, 같은 종 1번만)
+    const seen = new Set();
+    const deck = e.towers.map(t => t.def).filter(df => df && !seen.has(df.id) && seen.add(df.id))
+      .sort((a, b) => ORDER.indexOf(a.grade) - ORDER.indexOf(b.grade) || (stats[b.id] || 0) - (stats[a.id] || 0)).slice(0, 6);
+    g.fillStyle = 'rgba(255,255,255,0.7)'; g.font = font(30, 800); g.fillText('나의 덱', W / 2, 950);
+    const imgs = await Promise.all(deck.map(df => loadImg(window.TowerSpriteImages[df.id])));
+    const cw = 150, gap = 22, startX = (W - (cw * 6 + gap * 5)) / 2;
+    for (let i = 0; i < 6; i++) {
+      const x = startX + i * (cw + gap), y = 990, df = deck[i];
+      rr(x, y, cw, 190, 26); g.fillStyle = 'rgba(255,255,255,0.06)'; g.fill();
+      if (!df) continue;
+      g.lineWidth = 3; g.strokeStyle = GR[df.grade].color; g.stroke();
+      if (imgs[i]) g.drawImage(imgs[i], x + 15, y + 12, 120, 120);
+      else { g.font = font(80, 400); g.fillStyle = '#fff'; g.fillText(df.emoji, x + cw / 2, y + 72); }
+      g.fillStyle = GR[df.grade].color; g.font = font(26, 800); g.fillText(df.name, x + cw / 2, y + 160, cw - 12);
+    }
+    g.fillStyle = 'rgba(255,255,255,0.4)'; g.font = font(26, 700);
+    g.fillText('sonmn88-bot.github.io/pokemon-td', W / 2, 1290);
+    return c;
+  },
+
+  async shareResultCard(btn) {
+    const label = btn?.textContent;
+    if (btn) { btn.disabled = true; btn.textContent = '카드 만드는 중...'; }
+    try {
+      const canvas = await this.buildShareCard();
+      const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
+      const file = new File([blob], `pokemontd-wave${this.engine.currentWave}.png`, { type: 'image/png' });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: '포켓몬TD', text: `웨이브 ${this.engine.currentWave} 도달!` }).catch(() => {});
+      } else { // 공유 미지원(PC 등) → 이미지 저장
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = file.name;
+        document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+      }
+    } catch (err) { console.warn('share card', err); this.showWaveAnnounce('카드 생성 실패', '#ff6b6b'); }
+    if (btn) { btn.disabled = false; btn.textContent = label; }
   },
 
   buildBossSummonButton() {
@@ -760,7 +851,7 @@ Object.assign(App.prototype, {
     if (bar) bar.remove();
     bar = document.createElement('div');
     bar.id = 'boss-summon-bar';
-    bar.style.cssText = 'position:absolute;left:8px;bottom:calc(var(--bar-h,82px) + 100px);z-index:19;display:flex;flex-direction:column;gap:3px;background:rgba(20,5,5,0.75);border-radius:10px;padding:5px;border:1px solid rgba(255,60,60,0.3);';
+    bar.style.cssText = 'position:absolute;left:8px;bottom:calc(var(--bar-h,82px) + 12px);z-index:19;display:flex;flex-direction:column;gap:3px;background:rgba(20,5,5,0.75);border-radius:10px;padding:5px;border:1px solid rgba(255,60,60,0.3);';
     document.getElementById('game-screen').appendChild(bar);
 
     if (this._bossSummonTier == null) this._bossSummonTier = 1;

@@ -434,11 +434,12 @@ class App {
       { key:'swarm',      name:'👾 몬스터 창궐', desc:'몹 물량 +25%, 대신 체력 -12%' },
       { key:'eliteEra',   name:'⚔️ 정예의 시대', desc:'엘리트 몬스터 등장 확률 2배' },
       { key:'headStart',  name:'🚀 빠른 출발',   desc:'시작 골드 +200' },
-      { key:'masteryBoost',name:'⭐ 숙련의 축복', desc:'숙련도 상승 효과 2배' },
+      { key:'luckyStart', name:'🍀 행운의 시작', desc:'행운의 동전 1개 지급 (랜덤 합성 2택)' },
     ];
     const trait = traits[Math.floor(Math.random() * traits.length)];
     this.engine._runTrait = trait;
     if (trait.key === 'headStart') this.engine.addGold(200);
+    if (trait.key === 'luckyStart') this.engine._luckyCoins = (this.engine._luckyCoins || 0) + 1;
     this._runTraitInfo = trait;
     const badge = document.getElementById('hud-trait');
     if (badge) { badge.title = `${trait.name} — ${trait.desc}`; badge.textContent = trait.name.split(' ')[0]; }
@@ -555,6 +556,7 @@ class App {
       // 입력창/오버레이가 떠 있으면 무시
       if (document.querySelector('.shop-overlay, .skilltree-overlay, .tenpull-overlay, .mission-overlay, .end-overlay')) return;
       const k = e.key.toLowerCase();
+      if (k === 'u') { e.preventDefault(); this.toggleUpgradeSheet(); return; } // v28 세션E: 강화 시트
 
       // 1~4: 선택된 슬롯에 즉시 뽑기
       if (['1','2','3','4'].includes(k)) {
@@ -723,12 +725,6 @@ class App {
           if (r.grade === 'unique')
             this.missionTracker.stats.totalUniqueCount++;
           this.missionTracker.stats.collectedIds.add(r.id);
-          if (!this.engine._masteryLevel) this.engine._masteryLevel = {};
-          this.engine._masteryLevel[r.id] = (this.engine._masteryLevel[r.id] || 0) + (this.engine._runTrait?.key === 'masteryBoost' ? 2 : 1); // v27-5/18: 숙련도 (item2, 시드특성 반영)
-          const newMastery = 1 + Math.min(20, this.engine._masteryLevel[r.id]) * 0.02;
-          for (const s of this.engine.towerSlots) {
-            if (s.occupied && s.tower?._gachaId === r.id) s.tower.masteryMul = newMastery;
-          }
         }
         this.missionTracker.check();
       }
@@ -790,12 +786,6 @@ class App {
         this.missionTracker.stats.totalUniqueCount++;
       if (pullKey === 'gamble') this.missionTracker.stats.gambleCount++;
       this.missionTracker.stats.collectedIds.add(towerDef.id); // v27-5: 전체모으기 미션용
-      if (!this.engine._masteryLevel) this.engine._masteryLevel = {};
-      this.engine._masteryLevel[towerDef.id] = (this.engine._masteryLevel[towerDef.id] || 0) + (this.engine._runTrait?.key === 'masteryBoost' ? 2 : 1); // v27-5/18: 숙련도 (item2, 시드특성 반영)
-      const newMastery = 1 + Math.min(20, this.engine._masteryLevel[towerDef.id]) * 0.02;
-      for (const s of this.engine.towerSlots) {
-        if (s.occupied && s.tower?._gachaId === towerDef.id) s.tower.masteryMul = newMastery;
-      }
       this.missionTracker.check();
     }
 
@@ -1200,8 +1190,8 @@ class App {
       if (this.engine.state === 'wave' && this.els.btnWave) {
         const backlog = this.engine.spawnQueue ? this.engine.spawnQueue.length : 0;
         this.els.btnWave.textContent = backlog > 0
-          ? `⏭ 스킵 (미처리 ${backlog}마리 밀림)`
-          : '⏭ 스킵 (남은 적 놔두고 진행)';
+          ? `⏭ 스킵 · 대기 ${backlog}`
+          : '⏭ 다음 웨이브';
       }
       // v27-6: 필드 위험 비네트 (요청2, 절제된 연출)
       if (this.engine.endless) {
@@ -1218,21 +1208,18 @@ class App {
           const cnt = this.engine.enemies.length;
           fcEl.textContent = cnt;
           const cell = document.getElementById('hud-field');
-          if (cell) cell.style.color = cnt >= 160 ? '#ff5252' : cnt >= 120 ? '#ffab40' : cnt >= 80 ? '#ffd60a' : '';
+          const col = cnt >= 160 ? '#ff5252' : cnt >= 120 ? '#ffab40' : cnt >= 80 ? '#ffd60a' : '#06d6a0';
+          if (cell) cell.style.color = cnt >= 80 ? col : '';
+          const gauge = document.getElementById('field-gauge'); // v28 세션E: 0~200 진행바
+          if (gauge) { gauge.style.width = Math.min(100, cnt / 2) + '%'; gauge.style.background = col; }
         }
       }
       // v27-24: 황금 시간 이벤트 완전 제거함 (요청 - 게임을 시작도 안 했는데 idle 상태에서 계속 발동돼서
       // 가만히 놔둬도 골드가 쌓이는 심각한 문제가 있었음. 아예 매커니즘 삭제.
       // v27-36: 미니 현상금 이벤트 완전 제거함 (요청 - 금방 잡히는데 돈만 많이 줘서 경제에 안 좋았음)
-      // v27-6: 최고 시너지 달성치 추적 (요청4 - 게임오버 요약화면 MVP용)
-      if (this.engine.towers.length) {
-        const maxSyn = this.engine.towers.reduce((m,t)=>Math.max(m,t.synergyBonus||0), 0);
-        this.engine._maxSynergySeen = Math.max(this.engine._maxSynergySeen||0, maxSyn);
-      }
       // v27-5: 초반 유도미션용 트래킹 (요청C)
       if (this.missionTracker) {
         if (this.engine.currentWave <= 3 && this.engine.towers.length >= 6) this.missionTracker.stats.earlyDeploy4 = true;
-        if (this.engine.towers.some(t => (t.synergyBonus||0) > 0)) this.missionTracker.stats.firstSynergy = true;
       }
       // 웨이브 진행 중 타이머 + 남은 적 표시
       if (this.engine.state === 'wave') {
@@ -1789,14 +1776,12 @@ class App {
       for (const id in dmgStats) { if (dmgStats[id] > mvpDmg) { mvpDmg = dmgStats[id]; mvpId = id; } }
       const mvpDef = mvpId && window.GachaTowerDefs?.[mvpId];
       const varietyCount = this.missionTracker?.stats?.collectedIds?.size || 0;
-      const maxSynergy = this.engine._maxSynergySeen || 0;
       // v27-18: 사망 서사 (요청F)
       const dc = this.engine._deathCause;
       const deathLine = dc ? `<div style="color:#ff6b6b;font-style:italic;margin-top:4px">💀 ${dc.name} ${dc.count}마리에게 둘러싸여 무너졌습니다</div>` : '';
       summary.innerHTML = `
         <div style="color:#ffd60a;font-weight:700;margin-bottom:4px;">📊 이번 판 요약</div>
         <div>⭐ MVP 타워: ${mvpDef ? `${mvpDef.emoji} ${mvpDef.name}` : '-'}</div>
-        <div>🔗 최고 시너지: +${maxSynergy}</div>
         <div>🎲 사용한 포켓몬 종류: ${varietyCount}종</div>
         <div>🏅 최종 점수: ${(this.engine.score||0).toLocaleString()}</div>
         ${deathLine}
@@ -1847,6 +1832,14 @@ class App {
       }
     }
 
+    // v28 세션E: 인스타 4:5 결과 카드 공유
+    const shareBtn = document.createElement('button');
+    shareBtn.className = 'end-btn';
+    shareBtn.style.cssText = 'background:linear-gradient(135deg,#c084fc,#4cc9f0);margin-bottom:8px;';
+    shareBtn.textContent = '📸 결과 카드 공유';
+    shareBtn.addEventListener('click', () => this.shareResultCard(shareBtn));
+    overlay.appendChild(shareBtn);
+
     const retryBtn = document.createElement('button');
     retryBtn.className = 'end-btn';
     retryBtn.style.cssText = 'background:linear-gradient(135deg,#ff9800,#ff5722);margin-bottom:8px;';
@@ -1872,6 +1865,9 @@ class App {
     if (this._resizeDebounceTimer) { clearTimeout(this._resizeDebounceTimer); this._resizeDebounceTimer = null; } // v27-26: 안 쓰는 타이머 정리
     this.BGM.stop();
     if (this.engine) { this.engine.stop(); this.engine = null; }
+    this.els.btnMenu.textContent = '⏸';
+    document.getElementById('upgrade-sheet')?.classList.remove('open');
+    document.querySelector('.upg-open-btn')?.classList.remove('active');
     // 배속 초기화
     document.querySelectorAll('.speed-btn').forEach(b => b.classList.toggle('active', b.dataset.speed === '1'));
     document.querySelectorAll('.gacha-btn').forEach(b => b.classList.remove('slot-ready'));
@@ -1882,7 +1878,7 @@ class App {
     const ctx = this.els.canvas.getContext('2d');
     ctx.clearRect(0, 0, this.els.canvas.width, this.els.canvas.height);
 
-    document.querySelectorAll('.end-overlay,.wave-announce,.shop-overlay,.skin-picker,.skilltree-overlay,.mission-overlay,.synergy-overlay,.power-overlay,#field-warning-banner,#field-danger-vignette,#wave-preview').forEach(el => el.remove());
+    document.querySelectorAll('.end-overlay,.pause-overlay,.wave-announce,.shop-overlay,.skin-picker,.skilltree-overlay,.mission-overlay,.synergy-overlay,.power-overlay,#field-warning-banner,#field-danger-vignette,#wave-preview').forEach(el => el.remove());
     const shopBar = document.getElementById('shop-bar');
     if (shopBar) shopBar.innerHTML = '';
     const bossBtn = document.getElementById('boss-summon-bar');
@@ -1911,10 +1907,19 @@ class App {
       this.engine.state = 'paused';
       this.engine.stop();
       this.els.btnMenu.textContent = '▶';
+      // v28 세션E: 일시정지 메뉴 (웨이브 버튼과 겹치던 '← 맵' 버튼을 여기로 옮김)
+      const ov = document.createElement('div');
+      ov.className = 'pause-overlay';
+      ov.innerHTML = `<div class="po-card"><div class="po-title">⏸ 일시정지</div>
+        <button class="po-btn go">▶ 계속하기</button><button class="po-btn quit">🏠 타이틀로</button></div>`;
+      ov.querySelector('.go').onclick = () => this.togglePause();
+      ov.querySelector('.quit').onclick = () => { if (confirm('타이틀로 돌아가시겠습니까? 진행 중인 게임은 저장되지 않습니다.')) { ov.remove(); this.backToMapSelect(); } };
+      document.getElementById('game-screen').appendChild(ov);
     } else if (this.engine.state === 'paused') {
       this.engine.state = this._pausedFromState || 'wave';
       this.engine.start();
-      this.els.btnMenu.textContent = '☰';
+      this.els.btnMenu.textContent = '⏸';
+      document.querySelector('.pause-overlay')?.remove();
     }
   }
 }
