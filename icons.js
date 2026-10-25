@@ -1,4 +1,4 @@
-// ===== ICONS.JS - v3.0 자체 제작 SVG 아이콘 세트 (이모지 대체) =====
+// ===== ICONS.JS - v3.1 아이콘 (게임 아이콘 PNG + 조작 버튼 벡터) =====
 // 스타일: 둥근 배지 + 흰 심볼(타입), 2톤 플랫 심볼(UI). 모두 24×24 viewBox, 외부 파일 없음.
 // 사용: ICON('fire')  → <svg class="ic"> 문자열 (DOM용)
 //       ICON_IMG('fire') → Image (캔버스용, 로드 후 사용)
@@ -50,21 +50,25 @@ const _IC = {
 const _IC_TYPE = { fire:['#ff8a3d','#e8481e'], water:['#5cb8ff','#2a7de1'], grass:['#6fd27a','#2f9a4a'],
   electric:['#ffd84a','#f0a800'], psychic:['#e083c8','#9c4dcc'], normal:['#c3c8d2','#8a919e'] };
 
+// v3.1: 게임 아이콘은 tools/icon-src.js 원본을 구운 PNG(assets/icons) 사용 - 재질감·광원 표현.
+//       일시정지·나침반 같은 조작 버튼만 위의 벡터 글리프 그대로.
+const _IC_PNG = new Set(['bag','build','candy','capsule','capsuleBlue','capsules','coin','dice','disc','dumbbell','electric','fire','flask','grass',
+  'luckycoin','medal','monster','net','normal','psychic','sell','swirl','timer','upgrade','water','wave','web']);
+
 function ICON(name, size = 20, extra = '') {
+  if (_IC_PNG.has(name)) return `<img class="ic ic-${name}" ${extra} src="assets/icons/${name}.png" width="${size}" height="${size}" alt="" draggable="false">`;
   const body = _IC[name];
   if (!body) return '';
-  const t = _IC_TYPE[name];
-  const badge = t ? `<defs><linearGradient id="g_${name}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${t[0]}"/><stop offset="1" stop-color="${t[1]}"/></linearGradient></defs><circle cx="12" cy="12" r="11.4" fill="url(#g_${name})"/><g transform="translate(2.4 2.4) scale(.8)">${body}</g>` : body;
-  return `<svg class="ic ic-${name}" ${extra} width="${size}" height="${size}" viewBox="0 0 24 24" aria-hidden="true">${badge}</svg>`;
+  return `<svg class="ic ic-${name}" ${extra} width="${size}" height="${size}" viewBox="0 0 24 24" aria-hidden="true">${body}</svg>`;
 }
 
-// 캔버스용 이미지 캐시 (SVG → Image)
+// 캔버스용 이미지 캐시
 const _IC_IMG = {};
 function ICON_IMG(name) {
   if (_IC_IMG[name]) return _IC_IMG[name];
-  const svg = ICON(name, 64).replace('<svg ', '<svg xmlns="http://www.w3.org/2000/svg" ');
   const im = new Image();
-  im.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+  if (_IC_PNG.has(name)) im.src = `assets/icons/${name}.png`;
+  else im.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(ICON(name, 64).replace('<svg ', '<svg xmlns="http://www.w3.org/2000/svg" '));
   return (_IC_IMG[name] = im);
 }
 
