@@ -66,19 +66,13 @@ Object.assign(App.prototype, {
       const btn = document.createElement('button');
       btn.className = 'tower-btn hero-btn';
       btn.dataset.heroKey = heroId;
-      const skinId = this.selectedHeroSkins[heroId];
-      const skin = window.SkinDefs[heroId][skinId];
       btn.innerHTML = `
-        <span class="tower-btn-emoji">${skin.emoji}</span>
+        <span class="tower-btn-emoji"><img class="pk" src="assets/heroes/${heroId}.png" width="30" height="30" alt=""></span>
         <span class="tower-btn-name">${def.name}</span>
-        <span class="tower-btn-cost">👆이동 🎨스킨</span>
+        <span class="tower-btn-cost">👆 이동</span>
       `;
       btn.title = def.passive;
       btn.addEventListener('click', () => this.selectHeroToPlace(heroId, btn));
-      btn.addEventListener('contextmenu', (e) => { e.preventDefault(); this.openSkinPicker(heroId); });
-      let pressTimer;
-      btn.addEventListener('touchstart', () => { pressTimer = setTimeout(() => this.openSkinPicker(heroId), 500); });
-      btn.addEventListener('touchend', () => clearTimeout(pressTimer));
       scroll.appendChild(btn);
     }
 

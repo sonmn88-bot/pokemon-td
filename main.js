@@ -466,14 +466,15 @@ class App {
     overlay.innerHTML = `
       <div class="skin-picker-title">❓ 게임 방법</div>
       <div style="max-width:420px;text-align:left;color:#ddd;font-size:13px;line-height:1.9;padding:0 16px;max-height:60vh;overflow-y:auto;">
-        <b style="color:#ffc24b">🎯 목표</b> — 라이프가 아니라 <b>필드에 쌓이는 몬스터 수(200마리)</b>로 게임오버가 결정됩니다. 최대한 오래 버티세요.<br><br>
-        <b style="color:#ffc24b">🎰 뽑기</b> — 골드로 타워를 뽑아 빈 슬롯에 배치하세요. 등급이 높을수록 강합니다.<br><br>
-        <b style="color:#ffc24b">🧬 합체</b> — 같은 타워 3개를 모으면 상위 등급으로 합쳐집니다 (🔗 버튼에서 전체 레시피 확인 가능).<br><br>
-        <b style="color:#ffc24b">🔗 시너지</b> — 같은 타입이나 궁합 좋은 타입끼리 150px 이내에 배치하면 데미지가 오릅니다.<br><br>
-        <b style="color:#ffc24b">⭐ 숙련도</b> — 같은 포켓몬을 중복으로 뽑기만 해도 그 포켓몬 전용 데미지가 조금씩 오릅니다.<br><br>
-        <b style="color:#ffc24b">🔥 타입강화</b> — 화면 하단 바에서 타입별로 영구 강화를 살 수 있습니다.<br><br>
-        <b style="color:#ffc24b">👑 왕</b> — 90웨이브에 강력한 왕이 등장합니다. 처치하면 그 자리에서 무한히 강해지는 몹들과 계속 싸우게 됩니다.<br><br>
-        <b style="color:#ffc24b">🎯 미션 / 📖 도감</b> — 상단 버튼에서 확인 가능, 완료시 골드 보상.
+        <b style="color:#ffc24b">🎯 목표</b> — 필드에 몬스터가 <b>200마리</b> 쌓이면 끝. 웨이브를 최대한 오래 버티세요. 웨이브는 끝이 없어요.<br><br>
+        <b style="color:#ffc24b">🎰 뽑기</b> — 하단 캡슐 버튼으로 포켓몬을 뽑아요. 빈 자리를 먼저 누르고 뽑으면 바로 배치, 아니면 보관함으로 가요. 일반(1성) · 프리미엄(1~3성) · 도박(2~5성) · 10연.<br><br>
+        <b style="color:#ffc24b">🧪 합성</b> — 플라스크 버튼. 같은 등급 아무거나 3마리 → 다음 등급 랜덤, 같은 포켓몬 3마리 → 진화가 확정. <b>⚡⚡ 한 번에 전부</b>를 누르면 보관함의 그 등급을 전부 합성해요(배치된 타워는 그대로).<br><br>
+        <b style="color:#ffc24b">💗 유니크</b> — 뮤 = 서로 다른 레전드 3마리, 뮤츠 = 뮤 + 레전드 2마리 + 2000골드. 합성 연구소 위쪽 레시피에서 만들어요.<br><br>
+        <b style="color:#ffc24b">⬆ 강화 · 상점</b> — 하단 화살표 버튼. 타입 강화는 그 타입 타워 전부(등급별 고정 데미지 + 6%), 상점은 몬스터볼·대피시키기 같은 긴급 아이템이에요. 열어둔 채로 플레이할 수 있어요.<br><br>
+        <b style="color:#ffc24b">💰 골드</b> — 처치 골드 + 웨이브 클리어 보너스 + <b>이자</b>(10골드당 1, 최대 30). 모아두면 이자가 붙어요.<br><br>
+        <b style="color:#ffc24b">⚡ 영웅</b> — 맵에 놓고 길 근처로 옮겨요. 레벨이 오르면 스킬 포인트로 스킬트리를 찍어요(영웅을 누르면 열림).<br><br>
+        <b style="color:#ffc24b">👹 보스</b> — 왼쪽 아래에서 직접 소환하면 큰 보상. 30웨이브마다 구역이 바뀌고 전설 보스가, 90웨이브엔 왕 루기아가 나와요.<br><br>
+        <b style="color:#ffc24b">💿 기술머신</b> — 에픽·레전드 타워를 누르면 1500골드에 특성 1개를 배울 수 있어요(타워당 1번).
       </div>
     `;
     const closeBtn = document.createElement('button');
@@ -1172,7 +1173,9 @@ class App {
         this.updateSpellBarUI();
         this.updateHeroSkillBarUI();
       }
-      if (this.engine._bossSummonCooldown > 0) this._updateBossSummonUI();
+      // 버그수정: 쿨이 0이 되는 순간에도 한 번 더 갱신해야 '1초 남음'에 멈춰 있지 않음
+      if (this.engine._bossSummonCooldown > 0) { this._bossCdShown = true; this._updateBossSummonUI(); }
+      else if (this._bossCdShown) { this._bossCdShown = false; this._updateBossSummonUI(); }
       // v27-46: 논리 해상도를 고정하는 방식으로 바뀌면서, 이 감시는 "진짜 방향전환"(세로↔가로)일 때만
       // 필요함 - 단순 창 크기 조절은 이제 게임 로직에 영향을 주지 않아야 하므로 의도적으로 무시함.
       this._dimCheckTimer = (this._dimCheckTimer || 0) + this.engine.dt;
@@ -1439,11 +1442,9 @@ class App {
       <div style="font-size:10px;color:#aaa;margin:2px 0">${hero.def.passive || ''}</div>
       ${breakdown}
       <div class="tower-panel-btns">
-        <button class="tp-btn" data-action="skin">🎨 스킨 변경</button>
         <button class="tp-btn" data-action="close">닫기</button>
       </div>
     `;
-    panel.querySelector('[data-action="skin"]').addEventListener('click', () => this.openSkinPicker(hero.id));
     panel.querySelector('[data-action="close"]').addEventListener('click', () => panel.remove());
   }
 

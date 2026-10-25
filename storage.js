@@ -200,6 +200,7 @@ Object.assign(App.prototype, {
         <div class="mg-opts">
           <label><input type="checkbox" data-act="field" ${ui.field ? 'checked' : ''}> 필드 타워도 재료로</label>
           <button class="mg-auto" data-act="auto">⚡ 자동 3개</button>
+          <button class="mg-auto all" data-act="all" ${window.NEXT_GRADE[ui.grade] ? '' : 'disabled'}>⚡⚡ 한 번에 전부</button>
         </div>
         <div class="mg-grid">${cards}</div>
         ${(this.engine._luckyCoins || 0) > 0 ? `<div class="mg-coin">🪙 행운의 동전 ${this.engine._luckyCoins}개 — 다음 랜덤 합성은 2개 중 선택</div>` : ''}
@@ -226,6 +227,37 @@ Object.assign(App.prototype, {
         const triple = Object.values(byId).find(a => a.length >= 3);
         (triple || pool).slice(0, 3).forEach(m => ui.sel.add(m.key));
         render();
+      };
+      // v3.2: 일괄 합성 - 보관함의 이 등급을 3개씩 전부 합성 (같은 종 3개는 확정 진화 우선, 필드 타워는 건드리지 않음)
+      overlay.querySelector('[data-act="all"]').onclick = () => {
+        const grade = ui.grade;
+        if (!window.NEXT_GRADE[grade]) return;
+        const results = [];
+        for (;;) {
+          const pool = this._allMaterials(false).filter(m => m.def.grade === grade);
+          if (pool.length < 3) break;
+          const byId = {}; pool.forEach(m => (byId[m.def.id] = byId[m.def.id] || []).push(m));
+          const triple = Object.values(byId).find(a => a.length >= 3 && window.MERGE_EVOLUTION[a[0].def.id]);
+          const use = (triple || pool).slice(0, 3);
+          this._consumeMaterials(use);
+          let res;
+          if (triple) res = { ...window.GachaTowerDefs[window.getEvolutionId(use[0].def.id)], _starLevel: 1 };
+          else {
+            this._mergeState.jumpChance = this.engine._mergeJumpChance || 0;
+            this._mergeState.pityWeight = this.engine._pityWeight || 1.5;
+            res = window.rollRandomMerge(grade, this._mergeState);
+          }
+          this._addToStorage([res]); this._trackNewTower(res); results.push(res);
+        }
+        if (!results.length) { this.showWaveAnnounce('보관함에 이 등급이 3개 이상 없어요', '#ff5c7a'); return; }
+        this.SFX.play(results.some(d => d.grade === 'legend') ? 'pull_epic' : 'merge');
+        overlay.remove(); this.openMergePanel();
+        const ov = document.createElement('div');
+        ov.className = 'merge-bulk';
+        ov.innerHTML = `<div class="mb-card"><b>⚡ ${results.length}번 합성 완료</b><div class="mb-row">${results.map(d =>
+          `<span style="--gc:${window.GRADES[d.grade].color}">${PKM(d, 40)}<i>${d.name}</i></span>`).join('')}</div><small>탭해서 닫기</small></div>`;
+        ov.onclick = () => ov.remove();
+        document.getElementById('game-screen').appendChild(ov);
       };
       overlay.querySelector('[data-act="random"]').onclick = () => {
         if (!canRandom) return;

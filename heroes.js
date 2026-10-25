@@ -300,7 +300,7 @@ class Hero {
     this.level = 1;
     this.exp = 0;
     this.expToNext = 100;
-    this.skinId = skinId;
+    this.skinId = 'default'; // v3.2: 스킨 시스템 제거 (색만 바꾸는 수준이라 의미가 없었음)
     this._bobPhase = Math.random() * Math.PI * 2; // v27-51: 아이들 모션 위상차
 
     // 스킬 쿨다운
@@ -335,7 +335,10 @@ class Hero {
     if (!a) return 0;
     const burst = (this._burstTimer > 0) ? 1.4 : 1;
     const base = (a.baseDamage + (this.level-1)*a.damagePerLevel) * (1 + this._skillVal('atkDmg', 0) + (this._multiTargetDmgBonus || 0)) * (this._evoDmgMul || 1) * burst;
-    return base * this._typeUpgradeDmgMul();
+    // v3.2: 적 체력이 웨이브마다 지수로 오르니 영웅도 같은 곡선으로 성장 (예전엔 레벨 비례 직선이라 후반에 무의미)
+    const w = window.app?.engine?.currentWave || 0;
+    const waveScale = Math.pow(1.04, Math.max(0, w - 5));
+    return base * this._typeUpgradeDmgMul() * waveScale;
   }
 
   // v27-8: 영웅도 해당 속성의 타입강화 영향을 받도록 추가 (기존엔 전혀 반영 안 되고 있었음)

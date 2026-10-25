@@ -969,7 +969,7 @@ html, body {
   background:rgba(255,255,255,0.04); color:var(--gc); font-size:12px; font-weight:700; cursor:pointer; }
 .mg-tab.on { border-color:var(--gc); background:color-mix(in srgb, var(--gc) 18%, transparent); }
 .mg-tab i { font-style:normal; margin-left:5px; padding:0 6px; border-radius:8px; background:rgba(255,255,255,0.12); color:#fff; font-size:10px; }
-.mg-opts { display:flex; justify-content:space-between; align-items:center; font-size:12px; color:var(--text-mid); }
+.mg-opts { display:flex; flex-wrap:wrap; gap:6px; justify-content:space-between; align-items:center; font-size:12px; color:var(--text-mid); }
 .mg-opts input { accent-color:#a78bfa; vertical-align:middle; }
 .mg-auto { padding:6px 12px; border-radius:10px; border:1px solid rgba(255,194,75,0.45); background:rgba(255,194,75,0.1); color:#ffc24b; font-size:12px; font-weight:700; cursor:pointer; }
 .mg-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(78px,1fr)); gap:8px; align-content:start; min-height:120px; }
@@ -1217,3 +1217,12 @@ button { font-family:var(--font-ui); }
 .tp-btn .ic { vertical-align:-0.2em; margin-right:3px; }
 img.pk { object-fit:contain; vertical-align:middle; filter:drop-shadow(0 2px 3px rgba(0,0,0,0.4)); }
 .si-emoji, .mg-emoji, .mr-emoji, .tp-emoji { display:flex; align-items:center; justify-content:center; line-height:1; }
+/* v3.2 일괄 합성 결과 */
+.mg-auto.all { border-color:rgba(167,139,250,0.55); background:rgba(167,139,250,0.14); color:#d8c8ff; }
+.mg-auto:disabled { opacity:0.35; }
+.merge-bulk { position:absolute; inset:0; z-index:320; display:flex; align-items:center; justify-content:center; background:rgba(8,10,15,0.7); }
+.mb-card { background:var(--bg-panel); border:1px solid var(--border); border-radius:18px; padding:16px; max-width:min(92vw,420px); text-align:center; display:flex; flex-direction:column; gap:10px; }
+.mb-row { display:flex; flex-wrap:wrap; gap:6px; justify-content:center; max-height:50vh; overflow-y:auto; }
+.mb-row span { width:64px; border:1.5px solid var(--gc); border-radius:12px; padding:4px 2px; display:flex; flex-direction:column; align-items:center; font-size:10px; }
+.mb-row i { font-style:normal; margin-top:2px; }
+.mb-card small { color:var(--text-mid); }
