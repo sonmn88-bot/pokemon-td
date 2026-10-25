@@ -229,7 +229,7 @@ class GameEngine {
                     this.projectiles.length === 0 && this.particles.length === 0;
     this._frameSkip = (this._frameSkip || 0) + 1;
     if (!isQuiet || this._frameSkip % 2 === 0) {
-      try { this.draw(); } catch (err) { this._logError('draw', err); try { this.ctx.setTransform(1,0,0,1,0,0); } catch (_) {} }
+      try { this.draw(); } catch (err) { this._logError('draw', err); this._ctxDirty = true; }
     }
     requestAnimationFrame(t=>this.loop(t));
   }
@@ -638,6 +638,8 @@ class GameEngine {
   // ===== DRAW =====
   draw() {
     const ctx = this.ctx;
+    // v3.3: 지난 프레임에 그리기 오류가 있었으면 캔버스 상태(저장 스택·투명도·변환)를 완전히 초기화
+    if (this._ctxDirty) { this._ctxDirty = false; this.canvas.width = this.canvas.width; }
     ctx.save();
     ctx.clearRect(0, 0, this.width, this.height);
     // v27-47: 카메라 변환 (요청A) - 이 시점부터 그리는 모든 것은 "월드 좌표"로 취급되어
@@ -660,7 +662,7 @@ class GameEngine {
     const cx = this.camera.x, cy = this.camera.y;
     const inView = (o) => Math.abs(o.x - cx) <= viewHalfW && Math.abs(o.y - cy) <= viewHalfH;
 
-    const safe = (o) => { ctx.save(); try { o.draw(ctx); } catch (err) { this._logError('draw ' + (o._gachaId || o.typeId || o.constructor.name), err); } ctx.restore(); };
+    const safe = (o) => { ctx.save(); try { o.draw(ctx); } catch (err) { this._logError('draw ' + (o._gachaId || o.typeId || o.constructor.name), err); this._ctxDirty = true; } ctx.restore(); };
     for (const t of this.towers) if (inView(t)) safe(t);
     for (const h of this.heroes) safe(h);
 

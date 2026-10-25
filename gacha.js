@@ -716,7 +716,7 @@ function _createGachaTower(def, x, y, engine) {
       }
       // v27-5: 합체진화 직후 확장 링 연출 (item1 - 영웅 진화처럼 임팩트 있게)
       if(this._evolveGlowTimer>0){
-        const p = 1 - Math.max(0, this._evolveGlowTimer/1.2); // 0→1 진행도
+        const p = Math.min(1, Math.max(0, 1 - this._evolveGlowTimer/1.2)); // 0→1 진행도 (범위 고정 - 음수 반지름 방지)
         ctx.save();
         ctx.globalAlpha = Math.max(0, 1 - p);
         ctx.beginPath(); ctx.arc(this.x,this.y,20+p*40,0,Math.PI*2);

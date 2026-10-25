@@ -280,7 +280,7 @@ Object.assign(App.prototype, {
       const slot = this.engine.towerSlots[slotIdx];
       const nd = { ...GachaTowerDefs[mid], _stack: towerStack(t), _tmTag: t.def._tmTag };
       const nt = window._createGachaTower(nd, slot.x, slot.y, this.engine);
-      nt._evolveGlowTimer = 2;
+      nt._evolveGlowTimer = 1.2; // (2로 넣었던 게 화면 깨짐 원인 - 반지름이 음수가 됐음)
       this.engine.towers = this.engine.towers.filter(x => x !== t); this.engine.towers.push(nt);
       slot.tower = nt; this.engine.selectedTower = nt;
       window.applyTowerSynergies && window.applyTowerSynergies(this.engine.towers);
