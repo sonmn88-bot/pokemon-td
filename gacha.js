@@ -721,7 +721,7 @@ function _createGachaTower(def, x, y, engine) {
         ctx.globalAlpha = Math.max(0, 1 - p);
         ctx.beginPath(); ctx.arc(this.x,this.y,20+p*40,0,Math.PI*2);
         ctx.strokeStyle = grade.color; ctx.lineWidth = 3.5;
-        ctx.shadowColor = grade.color; ctx.shadowBlur = 18; ctx.stroke();
+        ctx.shadowColor = grade.color; ctx.shadowBlur=0; ctx.stroke();
         ctx.beginPath(); ctx.arc(this.x,this.y,12+p*24,0,Math.PI*2);
         ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.globalAlpha = Math.max(0,(1-p)*0.7);
         ctx.stroke();
@@ -732,7 +732,7 @@ function _createGachaTower(def, x, y, engine) {
         ctx.save(); ctx.globalAlpha=Math.min(1,this._typeGlowTimer/1.6);
         ctx.beginPath(); ctx.arc(this.x,this.y,25,0,Math.PI*2);
         ctx.strokeStyle=this._typeGlowColor; ctx.lineWidth=3;
-        ctx.shadowColor=this._typeGlowColor; ctx.shadowBlur=14; ctx.stroke(); ctx.restore();
+        ctx.shadowColor=this._typeGlowColor; ctx.shadowBlur=0; ctx.stroke(); ctx.restore();
       }
       // 발사 플래시
       if(this.fireFlash>0){

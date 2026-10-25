@@ -215,21 +215,31 @@ class GameEngine {
     // v28: 서브스텝 시뮬레이션 (3배속 끊김의 근본수정, v27-62 복구) - 배속을 dt에 한 번에 곱하면
     // 한 프레임에 이동거리가 3배가 되어 뚝뚝 끊겨보임. 최대 1/50초 단위로 잘게 쪼개서 여러 번 실행.
     const total = raw * this.speedMul;
-    const MAX_STEP = 1 / 50;
+    const MAX_STEP = this.enemies.length > 80 ? 1 / 30 : 1 / 50; // v3.3: 적이 많으면 계산 횟수 줄임
     let remaining = total;
     while (remaining > 0.0001) {
       this.dt = Math.min(remaining, MAX_STEP);
       remaining -= this.dt;
       this._isLastSubstep = remaining <= 0.0001; // main.js의 UI 갱신은 마지막 서브스텝에서만
-      this.update();
+      try { this.update(); } catch (err) { this._logError('update', err); break; }
     }
     this.dt = total;
     // 유휴 절전: idle + 필드에 아무것도 없으면 렌더링 절반(≈30fps)
     const isQuiet = this.state === 'idle' && this.enemies.length === 0 &&
                     this.projectiles.length === 0 && this.particles.length === 0;
     this._frameSkip = (this._frameSkip || 0) + 1;
-    if (!isQuiet || this._frameSkip % 2 === 0) this.draw();
+    if (!isQuiet || this._frameSkip % 2 === 0) {
+      try { this.draw(); } catch (err) { this._logError('draw', err); try { this.ctx.setTransform(1,0,0,1,0,0); } catch (_) {} }
+    }
     requestAnimationFrame(t=>this.loop(t));
+  }
+
+  // v3.3: 오류가 나도 게임 루프가 멈추지 않게 기록만 하고 계속 진행 (예전엔 한 번 오류로 화면이 얼어붙었음)
+  _logError(where, err) {
+    this._errCount = (this._errCount || 0) + 1;
+    const msg = `${where}: ${err && err.message}`;
+    if (!this._errLog) this._errLog = [];
+    if (this._errLog.length < 8 && !this._errLog.includes(msg)) { this._errLog.push(msg); console.error('[게임 오류]', msg, err && err.stack); }
   }
 
   update() {
@@ -257,7 +267,8 @@ class GameEngine {
     // 적 이동 (순환 트랙 - 더 이상 '도착'으로 라이프를 잃지 않음, 시간 내 처치해야 함)
     for (let i = this.enemies.length - 1; i >= 0; i--) {
       const e = this.enemies[i];
-      e.update(this.dt);
+      try { e.update(this.dt); if (!isFinite(e.x) || !isFinite(e.y) || !isFinite(e.hp)) throw new Error('비정상 좌표/체력: ' + e.typeId); }
+      catch (err) { this._logError('enemy', err); e.dead = true; e.reachedEnd = true; }
       if (e.dead) { this._onEnemyDie(e); this.enemies.splice(i,1); }
     }
 
@@ -265,18 +276,18 @@ class GameEngine {
     this.activeBoss = this.enemies.find(e => e.isBoss && !e.dead && !e.reachedEnd) || null;
 
     // 타워
-    for (const t of this.towers) t.update(this.dt, this.enemies, this);
+    for (const t of this.towers) { try { t.update(this.dt, this.enemies, this); } catch (err) { this._dmgSrc = null; this._logError('tower ' + t._gachaId, err); t.cooldown = 1; } }
     // 영웅
-    for (const h of this.heroes) { this._dmgSrc = h; h.update(this.dt, this); this._dmgSrc = null; }
+    for (const h of this.heroes) { this._dmgSrc = h; try { h.update(this.dt, this); } catch (err) { this._logError('hero', err); } this._dmgSrc = null; }
     // 발사체
     for (let i = this.projectiles.length - 1; i >= 0; i--) {
-      this.projectiles[i].update(this.dt);
+      try { this.projectiles[i].update(this.dt); } catch (err) { this._logError('proj', err); this.projectiles[i].done = true; }
       if (this.projectiles[i].done) this.projectiles.splice(i,1);
     }
     // 파티클 캡
     if (this.particles.length > 150) this.particles.splice(0, this.particles.length - 150);
     for (let i = this.particles.length - 1; i >= 0; i--) {
-      this.particles[i].update(this.dt);
+      try { this.particles[i].update(this.dt); } catch (err) { this.particles[i].dead = true; }
       if (this.particles[i].dead) this.particles.splice(i,1);
     }
 
@@ -619,8 +630,9 @@ class GameEngine {
   }
 
   // ===== FX =====
-  spawnFloatingText(text, x, y, color, opts={}) { this.particles.push(new FloatingText(text,x,y,color,opts)); }
-  spawnHitParticle(x, y, color) { for (let i=0;i<6;i++) this.particles.push(new Spark(x,y,color)); this.onHitSound && this.onHitSound(); }
+  // v3.3 발열 최적화: 화면이 바쁠 때(파티클 많음)는 데미지 숫자·튀는 불꽃을 생략 - 중요한 안내(life 지정 X 큰 글씨)는 유지
+  spawnFloatingText(text, x, y, color, opts={}) { if (opts.life && opts.life <= 0.6 && this.particles.length > 70) return; this.particles.push(new FloatingText(text,x,y,color,opts)); }
+  spawnHitParticle(x, y, color) { if (this.particles.length < 90) { const n = this.particles.length > 40 ? 1 : 3; for (let i=0;i<n;i++) this.particles.push(new Spark(x,y,color)); } this.onHitSound && this.onHitSound(); }
   triggerScreenShake(amt=5, dur=0.2) { this.shakeAmt=amt; this.shakeTimer=dur; }
 
   // ===== DRAW =====
@@ -648,17 +660,18 @@ class GameEngine {
     const cx = this.camera.x, cy = this.camera.y;
     const inView = (o) => Math.abs(o.x - cx) <= viewHalfW && Math.abs(o.y - cy) <= viewHalfH;
 
-    for (const t of this.towers) if (inView(t)) t.draw(ctx);
-    for (const h of this.heroes) h.draw(ctx);
+    const safe = (o) => { ctx.save(); try { o.draw(ctx); } catch (err) { this._logError('draw ' + (o._gachaId || o.typeId || o.constructor.name), err); } ctx.restore(); };
+    for (const t of this.towers) if (inView(t)) safe(t);
+    for (const h of this.heroes) safe(h);
 
     // Y순 정렬 (제자리 정렬 - 매 프레임 배열 복사 제거)
     this.enemies.sort((a,b)=>a.y-b.y);
-    for (const e of this.enemies) if (inView(e)) e.draw(ctx);
+    for (const e of this.enemies) if (inView(e)) safe(e);
 
-    for (const p of this.projectiles) if (inView(p)) p.draw(ctx);
+    for (const p of this.projectiles) if (inView(p)) safe(p);
     // v27-47: RedFlash(전체화면 빨간 비네트)는 스크린 좌표 기준이라 카메라 변환 밖에서 그려야 함
     // (안에서 그리면 카메라 위치/줌에 따라 화면을 제대로 못 덮는 버그가 생김)
-    for (const p of this.particles) if (!(p instanceof RedFlash) && (p.x === undefined || inView(p))) p.draw(ctx);
+    for (const p of this.particles) if (!(p instanceof RedFlash) && (p.x === undefined || inView(p))) safe(p);
 
     if (this.selectedTower) this._drawRange(ctx, this.selectedTower);
     if (this.selectedSlotIdx !== null && this.selectedTowerType) this._drawPreview(ctx);

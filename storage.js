@@ -77,7 +77,7 @@ Object.assign(App.prototype, {
       const b = document.createElement('button');
       b.className = 'storage-item' + (this._placingId === def.id ? ' placing' : '');
       b.style.setProperty('--gc', g.color);
-      b.innerHTML = `<span class="si-emoji">${PKM(def, 30)}</span><span class="si-stars">${'★'.repeat(g.stars)}</span>${count > 1 ? `<span class="si-count">×${count}</span>` : ''}`;
+      b.innerHTML = `<span class="si-emoji">${PKM(def, 30)}</span><span class="si-stars">${'★'.repeat(g.stars)}</span>${count > 1 ? `<span class="si-count">×${count}</span>` : ''}${window.MEGA_OF?.[def.id] ? '<span class="si-mega">💎</span>' : ''}`;
       b.title = `${def.name} (${g.name}) - 탭해서 배치`;
       b.addEventListener('click', () => this._onStorageItemTap(def.id));
       strip.appendChild(b);
@@ -183,7 +183,7 @@ Object.assign(App.prototype, {
       const cards = list.length ? list.map(m => `
         <button class="mg-card ${ui.sel.has(m.key) ? 'sel' : ''}" data-key="${m.key}" style="--gc:${G.color}">
           ${m.kind === 'field' ? '<span class="mg-field">📍필드</span>' : ''}
-          <span class="mg-emoji">${PKM(m.def, 34)}</span><span class="mg-name">${m.def.name}</span>
+          ${window.MEGA_OF?.[m.def.id] ? '<span class="mg-megabadge">💎메가</span>' : ''}<span class="mg-emoji">${PKM(m.def, 34)}</span><span class="mg-name">${m.def.name}</span>
         </button>`).join('') : `<div class="mg-empty">이 등급의 포켓몬이 없어요</div>`;
 
       const n = selected.length;
@@ -234,7 +234,8 @@ Object.assign(App.prototype, {
         if (!window.NEXT_GRADE[grade]) return;
         const results = [];
         for (;;) {
-          const pool = this._allMaterials(false).filter(m => m.def.grade === grade);
+          // 💎 메가 원본(리자몽 등)은 먹이기용으로 남겨둠
+          const pool = this._allMaterials(false).filter(m => m.def.grade === grade && !window.MEGA_OF?.[m.def.id]);
           if (pool.length < 3) break;
           const byId = {}; pool.forEach(m => (byId[m.def.id] = byId[m.def.id] || []).push(m));
           const triple = Object.values(byId).find(a => a.length >= 3 && window.MERGE_EVOLUTION[a[0].def.id]);
@@ -249,13 +250,16 @@ Object.assign(App.prototype, {
           }
           this._addToStorage([res]); this._trackNewTower(res); results.push(res);
         }
-        if (!results.length) { this.showWaveAnnounce('보관함에 이 등급이 3개 이상 없어요', '#ff5c7a'); return; }
+        const keptMega = this._allMaterials(false).filter(m => m.def.grade === grade && window.MEGA_OF?.[m.def.id]).length;
+        const onField = this._allMaterials(true).filter(m => m.kind === 'field' && m.def.grade === grade).length;
+        const note = [keptMega ? `💎 메가 원본 ${keptMega}마리는 남겨뒀어요` : '', onField ? `배치된 ${onField}마리는 그대로예요` : ''].filter(Boolean).join(' · ');
+        if (!results.length) { this.showWaveAnnounce('합성할 보관함 포켓몬이 3마리 미만이에요' + (note ? `<br><span style="font-size:0.7em">${note}</span>` : ''), '#ff5c7a'); return; }
         this.SFX.play(results.some(d => d.grade === 'legend') ? 'pull_epic' : 'merge');
         overlay.remove(); this.openMergePanel();
         const ov = document.createElement('div');
         ov.className = 'merge-bulk';
         ov.innerHTML = `<div class="mb-card"><b>⚡ ${results.length}번 합성 완료</b><div class="mb-row">${results.map(d =>
-          `<span style="--gc:${window.GRADES[d.grade].color}">${PKM(d, 40)}<i>${d.name}</i></span>`).join('')}</div><small>탭해서 닫기</small></div>`;
+          `<span style="--gc:${window.GRADES[d.grade].color}">${PKM(d, 40)}<i>${d.name}</i></span>`).join('')}</div>${note ? `<small>${note}</small>` : ''}<small>탭해서 닫기</small></div>`;
         ov.onclick = () => ov.remove();
         document.getElementById('game-screen').appendChild(ov);
       };

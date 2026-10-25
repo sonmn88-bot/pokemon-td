@@ -189,12 +189,44 @@ Object.assign(App.prototype, {
     const info = HERO_ITEMS[h.evolved || h.id] || HERO_ITEMS[h.id];
     if (!info) return;
     e._heroItemGot = true;
-    h._transformed = info;
-    h._formMul = 1.15;
-    if (info.form) { h._formImg = window.loadSpriteImage ? window.loadSpriteImage(`assets/heroes/${info.form}.png`) : null; h._formName = info.formName; }
+    e._heroItemPending = info;                    // 바로 적용하지 않고, 플레이어가 눌러서 변신
     this.SFX && this.SFX.play('pull_epic');
-    this.showWaveAnnounce(`${info.icon} ${info.item} 발견! ${info.formName ? info.formName + '(으)로 변신!' : '영웅이 빛나기 시작했다!'}`, '#ffc24b');
     this._flashScreenEdge && this._flashScreenEdge();
+    const pop = document.createElement('div');
+    pop.className = 'hero-item-pop';
+    pop.innerHTML = `<div class="hip-icon">${info.icon}</div><b>${info.item} 획득!</b><small>오른쪽 아래 영웅 바의 ✨ 버튼을 눌러 ${info.formName ? info.formName + '(으)로 변신' : '각성'}하세요</small>`;
+    document.getElementById('game-screen').appendChild(pop);
+    setTimeout(() => pop.remove(), 4200);
+    this.buildHeroSkillBar && this.buildHeroSkillBar();
+  },
+
+  // 변신 연출: 화면 가득 빛 → 영웅이 커지며 하얗게 → 새 모습 등장. 영웅마다 색이 다름
+  _playHeroTransform() {
+    const e = this.engine, h = e.heroes && e.heroes[0], info = e._heroItemPending;
+    if (!h || !info) return;
+    e._heroItemPending = null;
+    const theme = { pikachu:['#ffe14a','#fff6b0','⚡'], raichu:['#ffb02e','#ffe9a0','⚡'], togepi:['#ff9ed8','#c9f2ff','✨'], togetic:['#ff9ed8','#c9f2ff','✨'] }[h.evolved || h.id] || ['#ffc24b','#fff3c4','🌟'];
+    const before = `assets/heroes/${h.evolved || h.id}.png`, after = info.form ? `assets/heroes/${info.form}.png` : before;
+    const ov = document.createElement('div');
+    ov.className = 'hero-evo';
+    ov.style.setProperty('--c1', theme[0]); ov.style.setProperty('--c2', theme[1]);
+    ov.innerHTML = `<div class="he-rays"></div><div class="he-ring"></div><img class="he-img" src="${before}" alt=""><div class="he-flash"></div>
+      <div class="he-sparks">${Array.from({ length: 18 }, (_, i) => `<i style="--a:${i * 20}deg;--d:${(i % 3) * 0.15}s">${theme[2]}</i>`).join('')}</div>
+      <div class="he-title">${info.formName || h.name + ' 각성'}!</div>`;
+    document.getElementById('game-screen').appendChild(ov);
+    this.SFX && this.SFX.play('pull_epic');
+    const img = ov.querySelector('.he-img');
+    setTimeout(() => { img.src = after; if (info.shine) img.classList.add('shine'); ov.classList.add('done'); this.SFX && this.SFX.play('merge'); }, 1500);
+    setTimeout(() => {
+      h._transformed = info; h._formMul = 1.15;
+      if (info.form) { h._formImg = window.loadSpriteImage ? window.loadSpriteImage(after) : null; h._formName = info.formName; }
+      e.triggerScreenShake && e.triggerScreenShake(9, 0.4);
+      if (window.AoeBurst) for (let k = 0; k < 3; k++) e.particles.push(new AoeBurst(h.x, h.y, 60 + k * 40, theme[0]));
+      this.buildHeroSkillBar && this.buildHeroSkillBar();
+    }, 1600);
+    setTimeout(() => ov.classList.add('out'), 2900);
+    setTimeout(() => ov.remove(), 3400);
+    ov.addEventListener('click', () => { if (ov.classList.contains('done')) ov.classList.add('out'); });
   },
 
   _onDiversityChange(types, mul) {

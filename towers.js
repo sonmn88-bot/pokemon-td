@@ -141,13 +141,12 @@ class Projectile {
       ctx.globalAlpha = Math.max(0, alpha);
       ctx.strokeStyle = this.color;
       ctx.lineWidth = this.size;
-      ctx.shadowColor = this.color;
-      ctx.shadowBlur = 14;
       ctx.lineCap = 'round';
       ctx.beginPath();
       ctx.moveTo(this.bx1, this.by1);
       ctx.lineTo(this.bx2, this.by2);
       ctx.stroke();
+      ctx.globalAlpha *= 0.35; ctx.lineWidth = this.size * 2.6; ctx.stroke(); // 번짐 대신 굵은 반투명 선 (v3.3 발열 최적화)
       ctx.restore();
       return;
     }
@@ -170,8 +169,6 @@ class Projectile {
       ctx.fillText(this.emoji, this.x, this.y);
     } else {
       ctx.fillStyle = this.color;
-      ctx.shadowColor = this.color;
-      ctx.shadowBlur = 10;
       ctx.beginPath();
       ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
       ctx.fill();
@@ -194,7 +191,6 @@ class ChainBolt {
     const alpha=1-this.life/this.maxLife;
     ctx.save();ctx.globalAlpha=Math.max(0,alpha);
     ctx.strokeStyle='#ffeb3b';ctx.lineWidth=2.5;
-    ctx.shadowColor='#fff176';ctx.shadowBlur=12;
     ctx.beginPath();ctx.moveTo(this.x1,this.y1);
     for(const s of this.segs){
       ctx.lineTo(this.x1+(this.x2-this.x1)*s.t+s.ox,
@@ -215,7 +211,6 @@ class AoeBurst {
     ctx.save();
     ctx.globalAlpha=(1-t)*0.65;
     ctx.strokeStyle=this.color;ctx.lineWidth=3*(1-t)+1;
-    ctx.shadowColor=this.color;ctx.shadowBlur=12;
     ctx.beginPath();ctx.arc(this.x,this.y,r,0,Math.PI*2);ctx.stroke();
     ctx.globalAlpha=(1-t)*0.12;
     ctx.fillStyle=this.color;ctx.fill();

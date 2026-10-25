@@ -1741,7 +1741,7 @@ class App {
     const el = document.createElement('div');
     el.className = 'wave-announce';
     el.style.color = color;
-    el.textContent = text;
+    if (/<(br|span|b)\b/.test(text)) el.innerHTML = text; else el.textContent = text; // 내부 문구만 들어옴 (줄바꿈·작은 글씨 지원)
     document.getElementById('game-screen').appendChild(el);
     const entry = { el, timer: null };
     this._activeAnnounces.push(entry);
@@ -1943,7 +1943,7 @@ class App {
       const ov = document.createElement('div');
       ov.className = 'pause-overlay';
       ov.innerHTML = `<div class="po-card"><div class="po-title">⏸ 일시정지</div>
-        <button class="po-btn go">▶ 계속하기</button><button class="po-btn quit">🏠 타이틀로</button></div>`;
+        <button class="po-btn go">▶ 계속하기</button><button class="po-btn quit">🏠 타이틀로</button>${(this.engine._errLog || []).length ? `<div class="po-err">오류 기록 ${this.engine._errCount}건 (스크린샷 보내주세요)<br>${this.engine._errLog.map(m => m.replace(/</g, '&lt;')).join('<br>')}</div>` : ''}</div>`;
       ov.querySelector('.go').onclick = () => this.togglePause();
       ov.querySelector('.quit').onclick = () => { if (confirm('타이틀로 돌아가시겠습니까? 진행 중인 게임은 저장되지 않습니다.')) { ov.remove(); this.backToMapSelect(); } };
       document.getElementById('game-screen').appendChild(ov);

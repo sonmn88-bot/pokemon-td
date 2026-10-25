@@ -289,6 +289,15 @@ Object.assign(App.prototype, {
         wrap.appendChild(btn);
       });
 
+      // v3.3: 변신 아이템을 얻었으면 ✨ 버튼이 반짝임 → 누르면 변신 연출
+      if (this.engine._heroItemPending) {
+        const evoBtn = document.createElement('button');
+        evoBtn.className = 'skill-btn hero-evo-btn';
+        evoBtn.innerHTML = `<span class="skill-emoji">✨</span>`;
+        evoBtn.title = `${this.engine._heroItemPending.item}: 눌러서 변신`;
+        evoBtn.addEventListener('click', () => this._playHeroTransform());
+        wrap.appendChild(evoBtn);
+      }
       // 스킬트리 버튼 (SP 있을 때만 강조)
       const treeBtn = document.createElement('button');
       treeBtn.className = 'skill-btn skill-tree-btn';

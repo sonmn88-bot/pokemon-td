@@ -238,8 +238,8 @@ HeroDefs.eevee = {
   role:'만능형 (진화로 특화)',
   passive:'모든 타워 공격력 +5% · Lv12에 3갈래 진화 (같은 갈래 스킬트리 효과 ×1.5)',
   attack:{
-    baseRange:116, baseDamage:7, baseFireRate:0.95,
-    rangePerLevel:6, damagePerLevel:2,
+    baseRange:116, baseDamage:11, baseFireRate:1.1, // v3.3: 초반이 너무 약했음 (7·0.95 → 11·1.1)
+    rangePerLevel:6, damagePerLevel:3,
     projColor:'#d7ccc8', projEmoji:'⭐', dmgType:'special',
   },
   evolution:{ level:12, options:[
@@ -632,7 +632,14 @@ class Hero {
       const bob = Math.sin(Date.now()*0.0022 + (this._bobPhase||0)) * 2.5;
       const _b = window.SpriteBoundsCache?.[window.HeroSpriteImages?.[spriteKey]];
       ctx.save();
-      if (this._transformed?.shine) ctx.filter = 'sepia(0.55) saturate(1.8) brightness(1.12)'; // 이브이 계열 금빛 각성
+      if (this._transformed?.shine && spriteImg.naturalWidth) { // 이브이 계열 금빛 각성 - 한 번만 구워서 재사용 (발열 최적화)
+        if (!this._shineCache || this._shineCache.src !== spriteImg.src) {
+          const c = document.createElement('canvas'); c.width = spriteImg.naturalWidth; c.height = spriteImg.naturalHeight;
+          const g = c.getContext('2d'); g.filter = 'sepia(0.55) saturate(1.8) brightness(1.12)'; g.drawImage(spriteImg, 0, 0);
+          this._shineCache = { src: spriteImg.src, c };
+        }
+        spriteImg = this._shineCache.c;
+      }
       if (_b) ctx.drawImage(spriteImg, _b.x, _b.y, _b.w, _b.h, this.x - drawSize/2, this.y - drawSize/2 + bob, drawSize, drawSize);
       else ctx.drawImage(spriteImg, this.x - drawSize/2, this.y - drawSize/2 + bob, drawSize, drawSize);
       ctx.restore();

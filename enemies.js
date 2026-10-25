@@ -624,7 +624,7 @@ class Enemy {
       ctx.beginPath();
       ctx.arc(this.x, drawY, s * 1.3, 0, Math.PI * 2);
       ctx.strokeStyle = `rgba(255,194,75,${0.6 + Math.sin(Date.now()*0.01)*0.3})`;
-      ctx.lineWidth = 3; ctx.shadowColor = '#ffc24b'; ctx.shadowBlur = 14;
+      ctx.lineWidth = 3; ctx.shadowColor = '#ffc24b'; ctx.shadowBlur = 0;
       ctx.stroke();
       ctx.restore();
       ctx.font = '14px serif'; ctx.textAlign = 'center';
@@ -655,7 +655,7 @@ class Enemy {
       ctx.strokeStyle = 'rgba(180,140,255,0.7)';
       ctx.lineWidth = 3;
       ctx.shadowColor = '#7c4dff';
-      ctx.shadowBlur = 12;
+      ctx.shadowBlur = 0;
       ctx.stroke();
       ctx.restore();
     }
