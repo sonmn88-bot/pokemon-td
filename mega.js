@@ -1,0 +1,261 @@
+// ===== MEGA.JS - v3.2 메가진화 · 각성 스택 · 메가스톤 · 영웅 변신 · 몬스터 편성 · 타입 다양성 =====
+// 로드 순서: storage.js 다음 (App.prototype 확장 + GachaTowerDefs 등록)
+//
+// 흐름: 에픽(원본) 필드 배치 → 같은 종을 '먹이기'로 ★ 올리기(★당 +35%) → ★3 + 메가스톤 → 메가진화 → ★5까지 계속 먹이기
+// 메가스톤: 20웨이브 보스에서만 확률 드롭 (30% → 20웨이브마다 +10%p, 최대 90%, 100웨이브부터 25% 확률로 2개)
+
+const STACK_BONUS = 0.35;   // ★ 하나당 공격력 +35%
+const STACK_MAX = 5;
+const MEGA_NEED_STACK = 3;
+
+// ---- 공용 헬퍼 ----
+function _mgTargets(t, e, n, range) {
+  const r2 = (range || t.range) ** 2;
+  return e.enemies.filter(en => !en.dead && !en.reachedEnd && ((en.x - t.x) ** 2 + (en.y - t.y) ** 2) <= r2)
+    .sort((a, b) => b.distTraveled - a.distTraveled).slice(0, n);
+}
+function _mgBeam(t, e, tgt, color, life = 0.18) {
+  e.projectiles.push(new Projectile(t.x, t.y, tgt, { engine: e, color, size: 5, beam: true, beamLife: life }));
+}
+function _mgArea(e, x, y, r, dmg, type, fn) {
+  for (const en of e.enemies) if (!en.dead && !en.reachedEnd && Math.hypot(en.x - x, en.y - y) <= r) { en.takeDamage(dmg, type); fn && fn(en); }
+  if (window.AoeBurst) e.particles.push(new AoeBurst(x, y, r, '#ffffff'));
+}
+const _isFly = en => en.def?.special === 'flying';
+
+// ---- 메가 13종 (각자 잘 잡는 상대가 다름) ----
+// dmgMul/fireRate는 뮤츠(4타겟+크리) 대비 ★3에서 약간 아래, ★5에서 위가 되도록 맞춤
+const MEGA_DEFS = [
+  { id:'mega_charizard_x', base:'charizard', name:'메가리자몽X', type:'fire', emoji:'🔥', fr:1.0, range:150,
+    desc:'근접 폭발 일격 · 방어 절반 무시 · 화상 → 장갑에 강함',
+    fire(t, e) { const [tgt] = _mgTargets(t, e, 1); if (!tgt) return; _mgBeam(t, e, tgt, '#3fa9ff', 0.22);
+      tgt.takeDamage(t.damage * 4.2, 'splash'); tgt.applyStatus('burn', 2.5, t.damage * 0.4);
+      _mgArea(e, tgt.x, tgt.y, 55, t.damage * 1.2, 'splash'); } },
+  { id:'mega_charizard_y', base:'charizard', name:'메가리자몽Y', type:'fire', emoji:'☀️', fr:0.7, range:190,
+    desc:'넓은 화염 기둥 · 범위 화상 → 분열·물량에 강함',
+    fire(t, e) { const [tgt] = _mgTargets(t, e, 1); if (!tgt) return; _mgBeam(t, e, tgt, '#ff7a1a', 0.25);
+      _mgArea(e, tgt.x, tgt.y, 95, t.damage * 1.9, 'fire', en => en.applyStatus('burn', 2, t.damage * 0.3)); } },
+  { id:'mega_blastoise', base:'blastoise', name:'메가거북왕', type:'water', emoji:'🌊', fr:0.75, range:220,
+    desc:'일직선 관통 물대포 · 넉백 → 줄지어 오는 적에 강함',
+    fire(t, e) { const [tgt] = _mgTargets(t, e, 1); if (!tgt) return; _mgBeam(t, e, tgt, '#5bb8ff', 0.25);
+      const dx = tgt.x - t.x, dy = tgt.y - t.y, L = Math.hypot(dx, dy) || 1, ux = dx / L, uy = dy / L, reach = t.range * 1.3;
+      for (const en of e.enemies) { if (en.dead || en.reachedEnd) continue;
+        const px = en.x - t.x, py = en.y - t.y, along = px * ux + py * uy; if (along < 0 || along > reach) continue;
+        if (Math.abs(px * uy - py * ux) < 26) { en.takeDamage(t.damage * 2.4, 'special'); if (Math.random() < 0.25) en.distTraveled = Math.max(0, en.distTraveled - 30); } } } },
+  { id:'mega_gyarados', base:'gyarados', name:'메가갸라도스', type:'water', emoji:'🐉', fr:1.1, range:170,
+    desc:'같은 적을 계속 물수록 공격 속도 상승(최대 2.5배) → 보스에 강함',
+    fire(t, e) { const [tgt] = _mgTargets(t, e, 1); if (!tgt) return;
+      t._rage = (t._rageTgt === tgt) ? Math.min(15, (t._rage || 0) + 1) : 0; t._rageTgt = tgt;
+      t._tempSpeedMul = 1 + t._rage * 0.1; _mgBeam(t, e, tgt, '#29b6f6');
+      tgt.takeDamage(t.damage * (tgt.isBoss ? 3.6 : 2.6), 'special'); } },
+  { id:'mega_venusaur', base:'venusaur', name:'메가이상해꽃', type:'grass', emoji:'🌺', fr:0.7, range:180,
+    desc:'독 장판 · 재생 봉쇄 → 재생하는 적에 강함',
+    fire(t, e) { const [tgt] = _mgTargets(t, e, 1); if (!tgt) return; _mgBeam(t, e, tgt, '#7cd36a', 0.25);
+      _mgArea(e, tgt.x, tgt.y, 85, t.damage * 1.7, 'poison', en => { en.applyStatus('poison', 4, t.damage * 0.25); en._noRegen = 5; }); } },
+  { id:'mega_pinsir', base:'pinsir', name:'메가쁘사이저', type:'grass', emoji:'🪲', fr:0.9, range:150,
+    desc:'체력 18% 이하 즉사(보스 제외) · 30% 크리 → 체력 많은 적',
+    fire(t, e) { const [tgt] = _mgTargets(t, e, 1); if (!tgt) return; _mgBeam(t, e, tgt, '#c9a46a');
+      const crit = Math.random() < 0.3; tgt.takeDamage(t.damage * (crit ? 7.5 : 3.0), 'special');
+      if (!tgt.dead && !tgt.isBoss && tgt.hp / tgt.maxHp <= 0.18) { tgt.hp = 0; tgt.die(); e.spawnFloatingText('✂️처형', tgt.x, tgt.y - 22, '#ff5252'); } } },
+  { id:'mega_beedrill', base:'beedrill', name:'메가독침붕', type:'grass', emoji:'🐝', fr:2.2, range:150,
+    desc:'초고속 3연침 · 독 중첩 → 단일 고체력',
+    fire(t, e) { const [tgt] = _mgTargets(t, e, 1); if (!tgt) return;
+      for (let i = 0; i < 3; i++) e.projectiles.push(new Projectile(t.x, t.y, tgt, { engine: e, speed: 700, damage: t.damage * 0.55, color: '#e8d24a', size: 3, dmgType: 'special',
+        status: { type: 'poison', duration: 3, factor: t.damage * 0.08 } })); } },
+  { id:'mega_aerodactyl', base:'aerodactyl', name:'메가프테라', type:'grass', emoji:'🦖', fr:1.0, range:180,
+    desc:'2마리 공격 · 비행 ×2.5 · 넉백 → 비행에 강함',
+    fire(t, e) { for (const tgt of _mgTargets(t, e, 2)) { _mgBeam(t, e, tgt, '#b9a3d6');
+      tgt.takeDamage(t.damage * 1.9 * (_isFly(tgt) ? 2.5 : 1), 'special'); if (Math.random() < 0.3) tgt.distTraveled = Math.max(0, tgt.distTraveled - 40); } } },
+  { id:'mega_kangaskhan', base:'kangaskhan', name:'메가캥카', type:'normal', emoji:'🦘', fr:1.2, range:160,
+    desc:'엄마+아기 2연타(2타째 60%) · 2마리 → 무난한 만능',
+    fire(t, e) { for (const tgt of _mgTargets(t, e, 2)) { _mgBeam(t, e, tgt, '#d9b38c');
+      tgt.takeDamage(t.damage * 1.7, 'special'); if (!tgt.dead) tgt.takeDamage(t.damage * 1.0, 'special'); } } },
+  { id:'mega_pidgeot', base:'pidgeot', name:'메가피죤투', type:'normal', emoji:'🦅', fr:1.0, range:300,
+    desc:'가장 긴 사거리 · 2마리 · 비행 ×2.5 → 비행에 강함',
+    fire(t, e) { for (const tgt of _mgTargets(t, e, 2)) { _mgBeam(t, e, tgt, '#f2e2a0');
+      tgt.takeDamage(t.damage * 1.8 * (_isFly(tgt) ? 2.5 : 1), 'special'); } } },
+  { id:'mega_alakazam', base:'alakazam', name:'메가후딘', type:'psychic', emoji:'🥄', fr:1.0, range:220,
+    desc:'5마리 동시 공격 · 30% 스턴 → 빠른 적에 강함',
+    fire(t, e) { for (const tgt of _mgTargets(t, e, 5)) { _mgBeam(t, e, tgt, '#e7c46a');
+      tgt.takeDamage(t.damage * 0.95, 'special'); if (Math.random() < 0.3) tgt.applyStatus('stun', 0.5); } } },
+  { id:'mega_gengar', base:'gengar', name:'메가팬텀', type:'psychic', emoji:'👻', fr:0.9, range:190, needGrade:'legend',
+    desc:'방어 완전 무시 · 2마리 · 그림자 속박(20% 1초 정지) → 장갑·유령에 강함',
+    fire(t, e) { for (const tgt of _mgTargets(t, e, 2)) { _mgBeam(t, e, tgt, '#7a4dd6', 0.22);
+      tgt.takeDamage(t.damage * 2.3, 'true'); if (Math.random() < 0.2) tgt.applyStatus('stun', 1.0); } } },
+  { id:'awakened_zapdos', base:'zapdos', name:'각성 썬더', type:'electric', emoji:'⚡', fr:0.9, range:210, needGrade:'legend',
+    desc:'8번 연쇄 번개 · 감전 → 물량에 강함',
+    fire(t, e) { const [tgt] = _mgTargets(t, e, 1); if (!tgt) return;
+      e.projectiles.push(new Projectile(t.x, t.y, tgt, { engine: e, speed: 900, damage: t.damage * 1.6, color: '#ffe066', size: 6, dmgType: 'special',
+        chain: 8, chainRange: 170, status: { type: 'stun', duration: 0.3 } })); } },
+];
+
+// 등록 (유니크 등급 · 메가 표시). 공격력 = 뮤츠 기본 공격력 기준
+(function registerMegas() {
+  const mt = GachaTowerDefs.mewtwo;
+  const base = mt ? mt.damage : 280;
+  window.MEGA_OF = {};
+  for (const m of MEGA_DEFS) {
+    GachaTowerDefs[m.id] = { id: m.id, name: m.name, emoji: m.emoji, grade: 'unique', type: m.type, pokemonId: m.id,
+      damage: Math.round(base * 0.62), fireRate: m.fr, range: m.range, desc: m.desc, fire: m.fire, mega: true, megaOf: m.base, _signature: true };
+    window.TowerSpriteImages[m.id] = `assets/towers/${m.id}.png`;
+    (window.MEGA_OF[m.base] = window.MEGA_OF[m.base] || []).push(m.id);
+  }
+  if (mt) mt.desc = '전지전능 4타겟+크리 (필드에 1마리만)'; // 뮤츠 조정(C)은 gacha.js에서 6→4타겟
+})();
+
+// ---- 스택(★)·메가 판정 ----
+function towerStack(t) { return (t && t.def && t.def._stack) || 1; }
+function canFeed(app, t) {
+  if (!t || !t.def) return 0;
+  const feedId = t.def.mega ? t.def.megaOf : t.def.id;
+  if (!t.def.mega && !window.MEGA_OF[t.def.id]) return 0;           // 메가 원본만 먹이기 가능
+  if (towerStack(t) >= STACK_MAX) return 0;
+  return (app._inventory || []).filter(d => d.id === feedId).length;
+}
+function feedTower(app, t) {
+  const feedId = t.def.mega ? t.def.megaOf : t.def.id;
+  if (!app._takeFromStorageById(feedId)) return false;
+  t.def = { ...t.def, _stack: towerStack(t) + 1 };
+  return true;
+}
+function canMega(app, t) {
+  return !!(t && t.def && !t.def.mega && window.MEGA_OF[t.def.id] && towerStack(t) >= MEGA_NEED_STACK && (app.engine._megaStones || 0) > 0);
+}
+
+// ---- 메가스톤 드롭 ----
+function megaStoneChance(wave) { return Math.min(0.9, 0.3 + 0.1 * (Math.floor(wave / 20) - 1)); }
+
+// ---- 몬스터 편성 (판마다 2가지 강조) ----
+const RUN_EMPHASIS = [
+  { key:'flying',  label:'🦅 비행',  hint:'메가피죤투·메가프테라' },
+  { key:'armor',   label:'🛡 장갑',  hint:'메가팬텀·메가리자몽X' },
+  { key:'regen',   label:'💚 재생',  hint:'메가이상해꽃' },
+  { key:'split',   label:'🔣 분열',  hint:'메가리자몽Y·각성 썬더' },
+  { key:'ghost',   label:'👻 유령',  hint:'메가팬텀·메가후딘' },
+  { key:'swift',   label:'💨 고속',  hint:'메가후딘' },
+  { key:'explode', label:'💥 폭발',  hint:'메가거북왕' },
+];
+
+// ---- 영웅 변신 아이템 ----
+const HERO_ITEMS = {
+  pikachu: { item:'다이맥스 밴드', icon:'⚡', form:'gmax_pikachu', formName:'거다이맥스 피카츄' },
+  raichu:  { item:'다이맥스 밴드', icon:'⚡', form:'gmax_pikachu', formName:'거다이맥스 피카츄' },
+  togepi:  { item:'빛의돌', icon:'✨', form:'togekiss', formName:'토게키스' },
+  togetic: { item:'빛의돌', icon:'✨', form:'togekiss', formName:'토게키스' },
+  eevee:   { item:'빛나는 비늘', icon:'🌟', shine:true },
+  vaporeon:{ item:'빛나는 비늘', icon:'🌟', shine:true },
+  jolteon: { item:'빛나는 비늘', icon:'🌟', shine:true },
+  flareon: { item:'빛나는 비늘', icon:'🌟', shine:true },
+};
+
+window.MEGA = { STACK_BONUS, STACK_MAX, MEGA_NEED_STACK, towerStack, canFeed, feedTower, canMega, megaStoneChance, RUN_EMPHASIS, HERO_ITEMS };
+
+// ================= 게임 연동 (App 확장) =================
+Object.assign(App.prototype, {
+  _megaRunInit() {
+    const e = this.engine;
+    e._megaStones = 0;
+    e._heroItemGot = false;
+    const pick = RUN_EMPHASIS.slice().sort(() => Math.random() - 0.5).slice(0, 2);
+    e._runEmphasis = pick.map(p => p.key);
+    e._runEmphasisInfo = pick;
+    this._refreshMegaHud();
+    setTimeout(() => this.showWaveAnnounce(`이번 판 몬스터: ${pick.map(p => p.label).join(' · ')} 많음<br><span style="font-size:0.65em">추천 메가: ${pick.map(p => p.hint).join(' / ')}</span>`, '#6aa8ff'), 3200);
+    // 보스 처치 → 메가스톤 / 웨이브 클리어 → 영웅 아이템
+    const origDie = e._onEnemyDie.bind(e);
+    e._onEnemyDie = (en) => { origDie(en); if (en._megaDrop) this._rollMegaStone(en); };
+  },
+
+  _rollMegaStone(en) {
+    const e = this.engine, w = e.currentWave;
+    const chance = en._isKing ? 1 : megaStoneChance(w);
+    let n = Math.random() < chance ? 1 : 0;
+    if (n && w >= 100 && Math.random() < 0.25) n = 2;
+    if (Math.random() < 0.2) this._dropHeroItem('보스');
+    if (!n) { e.spawnFloatingText(`💎 메가스톤 안 나옴 (${Math.round(chance * 100)}%)`, en.x, en.y - 30, '#9aa3b2'); return; }
+    e._megaStones = (e._megaStones || 0) + n;
+    this.SFX && this.SFX.play('pull_epic');
+    this.showWaveAnnounce(`💎 메가스톤 ${n}개 획득! (보유 ${e._megaStones})`, '#b18cff');
+    this._refreshMegaHud();
+  },
+
+  _megaWaveClear(wave) {
+    if (wave >= 15 && Math.random() < 0.03) this._dropHeroItem('웨이브');
+  },
+
+  _dropHeroItem(from) {
+    const e = this.engine, h = e.heroes && e.heroes[0];
+    if (!h || e._heroItemGot) return;
+    const info = HERO_ITEMS[h.evolved || h.id] || HERO_ITEMS[h.id];
+    if (!info) return;
+    e._heroItemGot = true;
+    h._transformed = info;
+    h._formMul = 1.15;
+    if (info.form) { h._formImg = window.loadSpriteImage ? window.loadSpriteImage(`assets/heroes/${info.form}.png`) : null; h._formName = info.formName; }
+    this.SFX && this.SFX.play('pull_epic');
+    this.showWaveAnnounce(`${info.icon} ${info.item} 발견! ${info.formName ? info.formName + '(으)로 변신!' : '영웅이 빛나기 시작했다!'}`, '#ffc24b');
+    this._flashScreenEdge && this._flashScreenEdge();
+  },
+
+  _onDiversityChange(types, mul) {
+    const el = document.getElementById('hud-div');
+    if (!el) return;
+    el.style.display = types >= 2 ? '' : 'none';
+    el.querySelector('span').textContent = `${types}종${mul > 1 ? ' +' + Math.round((mul - 1) * 100) + '%' : ''}`;
+    el.style.color = mul > 1 ? '#34d399' : '';
+    if (this._lastDivMul && mul > this._lastDivMul) this.showWaveAnnounce(`🌈 타입 ${types}종! 전체 공격력 +${Math.round((mul - 1) * 100)}%`, '#34d399');
+    this._lastDivMul = mul;
+  },
+
+  _refreshMegaHud() {
+    const el = document.getElementById('hud-stones');
+    if (!el || !this.engine) return;
+    const n = this.engine._megaStones || 0;
+    el.style.display = n > 0 ? '' : 'none';
+    const v = el.querySelector('span'); if (v) v.textContent = n;
+  },
+
+  // 타워 패널에 붙일 버튼 HTML + 이벤트
+  _megaPanelHtml(t) {
+    if (!t || !t.def) return '';
+    const st = towerStack(t), feedN = canFeed(this, t);
+    const isBase = !!window.MEGA_OF[t.def.id];
+    if (!isBase && !t.def.mega) return '';
+    let h = `<div class="mg-stack">${'★'.repeat(st)}${'☆'.repeat(STACK_MAX - st)} <small>각성 ★${st} · 공격력 +${Math.round((st - 1) * STACK_BONUS * 100)}%</small></div>`;
+    if (feedN) h += `<button class="tp-btn" data-action="feed" style="background:linear-gradient(135deg,#f59e0b,#b45309)">🍖 먹이기 (보관함 ${feedN})</button>`;
+    if (isBase) {
+      const stones = this.engine._megaStones || 0;
+      for (const mid of window.MEGA_OF[t.def.id]) {
+        const md = GachaTowerDefs[mid], ok = canMega(this, t);
+        h += `<button class="tp-btn mega-btn" data-action="mega" data-mega="${mid}" ${ok ? '' : 'disabled'} title="${md.desc}">💎 ${md.name}${ok ? '' : st < MEGA_NEED_STACK ? ` (★${MEGA_NEED_STACK} 필요)` : ` (스톤 ${stones})`}</button>`;
+      }
+    }
+    return h;
+  },
+  _bindMegaPanel(panel, t, slotIdx) {
+    panel.querySelector('[data-action="feed"]')?.addEventListener('click', () => {
+      if (!feedTower(this, t)) return;
+      this.engine.spawnFloatingText(`★${towerStack(t)} 각성!`, t.x, t.y - 36, '#ffc24b');
+      this.SFX && this.SFX.play('merge');
+      this.renderStorageStrip && this.renderStorageStrip();
+      this.syncTowerPanel();
+    });
+    panel.querySelectorAll('[data-action="mega"]').forEach(b => b.addEventListener('click', () => {
+      if (!canMega(this, t)) return;
+      const mid = b.dataset.mega;
+      if (this.engine.towers.some(x => x._gachaId === mid)) { this.showWaveAnnounce('같은 메가는 필드에 1마리만', '#ff5c7a'); return; }
+      this.engine._megaStones--;
+      const slot = this.engine.towerSlots[slotIdx];
+      const nd = { ...GachaTowerDefs[mid], _stack: towerStack(t), _tmTag: t.def._tmTag };
+      const nt = window._createGachaTower(nd, slot.x, slot.y, this.engine);
+      nt._evolveGlowTimer = 2;
+      this.engine.towers = this.engine.towers.filter(x => x !== t); this.engine.towers.push(nt);
+      slot.tower = nt; this.engine.selectedTower = nt;
+      window.applyTowerSynergies && window.applyTowerSynergies(this.engine.towers);
+      this._refreshMegaHud();
+      this._trackNewTower && this._trackNewTower(nd);
+      this._playMergeReveal ? this._playMergeReveal(nd, { recipe: true }, () => this.syncTowerPanel()) : this.syncTowerPanel();
+      this.engine.triggerScreenShake && this.engine.triggerScreenShake(8, 0.35);
+    }));
+  },
+});

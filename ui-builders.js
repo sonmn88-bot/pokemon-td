@@ -138,7 +138,7 @@ Object.assign(App.prototype, {
 
       panel.innerHTML = `
         <div class="tower-panel-name" style="color:${grade.color}">
-          ${def.emoji} ${def.name} ${'★'.repeat(grade.stars)} <span style="font-size:10px">${grade.name}</span>
+          ${def.emoji} ${def.name} ${'★'.repeat(grade.stars)} <span style="font-size:10px">${def.mega ? "메가" : grade.name}</span>
         </div>
         <div class="tower-panel-stats">⚔️${Math.round(t.damage)}${dmgTag} · ⏱️${t.fireRate.toFixed(1)}/s${spdTag} · DPS:${dps} · 📏${Math.round(t.range)}${rangeTag} ${synergyInfo}</div>
         ${upgradeHint}
@@ -151,6 +151,7 @@ Object.assign(App.prototype, {
             ? `✅ 합치기 가능! (${sameCount}/3)${evolveDef?' → '+evolveDef.emoji+evolveDef.name:''}`
             : `동일 타워 ${sameCount}/3${evolveDef?' (목표: '+evolveDef.emoji+evolveDef.name+')':''}`}
         </div>
+        ${this._megaPanelHtml ? `<div class="mega-box">${this._megaPanelHtml(t)}</div>` : ''}
         <div class="tower-panel-btns">
           ${canMerge
             ? `<button class="tp-btn tp-upgrade" data-action="merge">✨ 합치기 진화!</button>`
@@ -172,6 +173,7 @@ Object.assign(App.prototype, {
         this.showWaveAnnounce(`🎒 ${def.name} 보관함으로`, '#a78bfa');
       });
 
+      this._bindMegaPanel && this._bindMegaPanel(panel, t, slotIdx);
       // v28 세션D: 기술머신 - 에픽·레전드에 랜덤 태그 1개 (회수해도 유지)
       panel.querySelector('[data-action="tm"]')?.addEventListener('click', () => {
         if (!this.engine.spendGold(window.TM_COST)) { this.showWaveAnnounce('💰 골드가 부족해요', '#ff5c7a'); return; }

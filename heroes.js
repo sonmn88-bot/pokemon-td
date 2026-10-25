@@ -338,7 +338,7 @@ class Hero {
     // v3.2: 적 체력이 웨이브마다 지수로 오르니 영웅도 같은 곡선으로 성장 (예전엔 레벨 비례 직선이라 후반에 무의미)
     const w = window.app?.engine?.currentWave || 0;
     const waveScale = Math.pow(1.04, Math.max(0, w - 5));
-    return base * this._typeUpgradeDmgMul() * waveScale;
+    return base * this._typeUpgradeDmgMul() * waveScale * (this._formMul || 1);
   }
 
   // v27-8: 영웅도 해당 속성의 타입강화 영향을 받도록 추가 (기존엔 전혀 반영 안 되고 있었음)
@@ -573,7 +573,9 @@ class Hero {
   cast(idx, engine) {
     if (!this.canCast(idx)) return false;
     const skill = this.def.skills[idx];
+    const _prevSrc = engine._dmgSrc; engine._dmgSrc = this; // v3.2: 스킬 데미지도 영웅 몫으로 집계
     skill.cast(this, engine);
+    engine._dmgSrc = _prevSrc;
     this.cooldowns[idx] = this._skillCd(idx);
     this.castFlash[idx] = 0.3;
     return true;
@@ -598,7 +600,8 @@ class Hero {
     const auraColor = this._evoColor || skin.color;
     const spriteKey = this.evolved || this.id;
     const spritePath = window.HeroSpriteImages && window.HeroSpriteImages[spriteKey];
-    const spriteImg = spritePath ? window.loadSpriteImage(spritePath) : null;
+    let spriteImg = spritePath ? window.loadSpriteImage(spritePath) : null;
+    if (this._formImg && this._formImg.complete && this._formImg.naturalWidth > 0) spriteImg = this._formImg; // v3.2 변신
 
     if (spriteImg && spriteImg.complete && spriteImg.naturalWidth > 0) {
       ctx.save();
@@ -616,11 +619,20 @@ class Hero {
       }
       ctx.restore();
 
-      const drawSize = 46;
+      const drawSize = this._formImg ? 54 : 46;
+      if (this._transformed) { // v3.2: 변신·각성 반짝임
+        const tt = Date.now() * 0.003;
+        ctx.save(); ctx.globalAlpha = 0.35 + Math.sin(tt * 2) * 0.15; ctx.strokeStyle = '#ffd86b'; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.arc(this.x, this.y, 33, 0, Math.PI * 2); ctx.stroke(); ctx.globalAlpha = 1; ctx.fillStyle = '#fff6c8';
+        for (let k = 0; k < 6; k++) { const a = tt + k * 1.047, r = 30 + Math.sin(tt * 3 + k) * 6; const s = 1.5 + (Math.sin(tt * 5 + k) + 1);
+          ctx.beginPath(); ctx.arc(this.x + Math.cos(a) * r, this.y + Math.sin(a) * r, s, 0, Math.PI * 2); ctx.fill(); }
+        ctx.restore();
+      }
       // v27-51: 정지된 느낌이 없게 살짝 위아래로 부드럽게 움직이는 아이들 모션 추가 (요청2)
       const bob = Math.sin(Date.now()*0.0022 + (this._bobPhase||0)) * 2.5;
       const _b = window.SpriteBoundsCache?.[window.HeroSpriteImages?.[spriteKey]];
       ctx.save();
+      if (this._transformed?.shine) ctx.filter = 'sepia(0.55) saturate(1.8) brightness(1.12)'; // 이브이 계열 금빛 각성
       if (_b) ctx.drawImage(spriteImg, _b.x, _b.y, _b.w, _b.h, this.x - drawSize/2, this.y - drawSize/2 + bob, drawSize, drawSize);
       else ctx.drawImage(spriteImg, this.x - drawSize/2, this.y - drawSize/2 + bob, drawSize, drawSize);
       ctx.restore();

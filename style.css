@@ -1226,3 +1226,20 @@ img.pk { object-fit:contain; vertical-align:middle; filter:drop-shadow(0 2px 3px
 .mb-row span { width:64px; border:1.5px solid var(--gc); border-radius:12px; padding:4px 2px; display:flex; flex-direction:column; align-items:center; font-size:10px; }
 .mb-row i { font-style:normal; margin-top:2px; }
 .mb-card small { color:var(--text-mid); }
+/* v3.2 결과 화면 데미지 순위 */
+.rs-row { display:grid; grid-template-columns:16px 28px 1fr; grid-template-rows:auto auto auto; column-gap:6px; align-items:center; margin:4px 0; min-width:min(80vw,320px); }
+.rs-row .pk, .rs-row > :nth-child(2) { grid-row:1 / span 3; grid-column:2; }
+.rs-rank { grid-row:1 / span 3; color:var(--text-mid); font-weight:800; font-family:var(--font-px); }
+.rs-name { grid-column:3; font-weight:800; font-size:12px; }
+.rs-bar { grid-column:3; height:5px; border-radius:3px; background:rgba(255,255,255,0.08); overflow:hidden; display:block; }
+.rs-bar i { display:block; height:100%; border-radius:3px; }
+.rs-num { grid-column:3; font-size:10px; color:var(--text-mid); font-family:var(--font-px); }
+.rs-foot { margin-top:8px; font-size:11px; color:var(--text-mid); }
+/* v3.2 메가 · 각성 */
+.mega-box { display:flex; flex-direction:column; gap:5px; width:100%; }
+.mega-box:empty { display:none; }
+.mg-stack { color:#ffc24b; font-size:14px; letter-spacing:1px; text-align:center; }
+.mg-stack small { color:var(--text-mid); font-size:10px; letter-spacing:0; margin-left:4px; }
+.mega-btn { background:linear-gradient(135deg,#a78bfa,#6d28d9); width:100%; }
+.mega-btn:disabled { opacity:0.45; }
+#hud-stones { color:#d8c8ff; }

@@ -27,6 +27,7 @@ class Projectile {
     this.chainRange = opts.chainRange || 140;
     this.onHit = opts.onHit || null;
     this.engine = opts.engine;
+    this.src = opts.engine ? opts.engine._dmgSrc : null; // v3.2: 이 투사체를 쏜 타워 (데미지 집계용)
     this.done = false;
     this.trail = [];
     this.emoji = opts.emoji || null;
@@ -91,6 +92,8 @@ class Projectile {
 
   hit(enemy) {
     if (!enemy || enemy.dead) return;
+    const prevSrc = this.engine && this.engine._dmgSrc;
+    if (this.engine) this.engine._dmgSrc = this.src;
     enemy.takeDamage(this.damage, this.dmgType);
     // v27-10: 스턴은 지금까지 맞을 때마다 100% 발동이었음 - 확률제(35%)로 변경해서
     // 전기타워 연사에 계속 멈춰있던 문제를 근본적으로 완화 (다른 상태이상은 그대로 100% 유지)
@@ -112,6 +115,7 @@ class Projectile {
     if (this.chain > 0 && this.engine) this._doChain(enemy, this.chain);
     this.engine && this.engine.spawnHitParticle(enemy.x, enemy.y, this.color);
     this.onHit && this.onHit(enemy);
+    if (this.engine) this.engine._dmgSrc = prevSrc;
   }
 
   _doChain(from, rem) {

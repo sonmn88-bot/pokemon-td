@@ -373,7 +373,7 @@ const GachaTowerDefs = {
     id:'mewtwo', name:'뮤츠', emoji:'🔮', grade:'unique', type:'psychic', pokemonId:'mewtwo',
     damage:100, range:320, fireRate:1.6, desc:'전지전능 6타겟+크리',
     fire(t,e){
-      const all=e.enemies.filter(en=>!en.dead&&!en.reachedEnd&&Math.hypot(en.x-t.x,en.y-t.y)<=t.range).sort((a,b)=>b.distTraveled-a.distTraveled).slice(0,6);
+      const all=e.enemies.filter(en=>!en.dead&&!en.reachedEnd&&Math.hypot(en.x-t.x,en.y-t.y)<=t.range).sort((a,b)=>b.distTraveled-a.distTraveled).slice(0,4);
       for(const tgt of all){ let dmg=t.damage; if(Math.random()<0.35){dmg*=3;e.spawnFloatingText('🔮크리!',tgt.x,tgt.y-20,'#b39ddb');} e.projectiles.push(new Projectile(t.x,t.y,tgt,{engine:e,color:'#b39ddb',size:5,beam:true,beamLife:0.2})); tgt.takeDamage(dmg,'special'); tgt.applyStatus('slow',2.5,0.35); e.spawnHitParticle(tgt.x,tgt.y,'#7c4dff'); }
       t._psyTimer=(t._psyTimer||0)+1/t.fireRate;
       if(t._psyTimer>=4){ t._psyTimer=0; for(const en of e.enemies) if(!en.dead&&!en.reachedEnd&&Math.hypot(en.x-t.x,en.y-t.y)<=t.range) en.applyStatus('slow',1.5,0.5); e.particles.push(new AoeBurst(t.x,t.y,t.range,'#7c4dff')); }
@@ -457,8 +457,6 @@ GachaTowerDefs.moltres.fireRate = Math.round(2.0 * 0.68 * 100) / 100;
 function _shot(tower, engine, color, emoji, status, speed, onHit, splash, knockback) {
   if (!tower.target) return;
   // v27-6: MVP 집계용 데미지 출력량 트래킹 (요청4 - 게임오버 요약화면)
-  if (!engine._towerDamageStats) engine._towerDamageStats = {};
-  engine._towerDamageStats[tower._gachaId] = (engine._towerDamageStats[tower._gachaId] || 0) + tower.damage;
   engine.projectiles.push(new Projectile(tower.x, tower.y, tower.target, {
     engine, speed:speed||380, damage:tower.damage,
     color, size:5, dmgType:'special', emoji, status, onHit,
@@ -605,7 +603,7 @@ function _createGachaTower(def, x, y, engine) {
     _tempDmgMul:1, _pokecenterTimer:0, _auraDmgMul:1, // v27-29: 임시버프+오라 전용 필드 (영구곱연산 버그 수정)
     get range(){ return (def.range+(this.synergyBonus*2))*Math.min(this.buffRangeMul, BUFF_CAPS.range)*(this._heroRangeMul||1); },
     get damage(){
-      const base = (def.damage+this.synergyBonus+(this.flatDmg||0))*Math.min(this.buffDmgMul, BUFF_CAPS.damage)*this.masteryMul*(this._tempDmgMul||1)*(this._auraDmgMul||1)*(this._heroDmgMul||1);
+      const base = (def.damage+this.synergyBonus+(this.flatDmg||0))*Math.min(this.buffDmgMul, BUFF_CAPS.damage)*this.masteryMul*(this._tempDmgMul||1)*(this._auraDmgMul||1)*(this._heroDmgMul||1)*(this._divMul||1)*(1+0.35*(((this.def&&this.def._stack)||1)-1)); // v3.2: 타입 다양성 · 각성 ★
       const mul = window.typeEffectiveness ? window.typeEffectiveness(def.type, this.target && this.target.typeTag) : 1;
       return base * mul;
     },
@@ -652,7 +650,7 @@ function _createGachaTower(def, x, y, engine) {
       if(this.target&&this.cooldown<=0){
         this.cooldown=1/this.fireRate;
         this.fireFlash=0.1;
-        def.fire(this,engine);
+        engine._dmgSrc = this; def.fire(this,engine); engine._dmgSrc = null; // v3.2: 실제 데미지 귀속 (MVP 정확도)
       }
     },
     draw(ctx){
@@ -825,6 +823,11 @@ function applyTowerSynergies(towers) {
   // v27-46: 일반 타입 시너지(같은/유사 타입 근접 배치 보너스) 완전 제거함 (요청4 - "너무 랜덤이라
   // 없애도 될 것 같다"). 피삐/픽시블 전용 오라는 그 타워 고유 능력이라 유지함.
   for(const t of towers) { t.synergyBonus=0; t._auraDmgMul=1; }
+  // v3.2 (D): 필드의 서로 다른 타입 수 보너스 - 4종 +10% / 5종 +20% / 6종 +30% (위치 무관)
+  const _types = new Set(towers.map(t => t.def && t.def.type).filter(Boolean)).size;
+  const _div = _types >= 6 ? 1.3 : _types >= 5 ? 1.2 : _types >= 4 ? 1.1 : 1;
+  for (const t of towers) t._divMul = _div;
+  if (window.app && window.app._onDiversityChange) window.app._onDiversityChange(_types, _div);
   for(let i=0;i<towers.length;i++){
     for(let j=i+1;j<towers.length;j++){
       const a=towers[i],b=towers[j];

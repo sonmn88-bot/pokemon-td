@@ -34,7 +34,7 @@
       <button id="btn-start" class="title-start-btn">
         게임 시작
       </button>
-      <div class="title-version" id="app-version">v3.2 · 10/25 · #43</div>
+      <div class="title-version" id="app-version">v3.3 · 10/25 · #44</div>
     </div>
     <div class="title-pokemon-row">
       <span class="title-pkm" data-delay="0">⚡</span>
@@ -77,6 +77,8 @@
       <div class="hud-cell" id="hud-wave"><i data-ic="wave"></i><span id="wave-val">0</span>/<span id="wave-total">∞</span></div>
       <div class="hud-cell" id="hud-score"><i data-ic="medal"></i><span id="score-val">0</span></div>
       <div class="hud-cell" id="hud-field" title="필드 몬스터 (200마리가 되면 패배)"><i data-ic="monster"></i><span id="field-count-val">0</span><span class="fg-bar"><i id="field-gauge"></i></span></div>
+      <div class="hud-cell" id="hud-stones" style="display:none" title="메가스톤 (20웨이브 보스에서 확률 드롭)">💎<span>0</span></div>
+      <div class="hud-cell" id="hud-div" style="display:none" title="서로 다른 타입 수 보너스 (4종 +10% · 5종 +20% · 6종 +30%)">🌈<span>0</span></div>
       <div class="hud-cell" id="hud-trait" title="이번 판 시드특성" style="cursor:help">🎲</div>
       <div class="hud-cell" id="hud-timer" style="display:none"><i data-ic="timer"></i><span id="timer-val">--</span>s</div>
       <div id="hud-speed">
@@ -120,5 +122,6 @@
 <script src="main.js"></script>
 <script src="ui-builders.js"></script>
 <script src="storage.js"></script>
+<script src="mega.js"></script>
 </body>
 </html>

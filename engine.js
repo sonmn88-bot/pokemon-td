@@ -267,7 +267,7 @@ class GameEngine {
     // 타워
     for (const t of this.towers) t.update(this.dt, this.enemies, this);
     // 영웅
-    for (const h of this.heroes) h.update(this.dt, this);
+    for (const h of this.heroes) { this._dmgSrc = h; h.update(this.dt, this); this._dmgSrc = null; }
     // 발사체
     for (let i = this.projectiles.length - 1; i >= 0; i--) {
       this.projectiles[i].update(this.dt);
@@ -302,6 +302,20 @@ class GameEngine {
     }
 
     if (this.shakeTimer > 0) this.shakeTimer -= this.dt;
+  }
+
+  // v3.2: 실제로 들어간 데미지·처치를 출처별로 집계 (MVP·결과 화면용). 출처: 타워(_gachaId) / 영웅 / 기타
+  _recordDmg(src, dmg) {
+    const k = !src ? 'other' : src._gachaId || (src.def && src.id && !src._gachaId ? 'hero' : 'other');
+    const s = this._dmgStats || (this._dmgStats = {});
+    const r = s[k] || (s[k] = { dmg: 0, kills: 0 });
+    r.dmg += dmg;
+    if (k !== 'hero' && k !== 'other') { const t = this._towerDamageStats || (this._towerDamageStats = {}); t[k] = (t[k] || 0) + dmg; }
+  }
+  _recordKill(src) {
+    const k = !src ? 'other' : src._gachaId || (src.def && src.id && !src._gachaId ? 'hero' : 'other');
+    const s = this._dmgStats || (this._dmgStats = {});
+    (s[k] || (s[k] = { dmg: 0, kills: 0 })).kills++;
   }
 
   _onEnemyDie(enemy) {
@@ -456,6 +470,7 @@ class GameEngine {
     }
 
     // v27: 수동 보스소환 등급 배율 (1~5단계, 너무 약해서 순삭당하던 문제 수정)
+    if (item.megaDrop || item.isKing) enemy._megaDrop = true; // v3.2: 20웨이브 보스·왕 → 메가스톤 확률 드롭
     if (item.bossTier) {
       enemy.maxHp = Math.round(enemy.maxHp * item.hpMul);
       enemy.hp = enemy.maxHp;

@@ -1,5 +1,5 @@
 // 배포 버전 표시: index.html의 #app-version 과 sw.js CACHE 번호(#)를 배포할 때마다 같이 올림
-const CACHE = 'pokemon-td-v43';
+const CACHE = 'pokemon-td-v44';
 const ASSETS = [
   '/pokemon-td/',
   '/pokemon-td/index.html',
@@ -18,6 +18,7 @@ const ASSETS = [
   '/pokemon-td/ui-builders.js',
   '/pokemon-td/storage.js',
   '/pokemon-td/icons.js',
+  '/pokemon-td/mega.js',
   '/pokemon-td/sprites.js',
   '/pokemon-td/manifest.json',
 ];

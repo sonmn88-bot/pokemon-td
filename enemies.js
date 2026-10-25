@@ -363,7 +363,8 @@ class Enemy {
     if (this._poisonCooldown > 0) this._poisonCooldown -= dt;
 
     // 재생
-    if (this.def.special === 'regen') {
+    if (this._noRegen > 0) this._noRegen -= dt; // v3.2 메가이상해꽃: 재생 봉쇄
+    if (this.def.special === 'regen' && !(this._noRegen > 0)) {
       this.hp = Math.min(this.maxHp, this.hp + this.def.regenRate * dt);
     }
 
@@ -435,6 +436,7 @@ class Enemy {
       this._dmgWindowTotal += dmg;
     }
 
+    if (this.engine && this.engine._recordDmg) this.engine._recordDmg(this.engine._dmgSrc, Math.max(0, Math.min(dmg, this.hp)));
     this.hp -= dmg;
     this.flashTimer = 0.1;
 
@@ -551,6 +553,7 @@ class Enemy {
   die() {
     if (this.dead) return;
     this.dead = true;
+    if (this.engine && this.engine._recordKill) this.engine._recordKill(this.engine._dmgSrc);
 
     // 폭발 (또가스)
     if (this.def.special === 'explode') {

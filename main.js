@@ -65,6 +65,12 @@ function generateWave(n) {
     const favored = pool.filter(id => EnemyTypes[id]?.type === favType);
     for (let i = 0; i < 2; i++) pool = pool.concat(favored); // 3배 가중치
   }
+  // v3.2: 이번 판 몬스터 편성 - 강조된 특성 2가지는 3배 자주 등장
+  const emph = window.app?.engine?._runEmphasis;
+  if (emph && typeof EnemyTypes !== 'undefined') {
+    const fav = pool.filter(id => emph.includes(EnemyTypes[id]?.special));
+    for (let i = 0; i < 2; i++) pool = pool.concat(fav);
+  }
 
   // 웨이브가 진행될수록 더 많이, 더 빽빽하게 스폰 (계속 돌면서 잡는 느낌). cycle이 늘수록(90웨이브 이후 반복) 한번 더 강화
   let enemyCount = Math.min(140, Math.round(18 + n * 1.0)) + cycle * 10; // v28 (설계서 §2): 18+웨이브, 최대 140 (+90 이후 사이클당 10) // v27-39: 선형계수 4.6→1.3 대폭 하향 (요청4 - wave44에 이미 228마리로 계산되어 단일 웨이브가 필드상한을 넘어서던 근본 문제)
@@ -91,9 +97,9 @@ function generateWave(n) {
   } else if (n % 30 === 0) {
     // v27-32 버그수정: 존보스가 소환보스와 달리 별도 체력배율이 전혀 없어서 일반몹 수준(예: 갸라도스
     // 기본체력 489)으로 취급되고 있었음 - "초반 보스가 너무 빨리 죽는다"는 문제의 진짜 원인이었을 가능성 높음
-    arr.push({ type: BOSS_POOL[Math.floor(Math.random() * BOSS_POOL.length)], delay: lastDelay + 4, bossTier: true, hpMul: 12 + n * 0.4, rewardMul: 6 }); // v27-46: 보상 추가 인상
+    arr.push({ type: BOSS_POOL[Math.floor(Math.random() * BOSS_POOL.length)], delay: lastDelay + 4, bossTier: true, hpMul: 12 + n * 0.4, rewardMul: 6, megaDrop: n % 20 === 0 }); // v27-46: 보상 추가 인상
   } else if (n % 10 === 0) {
-    arr.push({ type: MINIBOSS_POOL[Math.floor(Math.random() * MINIBOSS_POOL.length)], delay: lastDelay + 4, bossTier: true, hpMul: 8 + n * 0.3, rewardMul: 3.5 }); // v27-46: 보상 추가 인상
+    arr.push({ type: MINIBOSS_POOL[Math.floor(Math.random() * MINIBOSS_POOL.length)], delay: lastDelay + 4, bossTier: true, hpMul: 8 + n * 0.3, rewardMul: 3.5, megaDrop: n % 20 === 0 }); // v27-46: 보상 추가 인상
   }
 
   return arr;
@@ -474,6 +480,9 @@ class App {
         <b style="color:#ffc24b">💰 골드</b> — 처치 골드 + 웨이브 클리어 보너스 + <b>이자</b>(10골드당 1, 최대 30). 모아두면 이자가 붙어요.<br><br>
         <b style="color:#ffc24b">⚡ 영웅</b> — 맵에 놓고 길 근처로 옮겨요. 레벨이 오르면 스킬 포인트로 스킬트리를 찍어요(영웅을 누르면 열림).<br><br>
         <b style="color:#ffc24b">👹 보스</b> — 왼쪽 아래에서 직접 소환하면 큰 보상. 30웨이브마다 구역이 바뀌고 전설 보스가, 90웨이브엔 왕 루기아가 나와요.<br><br>
+        <b style="color:#ffc24b">💎 메가진화</b> — 리자몽·거북왕·이상해꽃·갸라도스·쁘사이저·독침붕·프테라·캥카·피죤투·후딘·팬텀·썬더를 필드에 두고 누르면 <b>🍖 먹이기</b>로 보관함의 같은 포켓몬을 흡수해 ★이 올라요(★당 +35%). ★3 + 메가스톤이면 메가진화, 이후 ★5까지 계속 키울 수 있어요. 메가스톤은 <b>20웨이브마다 나오는 보스</b>에서 확률로만 나와요(30%부터 점점 올라감).<br><br>
+        <b style="color:#ffc24b">🧭 이번 판 편성</b> — 시작할 때 이번 판에 많이 나오는 몬스터 특성 2가지와 추천 메가를 알려줘요. 유니크·메가는 같은 종 1마리만 배치할 수 있고, 필드에 서로 다른 타입이 4·5·6종이면 전체 공격력 +10·20·30%(상단 🌈).<br><br>
+        <b style="color:#ffc24b">✨ 영웅 변신</b> — 15웨이브 이후 가끔(또는 20웨이브 보스에서) 영웅 전용 아이템이 떨어지면 변신해요. 피카츄→거다이맥스, 토게틱→토게키스, 이브이 계열은 금빛 각성.<br><br>
         <b style="color:#ffc24b">💿 기술머신</b> — 에픽·레전드 타워를 누르면 1500골드에 특성 1개를 배울 수 있어요(타워당 1번).
       </div>
     `;
@@ -799,6 +808,12 @@ class App {
   _placePulledTower(def, slotIdx) {
     const slot = this.engine.towerSlots[slotIdx];
     if (!slot || slot.occupied) return;
+    // v3.2 (B): 유니크·메가는 같은 종 1마리만 필드에 - 넘치면 보관함으로
+    if (def.grade === 'unique' && this.engine.towers.some(t => t._gachaId === def.id)) {
+      this._addToStorage([def]);
+      this.showWaveAnnounce(`${def.name}은(는) 필드에 1마리만 둘 수 있어요 → 보관함`, '#ff5c7a');
+      return;
+    }
     const tower = window._createGachaTower(def, slot.x, slot.y, this.engine);
     slot.occupied = true;
     slot.tower = tower;
@@ -1059,6 +1074,7 @@ class App {
       this._recordKingKill(); // v27-17: 왕 처치 기록 갤러리 (요청4)
     };
     this.engine.onWaveComplete = (wave, bonus, timedOut) => {
+      this._megaWaveClear && this._megaWaveClear(wave);
       // v28: 토게피 '황금알' - N웨이브마다 무료 프리미엄 뽑기
       const every = this.engine._freePullEvery || 0;
       if (every > 0 && wave % every === 0) {
@@ -1115,6 +1131,7 @@ class App {
     this.buildBossSummonButton();
     this.startHeroLoop();
     this._applyRunSeedTrait(); // v27-18: 이번 판 한정 랜덤 시드특성 (요청G)
+    this._megaRunInit && this._megaRunInit(); // v3.2: 메가스톤·편성·영웅 아이템
     this._showStarterTowerPicker(); // v27-5: 시작 시 스타터 타워 3택1 (요청B - 초반 결정 유도)
   }
 
@@ -1772,19 +1789,31 @@ class App {
       // v27-6: 이번 판 요약 (요청4) - MVP타워/최고시너지/사용 종수
       const summary = document.createElement('div');
       summary.style.cssText = 'background:rgba(0,0,0,0.3);border-radius:10px;padding:10px 16px;margin:6px 0;font-size:12px;color:#ccc;text-align:left;min-width:220px;';
-      const dmgStats = this.engine._towerDamageStats || {};
-      let mvpId = null, mvpDmg = 0;
-      for (const id in dmgStats) { if (dmgStats[id] > mvpDmg) { mvpDmg = dmgStats[id]; mvpId = id; } }
-      const mvpDef = mvpId && window.GachaTowerDefs?.[mvpId];
-      const varietyCount = this.missionTracker?.stats?.collectedIds?.size || 0;
+      // v3.2: 실제로 들어간 데미지 기준 (예전엔 '공격 횟수 × 공격력'이라 뮤츠처럼 특수 공격하는 타워가 빠졌음)
+      const ds = this.engine._dmgStats || {};
+      const total = Object.values(ds).reduce((a, r) => a + r.dmg, 0) || 1;
+      const rows = Object.entries(ds).filter(([k]) => k !== 'other').sort((a, b) => b[1].dmg - a[1].dmg).slice(0, 6);
+      const fmt = n => n >= 1e6 ? (n / 1e6).toFixed(1) + 'M' : n >= 1e3 ? (n / 1e3).toFixed(1) + 'K' : Math.round(n);
+      const mvpRow = rows.find(([k]) => k !== 'hero');
+      const mvpDef = mvpRow && window.GachaTowerDefs?.[mvpRow[0]];
+      const heroName = this.engine.heroes?.[0]?.name || '영웅';
+      const rowHtml = rows.map(([k, r], i) => {
+        const d = k === 'hero' ? null : window.GachaTowerDefs?.[k];
+        const nm = d ? d.name : heroName;
+        const cnt = d ? this.engine.towers.filter(t => t._gachaId === k).length : 1;
+        const pct = Math.round(r.dmg / total * 100);
+        const col = d ? window.GRADES[d.grade].color : '#ffc24b';
+        return `<div class="rs-row"><span class="rs-rank">${i + 1}</span>${d ? PKM(d, 26) : '⚡'}<span class="rs-name" style="color:${col}">${nm}${cnt > 1 ? ` ×${cnt}` : ''}</span>
+          <span class="rs-bar"><i style="width:${pct}%;background:${col}"></i></span><span class="rs-num">${fmt(r.dmg)} · ${pct}% · ${r.kills}킬</span></div>`;
+      }).join('');
+      const varietyCount = new Set(this.engine.towers.map(t => t.def?.type)).size;
       // v27-18: 사망 서사 (요청F)
       const dc = this.engine._deathCause;
       const deathLine = dc ? `<div style="color:#ff5c7a;font-style:italic;margin-top:4px">💀 ${dc.name} ${dc.count}마리에게 둘러싸여 무너졌습니다</div>` : '';
       summary.innerHTML = `
-        <div style="color:#ffc24b;font-weight:700;margin-bottom:4px;">📊 이번 판 요약</div>
-        <div>⭐ MVP 타워: ${mvpDef ? `${mvpDef.emoji} ${mvpDef.name}` : '-'}</div>
-        <div>🎲 사용한 포켓몬 종류: ${varietyCount}종</div>
-        <div>🏅 최종 점수: ${(this.engine.score||0).toLocaleString()}</div>
+        <div style="color:#ffc24b;font-weight:700;margin-bottom:6px;">📊 이번 판 요약 — 데미지 순위</div>
+        ${rowHtml || '<div>기록 없음</div>'}
+        <div class="rs-foot">총 데미지 ${fmt(total)} · 필드 ${this.engine.towers.length}마리 · 타입 ${varietyCount}종 · 점수 ${(this.engine.score||0).toLocaleString()}</div>
         ${deathLine}
       `;
       overlay.appendChild(summary);

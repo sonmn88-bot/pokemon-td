@@ -299,8 +299,6 @@ function _dexFire(def, color) {
       if (has('crit') && Math.random() < 0.25) { dmg *= 2.2; crit = true; }
       if (has('antiAir') && tgt.def?.special === 'flying') dmg *= 1.7;
       if (def.role === 'boss' && (tgt.isBoss || tgt._elite)) dmg *= 2.5;
-      if (!e._towerDamageStats) e._towerDamageStats = {};
-      e._towerDamageStats[def.id] = (e._towerDamageStats[def.id] || 0) + dmg;
       e.projectiles.push(new Projectile(t.x, t.y, tgt, {
         engine: e, speed: def.profile === 'F' ? 560 : def.profile === 'H' ? 360 : 440,
         damage: dmg, color, size: def.profile === 'H' ? 7 : 5, emoji: def.emoji,
