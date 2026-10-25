@@ -16,16 +16,16 @@ const ENEMY_TIERS = {
   t4: ['gyarados','electrode','dragonite'],
 };
 const MINIBOSS_POOL = ['gyarados', 'dragonite'];
-const BOSS_POOL = ['lugia', 'mewtwo'];
+const BOSS_POOL = ['lugia', 'raikou', 'entei', 'hooh']; // v3.1: 스이쿤·라이코·앤테이·칠색조 (왕 루기아는 따로)
 
 // v27-3: 보스 난이도 추가 상향 - 기본 배율을 더 키우고, 소환 시점 웨이브에 비례해서도 더 강해지게
 // (10라운드째에도 5단계까지 다 잡히던 문제 - 고정배율만으론 후반에 상대적으로 계속 약해지므로 웨이브연동 필수)
 const BOSS_TIERS = [
-  { tier: 1, type: 'gyarados', label: '갸라도스',   hpMul: 1.4, rewardMul: 42,  minWave: 1  }, // v27-46: 잡기 어려워진 만큼 보상 추가 인상
-  { tier: 2, type: 'dragonite', label: '망나뇽',    hpMul: 2.0, rewardMul: 75, minWave: 15 },
-  { tier: 3, type: 'lugia',    label: '루기아',      hpMul: 2.8, rewardMul: 115, minWave: 35 },
-  { tier: 4, type: 'mewtwo',   label: '뮤츠',        hpMul: 3.8, rewardMul: 170, minWave: 55 },
-  { tier: 5, type: 'mewtwo',   label: '뮤츠(각성)',  hpMul: 5.2, rewardMul: 250, minWave: 75 },
+  { tier: 1, type: 'gyarados', label: '링곰',   hpMul: 1.4, rewardMul: 42,  minWave: 1  }, // v27-46: 잡기 어려워진 만큼 보상 추가 인상
+  { tier: 2, type: 'dragonite', label: '마기라스',    hpMul: 2.0, rewardMul: 75, minWave: 15 },
+  { tier: 3, type: 'lugia',    label: '스이쿤',      hpMul: 2.8, rewardMul: 115, minWave: 35 },
+  { tier: 4, type: 'hooh',     label: '칠색조',        hpMul: 3.8, rewardMul: 170, minWave: 55 },
+  { tier: 5, type: 'mewtwo',   label: '루기아(각성)',  hpMul: 5.2, rewardMul: 250, minWave: 75 },
 ];
 const BOSS_SUMMON_COOLDOWN = 180; // v27-42: 60→180(3배) - 스킵 대비 정면승부 보상을 늘리기 위해 쿨다운도 늘림
 // v27-46 버그수정: 이전엔 (티어배율)×(웨이브배율) 형태로 곱연산되어 있어서 지수적으로 폭주하고 있었음
@@ -1043,7 +1043,7 @@ class App {
       const el = document.createElement('div');
       el.className = 'wave-announce boss';
       el.innerHTML = boss._isKing
-        ? `👑 ${boss.def.emoji} 궁극의 뮤츠 (왕) 등장!<br><span style="font-size:0.85em;font-style:italic">"…감히 내 영역에 발을 들이다니."</span>${weakHint}<br><span style="font-size:0.65em">⚠️ 이후로는 존 이동 없이 이 자리에서 무한 강화 모드로 진입합니다</span>`
+        ? `👑 ${boss.def.emoji} 바다의 신 루기아 (왕) 등장!<br><span style="font-size:0.85em;font-style:italic">"…감히 내 영역에 발을 들이다니."</span>${weakHint}<br><span style="font-size:0.65em">⚠️ 이후로는 존 이동 없이 이 자리에서 무한 강화 모드로 진입합니다</span>`
         : `${boss.def.emoji} ${boss.name} 등장!<br><span style="font-size:0.7em">⚠️ 보스</span>${weakHint}`;
       document.getElementById('game-screen').appendChild(el);
       setTimeout(() => el.remove(), boss._isKing ? 4500 : 2800);

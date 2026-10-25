@@ -1,27 +1,31 @@
-// ===== ENEMIES.JS - 적 12종 + 이동  시스템 =====
+// ===== ENEMIES.JS - 적 (v3.1: 2세대 포켓몬) + 이동 시스템 =====
+// 내부 id는 예전 이름 그대로(웨이브·보스 코드 호환), 이름·이미지·타입만 2세대로 교체
 
 // 적 캐릭터 이미지 (실사 포켓몬 스프라이트)
 const EnemySpriteImages = {
-  abo: 'assets/enemies/abo.png',
-  golbat: 'assets/enemies/golbat.png',
-  jigglypuff: 'assets/enemies/jigglypuff.png',
-  gastly: 'assets/enemies/gastly.png',
-  paras: 'assets/enemies/paras.png',
-  phantump: 'assets/enemies/phantump.png',
-  lapras: 'assets/enemies/lapras.png',
-  gyarados: 'assets/enemies/gyarados.png',
-  weezing: 'assets/enemies/weezing.png',
-  scyther: 'assets/enemies/scyther.png',
-  lugia: 'assets/enemies/lugia.png',
-  mewtwo: 'assets/enemies/mewtwo.png',
-  rattata: 'assets/enemies/rattata.png',
-  zubat: 'assets/enemies/zubat.png',
-  koffing: 'assets/enemies/koffing.png',
-  magnemite: 'assets/enemies/magnemite.png',
-  onix: 'assets/enemies/onix.png',
-  haunter: 'assets/enemies/haunter.png',
-  electrode: 'assets/enemies/electrode.png',
-  dragonite: 'assets/enemies/dragonite.png',
+  abo: 'assets/enemies/unown.png',
+  golbat: 'assets/enemies/crobat.png',
+  jigglypuff: 'assets/enemies/snubbull.png',
+  gastly: 'assets/enemies/misdreavus.png',
+  paras: 'assets/enemies/hoppip.png',
+  phantump: 'assets/enemies/blissey.png',
+  lapras: 'assets/enemies/swinub.png',
+  gyarados: 'assets/enemies/ursaring.png',
+  weezing: 'assets/enemies/magcargo.png',
+  scyther: 'assets/enemies/scizor.png',
+  lugia: 'assets/enemies/suicune.png',
+  mewtwo: 'assets/enemies/lugia.png',
+  rattata: 'assets/enemies/sentret.png',
+  zubat: 'assets/enemies/hoothoot.png',
+  koffing: 'assets/enemies/qwilfish.png',
+  magnemite: 'assets/enemies/mareep.png',
+  onix: 'assets/enemies/steelix.png',
+  haunter: 'assets/enemies/umbreon.png',
+  electrode: 'assets/enemies/elekid.png',
+  dragonite: 'assets/enemies/tyranitar.png',
+  raikou: 'assets/enemies/raikou.png',
+  entei: 'assets/enemies/entei.png',
+  hooh: 'assets/enemies/hooh.png',
 };
 
 // ===== 경로 진행도 계산 유틸 =====
@@ -56,15 +60,15 @@ function totalPathLength(path) {
 const EnemyTypes = {
   // ─── 1~5웨이브 메인 ───
   abo: {
-    type: 'grass',
-    name: '아보',     emoji: '🐍',
+    type: 'psychic',
+    name: '안농',  emoji: '🔣',
     hp: 203,  speed: 88, reward: 1,  size: 18,
     color: '#8bc34a',
     special: 'split',   // 죽을 때 약한 개체 2마리로 분裂
   },
   golbat: {
     type: 'psychic',
-    name: '골뱃',     emoji: '🦇',
+    name: '크로뱃',  emoji: '🦇',
     hp: 122,  speed: 139, reward: 1, size: 20,
     color: '#9c27b0',
     special: 'flying',   // 배리어 무시
@@ -72,14 +76,14 @@ const EnemyTypes = {
   },
   jigglypuff: {
     type: 'normal',
-    name: '푸린',     emoji: '🎤',
+    name: '블루',  emoji: '🐶',
     hp: 244, speed: 52, reward: 1, size: 22,
     color: '#f48fb1',
     special: 'poisonImmune',
   },
   gastly: {
     type: 'psychic',
-    name: '고오스',   emoji: '👻',
+    name: '무우마',  emoji: '👻',
     hp: 142,  speed: 94, reward: 1, size: 20,
     color: '#673ab7',
     special: 'ghost',    // 물리 데미지 50% 감소
@@ -87,7 +91,7 @@ const EnemyTypes = {
   },
   paras: {
     type: 'grass',
-    name: '파라스',   emoji: '🍄',
+    name: '통통코',  emoji: '🌸',
     hp: 181,  speed: 70, reward: 1, size: 20,
     color: '#ff7043',
     special: 'spore',    // 근처 타워 디버프
@@ -97,8 +101,8 @@ const EnemyTypes = {
 
   // ─── 6~10웨이브 ───
   phantump: {
-    type: 'grass',
-    name: '나목령',   emoji: '🌲',
+    type: 'normal',
+    name: '해피너스',  emoji: '🥚',
     hp: 406, speed: 43, reward: 2, size: 24,
     color: '#5d4037',
     special: 'regen',    // 초당 HP 5 재생
@@ -106,14 +110,14 @@ const EnemyTypes = {
   },
   lapras: {
     type: 'water',
-    name: '라프라스', emoji: '🦭',
+    name: '꾸꾸리',  emoji: '🐗',
     hp: 264, speed: 82, reward: 1, size: 22,
     color: '#b18cff',
     special: 'iceImmune',
   },
   gyarados: {
-    type: 'water',
-    name: '갸라도스',  emoji: '🐲',
+    type: 'normal',
+    name: '링곰',  emoji: '🐻',
     hp: 709, speed: 48, reward: 3, size: 30,
     color: '#1565c0',
     special: 'rage',     // 피격 시 분노 = 속도 +20% (최대 3스택)
@@ -123,7 +127,7 @@ const EnemyTypes = {
   // ─── 11~15웨이브 ───
   weezing: {
     type: 'fire',
-    name: '또도가스', emoji: '☁️',
+    name: '마그카르고',  emoji: '🐌',
     hp: 304, speed: 52, reward: 2, size: 26,
     color: '#78909c',
     special: 'explode',  // 사망 시 범위 데미지
@@ -131,7 +135,7 @@ const EnemyTypes = {
   },
   scyther: {
     type: 'grass',
-    name: '스라크',   emoji: '🦗',
+    name: '핫삼',  emoji: '🦂',
     hp: 568, speed: 88, reward: 2, size: 26,
     color: '#66bb6a',
     special: 'armor',    // 물리 데미지 90% 감소
@@ -140,7 +144,7 @@ const EnemyTypes = {
   // ─── 보스 ───
   lugia: {
     type: 'water',
-    name: '루기아',   emoji: '🕊️',
+    name: '스이쿤',  emoji: '💧',
     hp: 3654, speed: 39, reward: 8, size: 40,
     color: '#b0bec5',
     special: 'boss',
@@ -148,7 +152,7 @@ const EnemyTypes = {
   },
   mewtwo: {
     type: 'psychic',
-    name: '뮤츠',    emoji: '🔮',
+    name: '루기아',  emoji: '🌊',
     hp: 10150, speed: 52, reward: 22, size: 44,
     color: '#7c4dff',
     special: 'finalBoss',
@@ -158,25 +162,30 @@ const EnemyTypes = {
     teleportCooldown: 0, teleportInterval: 14,
   },
 
+  // v3.1: 2세대 전설 보스
+  raikou: { type:'electric', name:'라이코', emoji:'⚡', hp:3654, speed:44, reward:8, size:40, color:'#ffca28', special:'boss', isBoss:true },
+  entei:  { type:'fire',     name:'앤테이', emoji:'🔥', hp:3654, speed:39, reward:8, size:40, color:'#8d4a1f', special:'boss', isBoss:true },
+  hooh:   { type:'fire',     name:'칠색조', emoji:'🌈', hp:7000, speed:46, reward:16, size:44, color:'#ff7043', special:'boss', isBoss:true },
+
   // ─── 콘텐츠 확장: 추가 포켓몬 8종 ───
   rattata: {
     type: 'normal',
-    name: '꼬렛',     emoji: '🐭',
+    name: '꼬리선',  emoji: '🐿️',
     hp: 81,  speed: 165, reward: 1, size: 16,
     color: '#a1887f',
     special: 'swift',     // 매우 빠름, 타겟팅 우선순위 낮춤 트릭용
   },
   zubat: {
-    type: 'psychic',
-    name: '주뱃',     emoji: '🦋',
+    type: 'normal',
+    name: '부우부',  emoji: '🦉',
     hp: 102,  speed: 132, reward: 1, size: 18,
     color: '#7e57c2',
     special: 'flying',
     flyHeight: 6,
   },
   koffing: {
-    type: 'psychic',
-    name: '또가스',   emoji: '💨',
+    type: 'water',
+    name: '침바루',  emoji: '🐡',
     hp: 203, speed: 48, reward: 1, size: 20,
     color: '#90a4ae',
     special: 'poisonAura',  // 주변 적 면역 부여(단순화: 자기 자신만 면역 적용은 poisonImmune로 처리)
@@ -184,22 +193,22 @@ const EnemyTypes = {
   },
   magnemite: {
     type: 'electric',
-    name: '코일(야생)', emoji: '🧲',
+    name: '메리프',  emoji: '🐑',
     hp: 171,  speed: 76, reward: 1, size: 18,
     color: '#fdd835',
     special: 'shockImmune',  // 스턴 저항 50%
     stunResist: 0.5,
   },
   onix: {
-    type: 'normal',
-    name: '롱스톤',   emoji: '🪨',
+    type: 'electric',
+    name: '강철톤',  emoji: '⛓️',
     hp: 528, speed: 39, reward: 2, size: 28,
     color: '#8d6e63',
     special: 'armor',
   },
   haunter: {
     type: 'psychic',
-    name: '고우스트', emoji: '👤',
+    name: '블래키',  emoji: '🌑',
     hp: 284, speed: 100, reward: 2, size: 22,
     color: '#5e35b1',
     special: 'ghost',
@@ -207,19 +216,19 @@ const EnemyTypes = {
   },
   electrode: {
     type: 'electric',
-    name: '붐볼',     emoji: '🔴',
+    name: '에레키드',  emoji: '⚡',
     hp: 223, speed: 125, reward: 1, size: 20,
     color: '#e53935',
     special: 'explode',
     explodeRadius: 70, explodeDamage: 40,
   },
   dragonite: {
-    type: 'water',
-    name: '망나뇽',   emoji: '🐉',
+    type: 'grass',
+    name: '마기라스',  emoji: '🦖',
     hp: 1827, speed: 70, reward: 6, size: 34,
     color: '#fb8c00',
-    special: 'flying',
-    flyHeight: 10,
+    special: 'rage',     // v3.1 마기라스: 맞을수록 빨라짐 (비행 → 분노)
+    rageStacks: 0, maxRageStacks: 3,
     isBoss: false,
   },
 };
