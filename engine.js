@@ -759,38 +759,21 @@ class GameEngine {
       const map = this.currentMap;
       const pw = map.pathWidth || 34;
 
-      // 외곽 그림자
-      ctx.save(); ctx.strokeStyle='rgba(0,0,0,0.5)'; ctx.lineWidth=pw+12;
-      ctx.lineCap='round'; ctx.lineJoin='round';
-      ctx.beginPath(); ctx.moveTo(path[0].x,path[0].y);
-      for (let i=1;i<path.length;i++) ctx.lineTo(path[i].x,path[i].y);
-      ctx.stroke(); ctx.restore();
-
-      // 경로 어두운 테두리
-      ctx.save(); ctx.strokeStyle=map.pathColorDark||map.pathColor;
-      ctx.lineWidth=pw+6; ctx.lineCap='round'; ctx.lineJoin='round';
-      ctx.beginPath(); ctx.moveTo(path[0].x,path[0].y);
-      for (let i=1;i<path.length;i++) ctx.lineTo(path[i].x,path[i].y);
-      ctx.stroke(); ctx.restore();
-
-      // 경로 본체 - 텍스처(흙/벽돌/돌) 있으면 패턴으로
+      // v3.0 자연 지형: 딱딱한 테두리 대신 '닳은 흙 가장자리'를 흐리게 → 골짜기 바닥 길처럼
+      const trace = () => { ctx.beginPath(); ctx.moveTo(path[0].x,path[0].y); for (let i=1;i<path.length;i++) ctx.lineTo(path[i].x,path[i].y); };
+      ctx.save(); ctx.lineCap='round'; ctx.lineJoin='round';
+      ctx.filter='blur(6px)'; ctx.strokeStyle='rgba(0,0,0,0.32)'; ctx.lineWidth=pw+22; trace(); ctx.stroke();   // 골짜기 그늘
+      ctx.filter='blur(3px)'; ctx.strokeStyle=map.pathColorDark||map.pathColor; ctx.globalAlpha=0.75;
+      ctx.lineWidth=pw+9; trace(); ctx.stroke();                                                                   // 흙 가장자리
+      ctx.filter='none'; ctx.globalAlpha=1;
       let pathFill = map.pathColor;
       if (map.pathTextures) {
         const ppat = this._getMosaicPattern(ctx, map.name + '_path', map.pathTextures, map.pathTileSize || 40);
         if (ppat) pathFill = ppat;
       }
-      ctx.save(); ctx.strokeStyle=pathFill;
-      ctx.lineWidth=pw; ctx.lineCap='round'; ctx.lineJoin='round';
-      ctx.beginPath(); ctx.moveTo(path[0].x,path[0].y);
-      for (let i=1;i<path.length;i++) ctx.lineTo(path[i].x,path[i].y);
-      ctx.stroke(); ctx.restore();
-
-      // 하이라이트 (밝은 중앙선)
-      ctx.save(); ctx.strokeStyle=map.pathHighlight||'rgba(255,255,255,0.10)';
-      ctx.lineWidth=pw*0.32; ctx.lineCap='round'; ctx.lineJoin='round';
-      ctx.beginPath(); ctx.moveTo(path[0].x,path[0].y);
-      for (let i=1;i<path.length;i++) ctx.lineTo(path[i].x,path[i].y);
-      ctx.stroke(); ctx.restore();
+      ctx.strokeStyle=pathFill; ctx.lineWidth=pw; trace(); ctx.stroke();                                          // 길 바닥
+      ctx.strokeStyle='rgba(0,0,0,0.18)'; ctx.lineWidth=pw*0.55; ctx.setLineDash([2,9]); trace(); ctx.stroke();   // 바퀴/발자국 자국
+      ctx.setLineDash([]); ctx.restore();
 
       // 방향 화살표
       this._drawArrows(ctx, path, map);
@@ -798,7 +781,7 @@ class GameEngine {
   }
 
   _drawArrows(ctx, path, map) {
-    const interval = 85;
+    const interval = 120;
     let acc = 0;
     for (let i=0; i<path.length-1; i++) {
       const dx=path[i+1].x-path[i].x, dy=path[i+1].y-path[i].y;
@@ -833,7 +816,9 @@ class GameEngine {
 
       ctx.save();
       // v28 세션E: 빈 슬롯 = '돌 받침대' (미리 구워둔 스프라이트 1장을 drawImage - 매 프레임 그라디언트 생성 없음)
+      ctx.globalAlpha = (isHov || isMouseHover || isHL) ? 0.9 : 0.5; // v3.0: 평소엔 반투명 - 지형에 녹아들게
       ctx.drawImage(this._getPedestal(), s.x - 26, s.y - 22, 52, 52);
+      ctx.globalAlpha = 1;
       ctx.beginPath(); ctx.ellipse(s.x, s.y, 20, 15, 0, 0, Math.PI*2);
       if (isHov) {
         ctx.fillStyle='rgba(106,168,255,0.35)'; ctx.strokeStyle='#6aa8ff'; ctx.lineWidth=2.5;
@@ -847,7 +832,7 @@ class GameEngine {
 
       // + 아이콘
       ctx.shadowBlur=0;
-      ctx.strokeStyle=isHov?'#6aa8ff':(isHL?'rgba(255,255,255,0.85)':'rgba(255,255,255,0.28)');
+      ctx.strokeStyle=isHov?'#6aa8ff':(isHL?'rgba(255,255,255,0.85)':'rgba(255,255,255,0.16)');
       ctx.lineWidth=isHov?2.5:1.5; ctx.lineCap='round';
       ctx.beginPath();
       ctx.moveTo(s.x-6,s.y); ctx.lineTo(s.x+6,s.y);

@@ -1,281 +1,225 @@
-// ===== MAPS.JS - 맵 3종 =====
+// ===== MAPS.JS - 맵 3종 (v3.0 자연 지형 리뉴얼) =====
+// 세 맵은 같은 지형 배치(길·타워 자리)를 공유 → 존이 바뀌어도 타워 위치가 그대로 유지됨.
+// 바뀌는 건 바닥 텍스처·색·장식뿐.
+//
+// 길: 직각 지그재그 대신, 구불구불한 산길처럼 '흔들리는 제어점 + 부드러운 곡선(Catmull-Rom)'으로 만든 순환 트랙.
+//     줄 간격·커브 위치·흔들림이 고정 시드로 매번 같게 나옴(랜덤이지만 판마다 동일 → 공정).
+// 타워 자리: 격자 대신 길 근처 '쓸모 있는 거리' 안에서 서로 일정 간격을 두고 자연스럽게 흩뿌림.
+// 높낮이: 길은 골짜기(낮음), 타워 자리는 작은 언덕(높음) + 완만한 노이즈 → 음영(힐셰이드)으로 표현.
+
+// ---- 고정 시드 난수 ----
+function _mapRng(seed) {
+  let a = seed >>> 0;
+  return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+}
+
+// ---- 닫힌 Catmull-Rom 곡선 → 촘촘한 꺾은선 (적 이동 로직은 꺾은선 그대로 사용) ----
+function _closedSpline(ctrl, step) {
+  const n = ctrl.length, out = [];
+  for (let i = 0; i < n; i++) {
+    const p0 = ctrl[(i - 1 + n) % n], p1 = ctrl[i], p2 = ctrl[(i + 1) % n], p3 = ctrl[(i + 2) % n];
+    const seg = Math.max(2, Math.ceil(Math.hypot(p2.x - p1.x, p2.y - p1.y) / step));
+    for (let k = 0; k < seg; k++) {
+      const t = k / seg, t2 = t * t, t3 = t2 * t;
+      out.push({
+        x: 0.5 * (2*p1.x + (-p0.x + p2.x)*t + (2*p0.x - 5*p1.x + 4*p2.x - p3.x)*t2 + (-p0.x + 3*p1.x - 3*p2.x + p3.x)*t3),
+        y: 0.5 * (2*p1.y + (-p0.y + p2.y)*t + (2*p0.y - 5*p1.y + 4*p2.y - p3.y)*t2 + (-p0.y + 3*p1.y - 3*p2.y + p3.y)*t3),
+      });
+    }
+  }
+  out.push({ ...out[0] }); // 루프 닫기 (마지막 점 = 첫 점)
+  return out;
+}
+
+// 점 → 꺾은선 최단거리
+function _distToPath(x, y, pts) {
+  let best = Infinity;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const a = pts[i], b = pts[i + 1], dx = b.x - a.x, dy = b.y - a.y, L = dx*dx + dy*dy;
+    let t = L ? ((x - a.x)*dx + (y - a.y)*dy) / L : 0; t = t < 0 ? 0 : t > 1 ? 1 : t;
+    const ex = a.x + dx*t - x, ey = a.y + dy*t - y, d = ex*ex + ey*ey;
+    if (d < best) best = d;
+  }
+  return Math.sqrt(best);
+}
+
+// ---- 공통 지형 (w,h = 월드 크기). 같은 크기면 캐시 재사용 ----
+const NaturalLayout = {
+  _cache: null,
+  build(w, h) {
+    const key = Math.round(w) + 'x' + Math.round(h);
+    if (this._cache && this._cache.key === key) return this._cache;
+    const rnd = _mapRng(20261025);
+    const ROWS = 6;                              // 구불구불한 가로 줄 수 (짝수 → 마지막 줄이 왼쪽에서 끝남)
+    const top = h * 0.12, bot = h * 0.88, gap = (bot - top) / (ROWS - 1);
+    const corridorX = w * 0.055;                 // 왼쪽 복귀로
+    const leftTurn = w * 0.19, rightTurn = w * 0.90;
+    const ys = [];
+    for (let r = 0; r < ROWS; r++) ys.push(top + gap * r + (r > 0 && r < ROWS - 1 ? (rnd() - 0.5) * gap * 0.38 : 0));
+
+    const ctrl = [];
+    for (let r = 0; r < ROWS; r++) {
+      const ltr = r % 2 === 0;
+      const y = ys[r];
+      const xs = ltr ? (r === 0 ? corridorX + w*0.05 : leftTurn) : rightTurn - rnd() * w * 0.10;
+      const xe = ltr ? rightTurn - rnd() * w * 0.10 : (r === ROWS - 1 ? corridorX + w*0.06 : leftTurn + rnd() * w * 0.08);
+      const MID = 4;                             // 줄 하나에 흔들림 점 3개 → 언덕을 휘감는 느낌
+      for (let k = 0; k <= MID + 1; k++) {
+        const t = k / (MID + 1);
+        const wob = (k === 0 || k === MID + 1) ? 0 : (rnd() - 0.5) * gap * 0.62;
+        ctrl.push({ x: xs + (xe - xs) * (t + (k && k <= MID ? (rnd() - 0.5) * 0.08 : 0)), y: y + wob });
+      }
+      if (r < ROWS - 1) {                        // 다음 줄로 넘어가는 둥근 커브 꼭짓점
+        const midY = (y + ys[r + 1]) / 2;
+        ctrl.push(ltr ? { x: Math.min(w * 0.955, xe + gap * 0.42), y: midY } : { x: Math.max(corridorX + w*0.085, xe - gap * 0.42), y: midY });
+      }
+    }
+    // 왼쪽 복귀로: 아래 → 위, 살짝 휘어짐
+    ctrl.push({ x: corridorX, y: bot + gap * 0.18 });
+    for (let k = 1; k <= 3; k++) ctrl.push({ x: corridorX + (rnd() - 0.5) * w * 0.022, y: bot - (bot - top) * k / 4 });
+    ctrl.push({ x: corridorX, y: top - gap * 0.18 });
+
+    const path = _closedSpline(ctrl, 7);
+
+    // ---- 타워 자리: 길에서 40~105px, 서로 64px 이상, 길이 많이 지나가는 곳(커버리지) 우선 ----
+    const target = Math.round(Math.min(50, Math.max(38, (w * h) / 23000)));
+    const cand = [];
+    for (let y = 40; y < h - 40; y += 13) for (let x = 40; x < w - 40; x += 13) {
+      const px = x + (rnd() - 0.5) * 10, py = y + (rnd() - 0.5) * 10;
+      const d = _distToPath(px, py, path);
+      if (d < 42 || d > 105) continue;
+      let near = 0;                               // 사거리(~150) 안에 지나가는 길 점 수 = 쓸모
+      for (let i = 0; i < path.length; i += 3) { const q = path[i]; if ((q.x-px)**2 + (q.y-py)**2 < 22500) near++; }
+      cand.push({ x: px, y: py, score: near * (0.75 + rnd() * 0.5) - Math.abs(d - 64) * 0.4 });
+    }
+    cand.sort((a, b) => b.score - a.score);
+    const slots = [];
+    for (const c of cand) {
+      if (slots.length >= target) break;
+      if (slots.every(s => (s.x - c.x)**2 + (s.y - c.y)**2 >= 64*64)) slots.push({ x: Math.round(c.x), y: Math.round(c.y) });
+    }
+    slots.sort((a, b) => a.y - b.y || a.x - b.x);  // 위→아래 순서 (인덱스 안정)
+
+    this._cache = { key, path, slots, ys, gap };
+    return this._cache;
+  },
+  getPaths(w, h) { return [this.build(w, h).path]; },
+  getSlots(w, h) { return this.build(w, h).slots.map(s => ({ ...s })); },
+};
+
+// ---- 높낮이 음영 + 자연 장식 (배경 캐시에 1회만 그림) ----
+function drawNaturalTerrain(ctx, w, h, map) {
+  const L = NaturalLayout.build(w, h), path = L.path, slots = L.slots;
+  const rnd = _mapRng(777);
+  // 1) 높이맵 (저해상도) - 노이즈 언덕 + 타워 자리 둔덕 + 길 골짜기
+  const S = 8, gw = Math.ceil(w / S) + 1, gh = Math.ceil(h / S) + 1;
+  const H = new Float32Array(gw * gh);
+  const blobs = [];
+  for (let i = 0; i < 26; i++) blobs.push({ x: rnd() * w, y: rnd() * h, r: 90 + rnd() * 220, a: (rnd() - 0.35) * 1.1 });
+  const pathS = path.filter((_, i) => i % 2 === 0);
+  for (let gy = 0; gy < gh; gy++) for (let gx = 0; gx < gw; gx++) {
+    const x = gx * S, y = gy * S;
+    let v = 0;
+    for (const b of blobs) { const d2 = (x - b.x)**2 + (y - b.y)**2; v += b.a * Math.exp(-d2 / (2 * b.r * b.r)); }
+    for (const s of slots) { const d2 = (x - s.x)**2 + (y - s.y)**2; if (d2 < 3600) v += 0.32 * Math.exp(-d2 / 900); }
+    const dp = _distToPath(x, y, pathS);
+    v -= 0.9 * Math.exp(-(dp * dp) / (2 * 38 * 38));
+    H[gy * gw + gx] = v;
+  }
+  // 2) 힐셰이드: 왼쪽 위에서 빛 → 밝은 면/그늘, 낮은 곳은 살짝 더 어둡게
+  const sc = document.createElement('canvas'); sc.width = gw; sc.height = gh;
+  const sctx = sc.getContext('2d'), img = sctx.createImageData(gw, gh), D = img.data;
+  for (let gy = 0; gy < gh; gy++) for (let gx = 0; gx < gw; gx++) {
+    const i = gy * gw + gx;
+    const dx = H[gy * gw + Math.min(gw - 1, gx + 1)] - H[gy * gw + Math.max(0, gx - 1)];
+    const dy = H[Math.min(gh - 1, gy + 1) * gw + gx] - H[Math.max(0, gy - 1) * gw + gx];
+    const shade = (-dx - dy) * 3.2;               // 빛 방향 (-1,-1)
+    const low = Math.max(0, -H[i]) * 0.22;        // 골짜기 그늘
+    const lit = shade > 0;
+    const a = Math.min(0.42, Math.abs(shade) * 0.5 + (lit ? 0 : low));
+    D[i*4] = lit ? 255 : 10; D[i*4+1] = lit ? 244 : 12; D[i*4+2] = lit ? 214 : 20;
+    D[i*4+3] = Math.round((lit ? a * 0.16 : Math.min(0.5, a + low)) * 255);
+  }
+  sctx.putImageData(img, 0, 0);
+  ctx.save(); ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(sc, 0, 0, gw * S, gh * S);
+  // 등고선 느낌의 아주 옅은 높은 지대 하이라이트
+  for (const b of blobs) if (b.a > 0.45) {
+    const g = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, b.r * 0.8);
+    g.addColorStop(0, 'rgba(255,240,200,0.06)'); g.addColorStop(1, 'rgba(255,240,200,0)');
+    ctx.fillStyle = g; ctx.fillRect(b.x - b.r, b.y - b.r, b.r * 2, b.r * 2);
+  }
+  ctx.restore();
+
+  // 3) 자연 장식 - 길·타워 자리를 피해서, 높은 곳엔 큰 것(나무/바위), 낮은 곳엔 작은 것(풀/꽃)
+  const deco = map.deco || [];
+  if (!deco.length) return;
+  ctx.save(); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  const count = Math.round((w * h) / 9000);
+  for (let n = 0, tries = 0; n < count && tries < count * 6; tries++) {
+    const x = 14 + rnd() * (w - 28), y = 14 + rnd() * (h - 28);
+    if (_distToPath(x, y, pathS) < 34) continue;
+    if (slots.some(s => (s.x - x)**2 + (s.y - y)**2 < 40*40)) continue;
+    const hv = H[Math.round(y / S) * gw + Math.round(x / S)] || 0;
+    const big = deco.filter(d => d[2] === 'big'), small = deco.filter(d => d[2] !== 'big');
+    const pool = hv > 0.25 && big.length ? big : small.length ? small : big;
+    const [em, size] = pool[Math.floor(rnd() * pool.length)];
+    const sz = size * (0.75 + rnd() * 0.5);
+    ctx.globalAlpha = 0.22; ctx.font = `${sz}px serif`; ctx.fillText(em, x + sz * 0.12, y + sz * 0.18); // 그림자
+    ctx.globalAlpha = 0.55 + rnd() * 0.35; ctx.fillText(em, x, y);
+    n++;
+  }
+  ctx.restore();
+}
 
 const MapDefs = {
-
   // ===== 1. 태초마을 숲 =====
   forest: {
     name:'태초마을 숲',
     bgColor:'#2a5418',
-    // v27-58: 실사 잔디/흙길 텍스처 (Cethiel, CC0 - opengameart.org)
+    // 실사 잔디/흙길 텍스처 (Cethiel, CC0 - opengameart.org)
     bgTextures:['assets/textures/grass_01.jpg','assets/textures/grass_02.jpg','assets/textures/grass_03.jpg','assets/textures/grass_04.jpg'],
     bgTileSize:280,
     pathTextures:['assets/textures/dirt_02.jpg','assets/textures/dirt_03.jpg'],
     pathTileSize:44,
-    pathColor:'#c8a44a', pathColorDark:'#7a5510',
-    pathHighlight:'rgba(255,235,160,0.16)',
-    pathArrow:'rgba(255,210,80,0.32)', pathWidth:20,
-
-    // 순환 트랙 (스타 랜덤디펜스 스타일): 적이 사각 트랙을 계속 돌며,
-    // 제한시간 내에 처치해야 한다. 슬롯은 트랙 안쪽에 격자로 배치.
-    loopMargin: {x:0.09, y:0.13},
-    slotGrid: {cols:5, rows:4},
-
-    // v27-24 버그수정: 대각선으로 그려지던 문제(중간 꺾이는 점 누락) 수정 - 세로이동/가로이동을
-    // 항상 분리된 점으로 나눠서 직각 지그재그가 되도록 함. 5단으로 확장 (요청 - 더 꼬불꼬불하게)
-    getPaths(w, h) {
-      const mx = w*0.15, my = h*0.20;
-      const innerGap = w*0.08; // 지그재그가 왼쪽에서 멈추는 지점 (왼쪽 가장자리는 복귀 통로로 남김)
-      const FOLDS = 6; // v27-47: 카메라로 넓게 볼 수 있게 되어 4→6단으로 확장 (요청A - 월드가 커진 만큼 더 꼬불꼬불하게)
-      const pts = [{x:mx, y:my}, {x:w-mx, y:my}];
-      let curX = w-mx;
-      for (let i = 1; i <= FOLDS; i++) {
-        const y = my + (h - 2*my) * (i / (FOLDS + 1));
-        const goLeft = i % 2 === 1;
-        const nextX = goLeft ? mx+innerGap : w-mx;
-        pts.push({ x: curX, y });      // 세로로 내려감 (x는 그대로)
-        pts.push({ x: nextX, y });     // 가로로 이동 (y는 그대로)
-        curX = nextX;
-      }
-      pts.push({ x: curX, y: h-my });  // 마지막 밴드까지 세로로 내려감
-      pts.push({ x: mx, y: h-my });    // 바닥을 가로질러 왼쪽 끝으로
-      pts.push({ x: mx, y: my });      // 왼쪽 가장자리를 타고 복귀 (루프 닫힘)
-      return [pts];
-    },
-
-    // v27-22: 지그재그 경로의 3개 밴드(위/중간/아래) 사이 공간에 슬롯 배치 - 경로 선과 안 겹치게
-    getSlots(w, h) {
-      const slots = [];
-      const mx = w*0.15, my = h*0.20;
-      const innerGap = w*0.08;
-      const FOLDS = 6; // v27-47: getPaths와 동일해야 밴드가 맞물림 (4→6단 확장)
-      // 밴드 경계 y좌표들 (getPaths의 꺾이는 지점과 동일하게 계산)
-      const bounds = [my];
-      for (let i = 1; i <= FOLDS; i++) bounds.push(my + (h - 2*my) * (i / (FOLDS + 1)));
-      bounds.push(h - my);
-      const bandY = [];
-      for (let i = 0; i < bounds.length - 1; i++) bandY.push((bounds[i] + bounds[i+1]) / 2); // 각 밴드 중앙
-      const x0 = mx + innerGap + w*0.05, x1 = w - mx - w*0.04;
-      // v27-24: 좁은 화면(모바일)에서는 슬롯이 너무 촘촘해지지 않도록 컬럼수를 줄임 (요청1)
-      const cols = w < 500 ? 4 : w < 750 ? 5 : 6;
-      for (const y of bandY) {
-        for (let c = 0; c < cols; c++) {
-          slots.push({ x: x0 + (x1-x0) * (c/(cols-1)), y });
-        }
-      }
-      // 왼쪽 복귀 통로 옆 여유공간에도 세로로 슬롯 몇 개 추가 (공간 활용)
-      const leftX = mx * 0.5 + innerGap * 0.15;
-      for (let i = 0; i < bounds.length - 1; i++) {
-        slots.push({ x: leftX, y: (bounds[i] + bounds[i+1]) / 2 });
-      }
-      return slots;
-    },
-
-    drawBg(ctx, w, h) {
-      // v27-58: 바닥은 이제 실사 잔디 텍스처(bgTextures)가 채움. 여기선 음영 패치/장식만 추가.
-      // 풀밭 패치 (짙은 그림자로 질감에 입체감 추가)
-      for(let i=0;i<50;i++){
-        const rx=(Math.sin(i*137.5)*0.5+0.5)*w, ry=(Math.sin(i*97.3)*0.5+0.5)*h;
-        const r=25+Math.sin(i*43.7)*15;
-        const gp=ctx.createRadialGradient(rx,ry,0,rx,ry,r);
-        gp.addColorStop(0,'rgba(55,100,25,0.3)'); gp.addColorStop(1,'transparent');
-        ctx.fillStyle=gp; ctx.beginPath(); ctx.ellipse(rx,ry,r,r*0.7,0,0,Math.PI*2); ctx.fill();
-      }
-      // 나무
-      ctx.textAlign='center'; ctx.textBaseline='middle';
-      const trees=[[0.03,0.08,28],[0.11,0.05,24],[0.20,0.08,26],[0.30,0.05,22],[0.40,0.08,26],
-        [0.50,0.05,24],[0.60,0.08,28],[0.70,0.05,22],[0.80,0.08,26],[0.90,0.05,24],[0.97,0.08,22],
-        [0.03,0.93,26],[0.12,0.96,22],[0.22,0.93,28],[0.32,0.96,24],[0.42,0.93,22],
-        [0.52,0.96,26],[0.62,0.93,24],[0.72,0.96,28],[0.82,0.93,22],[0.92,0.96,24]];
-      for(const [rx,ry,sz] of trees){
-        ctx.save(); ctx.globalAlpha=0.20; ctx.filter='blur(3px)';
-        ctx.font=`${sz}px serif`; ctx.fillText('🌲',rx*w+3,ry*h+5); ctx.restore();
-        ctx.save(); ctx.globalAlpha=0.80; ctx.font=`${sz}px serif`;
-        ctx.fillText('🌲',rx*w,ry*h); ctx.restore();
-      }
-      const deco=[[0.33,0.48,'🌸',14],[0.59,0.48,'🌸',14],[0.44,0.12,'🌺',13],[0.88,0.12,'🌺',12]];
-      for(const [rx,ry,em,sz] of deco){
-        ctx.save(); ctx.globalAlpha=0.55; ctx.font=`${sz}px serif`; ctx.fillText(em,rx*w,ry*h); ctx.restore();
-      }
-      ctx.save(); ctx.globalAlpha=0.9; ctx.font='28px serif'; ctx.fillText('🏰',w*0.985,h*0.70);
-      ctx.font='18px serif'; ctx.fillText('🚩',8,h*0.70); ctx.restore();
-    },
+    pathColor:'#c8a44a', pathColorDark:'#5a4320',
+    pathArrow:'rgba(255,225,150,0.20)', pathWidth:22,
+    deco:[['🌲',30,'big'],['🌳',28,'big'],['🪨',18,'big'],['🌿',13],['🌼',11],['🍄',12],['🌱',11]],
+    getPaths:(w,h)=>NaturalLayout.getPaths(w,h),
+    getSlots:(w,h)=>NaturalLayout.getSlots(w,h),
+    drawBg(ctx,w,h){ drawNaturalTerrain(ctx,w,h,this); },
   },
 
-  // ===== 2. 홍련체육관 도시 =====
+  // ===== 2. 홍련체육관 도시 (화산 지대) =====
   city: {
     name:'홍련체육관 도시',
     bgColor:'#180600',
-    // v27-58: 실사 용암/벽돌 텍스처 (CC0 - opengameart.org)
     bgTextures:['assets/textures/lava_01.jpg','assets/textures/lava_02.jpg'],
     bgTileSize:420,
     pathTextures:['assets/textures/brick_02.jpg','assets/textures/brick_03.jpg'],
     pathTileSize:46,
-    pathColor:'#6b4428', pathColorDark:'#3a1a08',
-    pathHighlight:'rgba(255,120,40,0.14)',
-    pathArrow:'rgba(255,140,60,0.32)', pathWidth:20,
-
-    // v27-3: 존 전환해도 타워 위치가 깨지지 않도록 3맵 모두 동일한 트랙/슬롯 좌표 사용 (숲맵 기준 통일)
-    // v27-24 버그수정: 대각선으로 그려지던 문제(중간 꺾이는 점 누락) 수정 - 세로이동/가로이동을
-    // 항상 분리된 점으로 나눠서 직각 지그재그가 되도록 함. 5단으로 확장 (요청 - 더 꼬불꼬불하게)
-    getPaths(w, h) {
-      const mx = w*0.15, my = h*0.20;
-      const innerGap = w*0.08; // 지그재그가 왼쪽에서 멈추는 지점 (왼쪽 가장자리는 복귀 통로로 남김)
-      const FOLDS = 6; // v27-47: 카메라로 넓게 볼 수 있게 되어 4→6단으로 확장 (요청A - 월드가 커진 만큼 더 꼬불꼬불하게)
-      const pts = [{x:mx, y:my}, {x:w-mx, y:my}];
-      let curX = w-mx;
-      for (let i = 1; i <= FOLDS; i++) {
-        const y = my + (h - 2*my) * (i / (FOLDS + 1));
-        const goLeft = i % 2 === 1;
-        const nextX = goLeft ? mx+innerGap : w-mx;
-        pts.push({ x: curX, y });      // 세로로 내려감 (x는 그대로)
-        pts.push({ x: nextX, y });     // 가로로 이동 (y는 그대로)
-        curX = nextX;
-      }
-      pts.push({ x: curX, y: h-my });  // 마지막 밴드까지 세로로 내려감
-      pts.push({ x: mx, y: h-my });    // 바닥을 가로질러 왼쪽 끝으로
-      pts.push({ x: mx, y: my });      // 왼쪽 가장자리를 타고 복귀 (루프 닫힘)
-      return [pts];
-    },
-
-    // v27-22: 지그재그 경로의 3개 밴드(위/중간/아래) 사이 공간에 슬롯 배치 - 경로 선과 안 겹치게
-    getSlots(w, h) {
-      const slots = [];
-      const mx = w*0.15, my = h*0.20;
-      const innerGap = w*0.08;
-      const FOLDS = 6; // v27-47: getPaths와 동일해야 밴드가 맞물림 (4→6단 확장)
-      // 밴드 경계 y좌표들 (getPaths의 꺾이는 지점과 동일하게 계산)
-      const bounds = [my];
-      for (let i = 1; i <= FOLDS; i++) bounds.push(my + (h - 2*my) * (i / (FOLDS + 1)));
-      bounds.push(h - my);
-      const bandY = [];
-      for (let i = 0; i < bounds.length - 1; i++) bandY.push((bounds[i] + bounds[i+1]) / 2); // 각 밴드 중앙
-      const x0 = mx + innerGap + w*0.05, x1 = w - mx - w*0.04;
-      // v27-24: 좁은 화면(모바일)에서는 슬롯이 너무 촘촘해지지 않도록 컬럼수를 줄임 (요청1)
-      const cols = w < 500 ? 4 : w < 750 ? 5 : 6;
-      for (const y of bandY) {
-        for (let c = 0; c < cols; c++) {
-          slots.push({ x: x0 + (x1-x0) * (c/(cols-1)), y });
-        }
-      }
-      // 왼쪽 복귀 통로 옆 여유공간에도 세로로 슬롯 몇 개 추가 (공간 활용)
-      const leftX = mx * 0.5 + innerGap * 0.15;
-      for (let i = 0; i < bounds.length - 1; i++) {
-        slots.push({ x: leftX, y: (bounds[i] + bounds[i+1]) / 2 });
-      }
-      return slots;
-    },
-
-    drawBg(ctx, w, h) {
-      // v27-58: 바닥은 이제 실사 용암 텍스처(bgTextures)가 채움. 여기선 밝은 글로우 웅덩이만 덧그려서 포인트를 줌.
-      const pools=[[0.10,0.32,55,28],[0.38,0.55,70,32],[0.60,0.30,60,26],[0.80,0.62,65,30],[0.22,0.78,50,24]];
-      for(const [rx,ry,rw,rh] of pools){
-        const lg=ctx.createRadialGradient(rx*w,ry*h,2,rx*w,ry*h,rw);
-        lg.addColorStop(0,'rgba(255,140,0,0.55)'); lg.addColorStop(0.5,'rgba(220,60,0,0.25)'); lg.addColorStop(1,'transparent');
-        ctx.fillStyle=lg; ctx.beginPath(); ctx.ellipse(rx*w,ry*h,rw,rh,0,0,Math.PI*2); ctx.fill();
-      }
-      // 건물
-      ctx.textAlign='center'; ctx.textBaseline='middle';
-      const blds=[[0.03,0.5,30],[0.15,0.88,24],[0.50,0.45,26],[0.75,0.14,28],[0.95,0.68,30]];
-      for(const [rx,ry,sz] of blds){
-        ctx.save(); ctx.globalAlpha=0.35; ctx.font=`${sz}px serif`; ctx.fillText('🏢',rx*w,ry*h); ctx.restore();
-      }
-      const fires=[[0.22,0.93],[0.48,0.07],[0.76,0.93],[0.93,0.10]];
-      for(const [rx,ry] of fires){ ctx.save(); ctx.globalAlpha=0.6; ctx.font='18px serif'; ctx.fillText('🔥',rx*w,ry*h); ctx.restore(); }
-      ctx.save(); ctx.globalAlpha=0.9; ctx.font='26px serif'; ctx.fillText('🏯',w*0.985,h*0.50);
-      ctx.font='16px serif'; ctx.fillText('🚩',8,h*0.50); ctx.restore();
-    },
+    pathColor:'#6b4428', pathColorDark:'#2a1206',
+    pathArrow:'rgba(255,160,90,0.22)', pathWidth:22,
+    deco:[['🌋',30,'big'],['🪨',20,'big'],['🔥',14],['🪨',12],['🏮',13]],
+    getPaths:(w,h)=>NaturalLayout.getPaths(w,h),
+    getSlots:(w,h)=>NaturalLayout.getSlots(w,h),
+    drawBg(ctx,w,h){ drawNaturalTerrain(ctx,w,h,this); },
   },
 
   // ===== 3. 라벤더 동굴 =====
   cave: {
     name:'라벤더 동굴',
     bgColor:'#050210',
-    // v27-58: 실사 동굴 배경(커버 방식) + 돌길 텍스처 (CC0 - opengameart.org)
     bgImage:'assets/textures/cave_bg.jpg',
     pathTextures:['assets/textures/ground_01.jpg','assets/textures/ground_02.jpg'],
     pathTileSize:48,
-    pathColor:'#3e2860', pathColorDark:'#1e1030',
-    pathHighlight:'rgba(180,120,255,0.16)',
-    pathArrow:'rgba(160,120,255,0.28)', pathWidth:20,
+    pathColor:'#3e2860', pathColorDark:'#160b26',
+    pathArrow:'rgba(190,160,255,0.20)', pathWidth:22,
     ghostBonus:0.30,
-
-    // v27-3: 존 전환해도 타워 위치가 깨지지 않도록 3맵 모두 동일한 트랙/슬롯 좌표 사용 (숲맵 기준 통일)
-    // v27-24 버그수정: 대각선으로 그려지던 문제(중간 꺾이는 점 누락) 수정 - 세로이동/가로이동을
-    // 항상 분리된 점으로 나눠서 직각 지그재그가 되도록 함. 5단으로 확장 (요청 - 더 꼬불꼬불하게)
-    getPaths(w, h) {
-      const mx = w*0.15, my = h*0.20;
-      const innerGap = w*0.08; // 지그재그가 왼쪽에서 멈추는 지점 (왼쪽 가장자리는 복귀 통로로 남김)
-      const FOLDS = 6; // v27-47: 카메라로 넓게 볼 수 있게 되어 4→6단으로 확장 (요청A - 월드가 커진 만큼 더 꼬불꼬불하게)
-      const pts = [{x:mx, y:my}, {x:w-mx, y:my}];
-      let curX = w-mx;
-      for (let i = 1; i <= FOLDS; i++) {
-        const y = my + (h - 2*my) * (i / (FOLDS + 1));
-        const goLeft = i % 2 === 1;
-        const nextX = goLeft ? mx+innerGap : w-mx;
-        pts.push({ x: curX, y });      // 세로로 내려감 (x는 그대로)
-        pts.push({ x: nextX, y });     // 가로로 이동 (y는 그대로)
-        curX = nextX;
-      }
-      pts.push({ x: curX, y: h-my });  // 마지막 밴드까지 세로로 내려감
-      pts.push({ x: mx, y: h-my });    // 바닥을 가로질러 왼쪽 끝으로
-      pts.push({ x: mx, y: my });      // 왼쪽 가장자리를 타고 복귀 (루프 닫힘)
-      return [pts];
-    },
-
-    // v27-22: 지그재그 경로의 3개 밴드(위/중간/아래) 사이 공간에 슬롯 배치 - 경로 선과 안 겹치게
-    getSlots(w, h) {
-      const slots = [];
-      const mx = w*0.15, my = h*0.20;
-      const innerGap = w*0.08;
-      const FOLDS = 6; // v27-47: getPaths와 동일해야 밴드가 맞물림 (4→6단 확장)
-      // 밴드 경계 y좌표들 (getPaths의 꺾이는 지점과 동일하게 계산)
-      const bounds = [my];
-      for (let i = 1; i <= FOLDS; i++) bounds.push(my + (h - 2*my) * (i / (FOLDS + 1)));
-      bounds.push(h - my);
-      const bandY = [];
-      for (let i = 0; i < bounds.length - 1; i++) bandY.push((bounds[i] + bounds[i+1]) / 2); // 각 밴드 중앙
-      const x0 = mx + innerGap + w*0.05, x1 = w - mx - w*0.04;
-      // v27-24: 좁은 화면(모바일)에서는 슬롯이 너무 촘촘해지지 않도록 컬럼수를 줄임 (요청1)
-      const cols = w < 500 ? 4 : w < 750 ? 5 : 6;
-      for (const y of bandY) {
-        for (let c = 0; c < cols; c++) {
-          slots.push({ x: x0 + (x1-x0) * (c/(cols-1)), y });
-        }
-      }
-      // 왼쪽 복귀 통로 옆 여유공간에도 세로로 슬롯 몇 개 추가 (공간 활용)
-      const leftX = mx * 0.5 + innerGap * 0.15;
-      for (let i = 0; i < bounds.length - 1; i++) {
-        slots.push({ x: leftX, y: (bounds[i] + bounds[i+1]) / 2 });
-      }
-      return slots;
-    },
-
-    drawBg(ctx, w, h) {
-      // v27-58: 바닥/배경은 이제 실사 동굴 사진(bgImage)이 채움. 불투명 그라디언트는 제거하고
-      // 살짝 어두운 톤만 얹어서(반투명) 사진 위에 별/성운을 자연스럽게 겹침.
-      ctx.fillStyle='rgba(5,2,16,0.28)'; ctx.fillRect(0,0,w,h);
-      // 별
-      ctx.save();
-      for(let i=0;i<120;i++){
-        const sx=(Math.sin(i*113.7)*0.5+0.5)*w, sy=(Math.sin(i*79.3)*0.5+0.5)*h;
-        const sz2=i%7===0?2.5:i%3===0?1.5:0.8, sa=0.3+(Math.sin(i*67.9)*0.5+0.5)*0.6;
-        ctx.globalAlpha=sa; ctx.fillStyle=i%5===0?'#e8d0ff':'#ffffff';
-        ctx.shadowColor='#d0b0ff'; ctx.shadowBlur=sz2*3;
-        ctx.beginPath(); ctx.arc(sx,sy,sz2,0,Math.PI*2); ctx.fill();
-      }
-      ctx.restore();
-      // 성운
-      const neb=[[0.12,0.50,180,'#4a00a0'],[0.45,0.15,160,'#6a00c0'],[0.45,0.85,160,'#4a00a0'],[0.72,0.50,200,'#3a0090']];
-      for(const [rx,ry,r,col] of neb){
-        const ng=ctx.createRadialGradient(rx*w,ry*h,0,rx*w,ry*h,r);
-        ng.addColorStop(0,col+'40'); ng.addColorStop(1,'transparent');
-        ctx.fillStyle=ng; ctx.beginPath(); ctx.arc(rx*w,ry*h,r,0,Math.PI*2); ctx.fill();
-      }
-      ctx.textAlign='center'; ctx.textBaseline='middle';
-      const decos=[[0.06,0.50,'⛪',24],[0.30,0.50,'🪦',18],[0.56,0.50,'👻',18],[0.75,0.34,'🕯️',16],[0.75,0.66,'🕯️',16]];
-      for(const [rx,ry,em,sz] of decos){ ctx.save(); ctx.globalAlpha=0.30; ctx.font=`${sz}px serif`; ctx.fillText(em,rx*w,ry*h); ctx.restore(); }
-      ctx.save(); ctx.globalAlpha=0.85; ctx.font='24px serif'; ctx.fillText('💀',w*0.985,h*0.50);
-      ctx.font='16px serif'; ctx.fillText('👻',8,h*0.26); ctx.fillText('👻',8,h*0.74); ctx.restore();
-    },
+    deco:[['🪨',22,'big'],['🪦',18,'big'],['💎',12],['🍄',12],['🦴',11],['🕯️',12]],
+    getPaths:(w,h)=>NaturalLayout.getPaths(w,h),
+    getSlots:(w,h)=>NaturalLayout.getSlots(w,h),
+    drawBg(ctx,w,h){ drawNaturalTerrain(ctx,w,h,this); },
   },
 };
