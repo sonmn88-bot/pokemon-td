@@ -7,12 +7,13 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-fullscreen">
   <meta name="apple-mobile-web-app-title" content="포켓몬TD">
-  <meta name="theme-color" content="#080c14">
+  <meta name="theme-color" content="#0b0d12">
   <link rel="apple-touch-icon" href="icon-192.png">
   <link rel="manifest" href="manifest.json">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Noto+Sans+KR:wght@400;700;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
   <title>포켓몬 타워디펜스</title>
   <link rel="stylesheet" href="style.css">
 </head>
@@ -24,16 +25,16 @@
   <div id="title-screen" class="screen active">
     <canvas id="title-canvas"></canvas>
     <div class="title-content">
-      <div class="title-poke-label">P O K É M O N</div>
+      <div class="title-poke-label">POKÉMON</div>
       <div class="title-logo">
         <span class="title-logo-td">TOWER</span>
         <span class="title-logo-def">DEFENSE</span>
       </div>
       <div class="title-tagline">전설의 전투가 시작된다</div>
       <button id="btn-start" class="title-start-btn">
-        <span class="btn-star">⭐</span> 게임 시작 <span class="btn-star">⭐</span>
+        게임 시작
       </button>
-      <div class="title-version">v2.0 · Pokemon TD</div>
+      <div class="title-version">v3.0 · RENEWAL</div>
     </div>
     <div class="title-pokemon-row">
       <span class="title-pkm" data-delay="0">⚡</span>
@@ -51,19 +52,19 @@
     <div class="title-area">
       <div class="title-pokemon">영웅 선택</div>
       <div class="title-main">누구와 함께 싸울까?</div>
-      <div id="best-wave-label" style="margin-top:6px;color:#ffd60a;font-size:14px;opacity:0.9;">🏆 최고 도달 웨이브: -</div>
+      <div id="best-wave-label" style="margin-top:6px;color:#ffc24b;font-size:14px;opacity:0.9;">🏆 최고 도달 웨이브: -</div>
     </div>
     <div class="difficulty-select" id="starter-hero-select">
       <button class="diff-btn active" data-hero="pikachu" title="전기 몰빵 캐리 — 전기 타워가 많을수록 강해짐 (라이츄 진화)">⚡ 피카츄</button>
       <button class="diff-btn" data-hero="togepi" title="행운·경제 — 골드·이자·합성 운 담당, 직접 화력은 약함 (토게틱 진화)">🥚 토게피</button>
       <button class="diff-btn" data-hero="eevee" title="진화 분기 — Lv12에 부스터/쥬피썬더/샤미드 중 선택, 같은 갈래 스킬 ×1.5">🦊 이브이</button>
     </div>
-    <div id="starter-hero-desc" style="text-align:center;color:#ffd60a;font-size:12px;margin-top:-6px;margin-bottom:8px;min-height:16px;">⚡ 전기 몰빵 캐리 — 전기 타워가 많을수록 강해짐 (라이츄 진화)</div>
+    <div id="starter-hero-desc" style="text-align:center;color:#ffc24b;font-size:12px;margin-top:-6px;margin-bottom:8px;min-height:16px;">⚡ 전기 몰빵 캐리 — 전기 타워가 많을수록 강해짐 (라이츄 진화)</div>
     <button id="btn-title-skin" style="margin:14px auto 4px;display:block;padding:10px 24px;border-radius:10px;border:1px solid rgba(255,255,255,0.25);background:rgba(0,0,0,0.35);color:#fff;font-size:14px;cursor:pointer;">👕 스킨 선택</button>
-    <button id="btn-endless-start" style="margin:18px auto;display:block;padding:14px 40px;border-radius:14px;border:none;background:linear-gradient(135deg,#ffd60a,#ff8f00);color:#1a1200;font-size:18px;font-weight:800;cursor:pointer;">▶ 엔드리스 시작</button>
+    <button id="btn-endless-start" style="margin:18px auto;display:block;padding:14px 40px;border-radius:14px;border:none;background:linear-gradient(135deg,#ffc24b,#f59e0b);color:#1a1200;font-size:18px;font-weight:800;cursor:pointer;">▶ 엔드리스 시작</button>
     <button id="btn-howto" style="margin:0 auto;display:block;padding:8px 20px;border-radius:10px;border:1px solid rgba(255,255,255,0.2);background:transparent;color:#aaa;font-size:12px;cursor:pointer;">❓ 게임 방법</button>
-    <button id="btn-hof" style="margin:6px auto 0;display:block;padding:8px 20px;border-radius:10px;border:1px solid rgba(255,214,10,0.3);background:transparent;color:#ffd60a;font-size:12px;cursor:pointer;">👑 명예의 전당</button>
-    <button id="btn-globalrank" style="margin:6px auto 0;display:block;padding:8px 20px;border-radius:10px;border:1px solid rgba(79,195,247,0.4);background:transparent;color:#4fc3f7;font-size:12px;cursor:pointer;">🌍 전체 랭킹</button>
+    <button id="btn-hof" style="margin:6px auto 0;display:block;padding:8px 20px;border-radius:10px;border:1px solid rgba(255,194,75,0.3);background:transparent;color:#ffc24b;font-size:12px;cursor:pointer;">👑 명예의 전당</button>
+    <button id="btn-globalrank" style="margin:6px auto 0;display:block;padding:8px 20px;border-radius:10px;border:1px solid rgba(79,195,247,0.4);background:transparent;color:#5b9dff;font-size:12px;cursor:pointer;">🌍 전체 랭킹</button>
   </div>
 
   <!-- ===== 게임 화면 ===== -->

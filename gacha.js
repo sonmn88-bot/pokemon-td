@@ -3,11 +3,11 @@
 
 // ===== 등급 정의 =====
 const GRADES = {
-  normal:  { name:'노말',   color:'#9e9e9e', glow:'rgba(158,158,158,0.5)', stars:1, bg:'#2a2a2a' },
-  rare:    { name:'레어',   color:'#4fc3f7', glow:'rgba(79,195,247,0.6)',  stars:2, bg:'#0d2035' },
-  epic:    { name:'에픽',   color:'#ce93d8', glow:'rgba(206,147,216,0.7)', stars:3, bg:'#1e0d35' },
-  legend:  { name:'레전드', color:'#ffd60a', glow:'rgba(255,214,10,0.8)',  stars:4, bg:'#2a1d00' },
-  unique:  { name:'유니크', color:'#ff6b6b', glow:'rgba(255,107,107,0.9)', stars:5, bg:'#2a0000', rainbow:true },
+  normal:  { name:'노말',   color:'#a7adba', glow:'rgba(158,158,158,0.5)', stars:1, bg:'#2a2a2a' },
+  rare:    { name:'레어',   color:'#5b9dff', glow:'rgba(79,195,247,0.6)',  stars:2, bg:'#0d2035' },
+  epic:    { name:'에픽',   color:'#b18cff', glow:'rgba(206,147,216,0.7)', stars:3, bg:'#1e0d35' },
+  legend:  { name:'레전드', color:'#ffc24b', glow:'rgba(255,194,75,0.8)',  stars:4, bg:'#2a1d00' },
+  unique:  { name:'유니크', color:'#ff5c7a', glow:'rgba(255,107,107,0.9)', stars:5, bg:'#2a0000', rainbow:true },
 };
 
 // ===== 영구 버프 상한선 (상점/타입강화 중첩으로 인한 밸런스 붕괴 방지) =====
@@ -56,7 +56,7 @@ const GachaTowerDefs = {
   squirtle: {
     id:'squirtle', name:'꼬부기', emoji:'🐢', grade:'normal', type:'water', pokemonId:'squirtle',
     damage:11, range:185, fireRate:1.1, desc:'슬로우',
-    fire(t,e){ _shot(t,e,'#4fc3f7','💧',{type:'slow',duration:1.8,factor:0.65},360); }
+    fire(t,e){ _shot(t,e,'#5b9dff','💧',{type:'slow',duration:1.8,factor:0.65},360); }
   },
   pidgey: {
     id:'pidgey', name:'구구', emoji:'🐦', grade:'normal', type:'normal', pokemonId:'pidgey',
@@ -117,7 +117,7 @@ const GachaTowerDefs = {
     damage:13, range:200, fireRate:1.3, desc:'2타겟 에스퍼',
     fire(t,e){
       const targets=e.enemies.filter(en=>!en.dead&&!en.reachedEnd&&Math.hypot(en.x-t.x,en.y-t.y)<=t.range).sort((a,b)=>b.distTraveled-a.distTraveled).slice(0,2);
-      for(const tgt of targets){ e.projectiles.push(new Projectile(t.x,t.y,tgt,{engine:e,color:'#ce93d8',size:4,beam:true,beamLife:0.15})); tgt.takeDamage(t.damage,'special'); tgt.applyStatus('slow',1.5,0.65); e.spawnHitParticle(tgt.x,tgt.y,'#ba68c8'); }
+      for(const tgt of targets){ e.projectiles.push(new Projectile(t.x,t.y,tgt,{engine:e,color:'#b18cff',size:4,beam:true,beamLife:0.15})); tgt.takeDamage(t.damage,'special'); tgt.applyStatus('slow',1.5,0.65); e.spawnHitParticle(tgt.x,tgt.y,'#ba68c8'); }
     }
   },
   magnemite: {
@@ -174,7 +174,7 @@ const GachaTowerDefs = {
   golduck: {
     id:'golduck', name:'골덕', emoji:'🦆', grade:'rare', type:'water', pokemonId:'psyduck',
     damage:20, range:215, fireRate:1.35, desc:'강한 슬로우',
-    fire(t,e){ _shot(t,e,'#4fc3f7','💫',{type:'slow',duration:3,factor:0.45},380); }
+    fire(t,e){ _shot(t,e,'#5b9dff','💫',{type:'slow',duration:3,factor:0.45},380); }
   },
   arcanine: {
     id:'arcanine', name:'윈디', emoji:'🐕', grade:'rare', type:'fire', pokemonId:'growlithe',
@@ -204,7 +204,7 @@ const GachaTowerDefs = {
     damage:24, range:240, fireRate:1.4, desc:'3타겟 에스퍼',
     fire(t,e){
       const targets=e.enemies.filter(en=>!en.dead&&!en.reachedEnd&&Math.hypot(en.x-t.x,en.y-t.y)<=t.range).sort((a,b)=>b.distTraveled-a.distTraveled).slice(0,3);
-      for(const tgt of targets){ e.projectiles.push(new Projectile(t.x,t.y,tgt,{engine:e,color:'#ce93d8',size:4,beam:true,beamLife:0.15})); tgt.takeDamage(t.damage,'special'); tgt.applyStatus('slow',2.5,0.5); e.spawnHitParticle(tgt.x,tgt.y,'#ba68c8'); }
+      for(const tgt of targets){ e.projectiles.push(new Projectile(t.x,t.y,tgt,{engine:e,color:'#b18cff',size:4,beam:true,beamLife:0.15})); tgt.takeDamage(t.damage,'special'); tgt.applyStatus('slow',2.5,0.5); e.spawnHitParticle(tgt.x,tgt.y,'#ba68c8'); }
     }
   },
   geodude: {
@@ -291,7 +291,7 @@ const GachaTowerDefs = {
     damage:44, range:280, fireRate:1.5, desc:'5타겟+크리티컬',
     fire(t,e){
       const targets=e.enemies.filter(en=>!en.dead&&!en.reachedEnd&&Math.hypot(en.x-t.x,en.y-t.y)<=t.range).sort((a,b)=>b.distTraveled-a.distTraveled).slice(0,5);
-      for(const tgt of targets){ let dmg=t.damage; if(Math.random()<0.35){dmg*=2.8;e.spawnFloatingText('💥크리!',tgt.x,tgt.y-18,'#f48fb1');} e.projectiles.push(new Projectile(t.x,t.y,tgt,{engine:e,color:'#ce93d8',size:4,beam:true,beamLife:0.18})); tgt.takeDamage(dmg,'special'); tgt.applyStatus('slow',2.5,0.38); e.spawnHitParticle(tgt.x,tgt.y,'#ba68c8'); }
+      for(const tgt of targets){ let dmg=t.damage; if(Math.random()<0.35){dmg*=2.8;e.spawnFloatingText('💥크리!',tgt.x,tgt.y-18,'#f48fb1');} e.projectiles.push(new Projectile(t.x,t.y,tgt,{engine:e,color:'#b18cff',size:4,beam:true,beamLife:0.18})); tgt.takeDamage(dmg,'special'); tgt.applyStatus('slow',2.5,0.38); e.spawnHitParticle(tgt.x,tgt.y,'#ba68c8'); }
     }
   },
   gyarados: {
@@ -300,7 +300,7 @@ const GachaTowerDefs = {
     fire(t,e){
       _shot(t,e,'#1e88e5','🌊',{type:'slow',duration:2.5,factor:0.45},400,null,60);
       t._rageTimer=(t._rageTimer||0)+1/t.fireRate;
-      if(t._rageTimer>=9){ t._rageTimer=0; for(const en of e.enemies) if(!en.dead&&!en.reachedEnd&&Math.hypot(en.x-t.x,en.y-t.y)<=t.range) { en.takeDamage(t.damage*0.35,'special'); en.applyStatus('slow',2,0.55); } e.particles.push(new AoeBurst(t.x,t.y,t.range,'#4fc3f7')); e.spawnFloatingText('🌊분노!',t.x,t.y-30,'#29b6f6'); }
+      if(t._rageTimer>=9){ t._rageTimer=0; for(const en of e.enemies) if(!en.dead&&!en.reachedEnd&&Math.hypot(en.x-t.x,en.y-t.y)<=t.range) { en.takeDamage(t.damage*0.35,'special'); en.applyStatus('slow',2,0.55); } e.particles.push(new AoeBurst(t.x,t.y,t.range,'#5b9dff')); e.spawnFloatingText('🌊분노!',t.x,t.y-30,'#29b6f6'); }
     }
   },
   lapras: {
@@ -672,14 +672,14 @@ function _createGachaTower(def, x, y, engine) {
         if(sameCount>=3){
           // v27-62 최적화: shadowBlur 제거 - 굵은 반투명 링 + 얇은 링 이중으로 글로우 대체
           ctx.save(); ctx.beginPath(); ctx.arc(this.x,this.y,30,0,Math.PI*2);
-          ctx.strokeStyle=`rgba(6,214,160,0.25)`; ctx.lineWidth=6; ctx.stroke();
+          ctx.strokeStyle=`rgba(52,211,153,0.25)`; ctx.lineWidth=6; ctx.stroke();
           ctx.beginPath(); ctx.arc(this.x,this.y,30,0,Math.PI*2);
-          ctx.strokeStyle=`rgba(6,214,160,${0.5+Math.sin(Date.now()*0.006)*0.3})`;
+          ctx.strokeStyle=`rgba(52,211,153,${0.5+Math.sin(Date.now()*0.006)*0.3})`;
           ctx.lineWidth=2.5; ctx.stroke(); ctx.restore();
         } else if(sameCount===2){
           // v27-5: 1개만 더 모으면 합체 가능 - 노란색 링으로 미리 표시 (요청: 조합 힌트)
           ctx.save(); ctx.beginPath(); ctx.arc(this.x,this.y,30,0,Math.PI*2);
-          ctx.strokeStyle=`rgba(255,214,10,${0.35+Math.sin(Date.now()*0.006)*0.2})`;
+          ctx.strokeStyle=`rgba(255,194,75,${0.35+Math.sin(Date.now()*0.006)*0.2})`;
           ctx.lineWidth=2; ctx.setLineDash([4,3]); ctx.stroke();
           ctx.setLineDash([]); ctx.restore();
         }
@@ -781,7 +781,7 @@ function _createGachaTower(def, x, y, engine) {
       }
       // 등급 별 - v27-62 최적화: shadowBlur(값이 작아도 캔버스 슬로우패스 유발)를 타워 전부가
       // 매 프레임 쓰고 있었음 → 어두운 텍스트를 1px 아래 먼저 그리는 저렴한 가짜 그림자로 교체
-      ctx.font='bold 8px -apple-system,sans-serif';
+      ctx.font='bold 8px Pretendard,-apple-system,sans-serif';
       ctx.textAlign='center';
       const starStr='★'.repeat(GRADES[def.grade].stars);
       ctx.fillStyle='rgba(0,0,0,0.9)';

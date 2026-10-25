@@ -23,10 +23,10 @@ Object.assign(App.prototype, {
 
     // 뽑기 버튼 3종 (v27 fix: cost를 여기 하드코딩하지 말고 실제 과금 기준인 PULL_COSTS에서 읽어오도록 - 안 그러면 가격 바꿀 때마다 표시랑 실제가 어긋남)
     const pulls = [
-      { key:'normal',  label:'일반 뽑기',  color:'#9e9e9e', emoji:'🎰', hotkey:'1' },
-      { key:'premium', label:'프리미엄',   color:'#4fc3f7', emoji:'💎', hotkey:'2' },
-      { key:'gamble',  label:'도박 뽑기',  color:'#ffd60a', emoji:'🎲', hotkey:'3' },
-      { key:'ten',     label:'10연 뽑기',  color:'#ce93d8', emoji:'🌟', ten:true, hotkey:'4' },
+      { key:'normal',  label:'일반 뽑기',  color:'#a7adba', emoji:'🎰', hotkey:'1' },
+      { key:'premium', label:'프리미엄',   color:'#5b9dff', emoji:'💎', hotkey:'2' },
+      { key:'gamble',  label:'도박 뽑기',  color:'#ffc24b', emoji:'🎲', hotkey:'3' },
+      { key:'ten',     label:'10연 뽑기',  color:'#b18cff', emoji:'🌟', ten:true, hotkey:'4' },
     ];
 
     for (const p of pulls) {
@@ -119,16 +119,16 @@ Object.assign(App.prototype, {
       const dmgPct = Math.round(((t.buffDmgMul||1) - 1) * 100);
       const rangePct = Math.round(((t.buffRangeMul||1) - 1) * 100);
       const spdPct = Math.round(((t._shopSpeedMul||1) - 1) * 100);
-      const dmgTag = dmgPct !== 0 ? ` <span style="color:#4fc3f7">(+${dmgPct}%)</span>` : '';
-      const rangeTag = rangePct !== 0 ? ` <span style="color:#4fc3f7">(+${rangePct}%)</span>` : '';
-      const spdTag = spdPct !== 0 ? ` <span style="color:#4fc3f7">(+${spdPct}%)</span>` : '';
+      const dmgTag = dmgPct !== 0 ? ` <span style="color:#5b9dff">(+${dmgPct}%)</span>` : '';
+      const rangeTag = rangePct !== 0 ? ` <span style="color:#5b9dff">(+${rangePct}%)</span>` : '';
+      const spdTag = spdPct !== 0 ? ` <span style="color:#5b9dff">(+${spdPct}%)</span>` : '';
       const masteryTag = ''; // v28 세션E: 숙련도 제거
       const flavor = window.FLAVOR_TEXT?.[def.id];
       const flavorTag = flavor ? `<div style="font-size:9.5px;color:#777;font-style:italic;margin-top:3px;max-width:220px;">"${flavor}"</div>` : '';
       const tuLevel = window.TypeUpgradeLevels?.[def.type] || 0;
       const tuNext = window.TypeUpgrades?.[def.type]?.[tuLevel];
       const upgradeHint = tuNext
-        ? `<div style="font-size:10px;color:#7fe3ff;margin-top:2px">💡 🛠강화 시트에서 "${tuNext.label}"(💰${tuNext.cost}) 올리면 이 타워가 강해져요</div>`
+        ? `<div style="font-size:10px;color:#9cc4ff;margin-top:2px">💡 🛠강화 시트에서 "${tuNext.label}"(💰${tuNext.cost}) 올리면 이 타워가 강해져요</div>`
         : `<div style="font-size:10px;color:#888;margin-top:2px">💡 이 타입 강화 최대 단계 달성</div>`;
       // v27-23: 데미지 배율 breakdown (요청1) - 여러 배율이 어디서 왔는지 한눈에
       const teMul = window.typeEffectiveness && t.target ? window.typeEffectiveness(def.type, t.target.typeTag) : 1;
@@ -139,7 +139,7 @@ Object.assign(App.prototype, {
           ${(t._auraDmgMul||1)>1?`× 지원오라${t._auraDmgMul.toFixed(2)}`:''}
           ${(t._heroDmgMul||1)>1?`× 영웅${t._heroDmgMul.toFixed(2)}`:''}
           ${teMul!==1?`× 상성${teMul.toFixed(1)}`:''}
-          = <span style="color:#ffd60a">${Math.round(t.damage)}</span>
+          = <span style="color:#ffc24b">${Math.round(t.damage)}</span>
         </div>`;
 
       panel.innerHTML = `
@@ -152,7 +152,7 @@ Object.assign(App.prototype, {
         ${flavorTag}
         ${breakdown}
         <div style="font-size:10px;color:#aaa;margin:2px 0">${def.desc||''}</div>
-        <div style="font-size:10px;margin:3px 0;color:${canMerge?'#ffd60a':'#888'}">
+        <div style="font-size:10px;margin:3px 0;color:${canMerge?'#ffc24b':'#888'}">
           ${canMerge
             ? `✅ 합치기 가능! (${sameCount}/3)${evolveDef?' → '+evolveDef.emoji+evolveDef.name:''}`
             : `동일 타워 ${sameCount}/3${evolveDef?' (목표: '+evolveDef.emoji+evolveDef.name+')':''}`}
@@ -175,14 +175,14 @@ Object.assign(App.prototype, {
         this.engine.selectedTower = null;
         panel.remove();
         this._addToStorage([{ ...def, _starLevel: 1 }]);
-        this.showWaveAnnounce(`🎒 ${def.name} 보관함으로`, '#c084fc');
+        this.showWaveAnnounce(`🎒 ${def.name} 보관함으로`, '#a78bfa');
       });
 
       // v28 세션D: 기술머신 - 에픽·레전드에 랜덤 태그 1개 (회수해도 유지)
       panel.querySelector('[data-action="tm"]')?.addEventListener('click', () => {
-        if (!this.engine.spendGold(window.TM_COST)) { this.showWaveAnnounce('💰 골드가 부족해요', '#ff6b6b'); return; }
+        if (!this.engine.spendGold(window.TM_COST)) { this.showWaveAnnounce('💰 골드가 부족해요', '#ff5c7a'); return; }
         const tag = window.applyTM(t);
-        this.engine.spawnFloatingText(`💿 ${window.DEX_TAGS[tag]} 습득!`, t.x, t.y - 36, '#4cc9f0');
+        this.engine.spawnFloatingText(`💿 ${window.DEX_TAGS[tag]} 습득!`, t.x, t.y - 36, '#6aa8ff');
         this.SFX && this.SFX.play && this.SFX.play('merge');
         panel.remove(); this.engine.selectedTower = null;
       });
@@ -270,7 +270,7 @@ Object.assign(App.prototype, {
       const expInner = document.createElement('div');
       expInner.className = 'hero-exp-bar-inner';
       expInner.dataset.heroId = hero.id;
-      expInner.style.cssText = `height:100%;background:#4fc3f7;width:${Math.min(100, (hero.exp/hero.expToNext)*100)}%;transition:width 0.2s;`;
+      expInner.style.cssText = `height:100%;background:#5b9dff;width:${Math.min(100, (hero.exp/hero.expToNext)*100)}%;transition:width 0.2s;`;
       expOuter.appendChild(expInner);
       infoCol.appendChild(expOuter);
       wrap.appendChild(infoCol);
@@ -287,7 +287,7 @@ Object.assign(App.prototype, {
         btn.title = `${skill.name}: ${skill.desc}${hotkeyMap[idx] ? ` (단축키: ${hotkeyMap[idx]})` : ''}`;
         btn.addEventListener('click', () => {
           if (hero.cast(idx, this.engine)) {
-            this.showWaveAnnounce(`${skill.emoji} ${skill.name}!`, '#ffd60a');
+            this.showWaveAnnounce(`${skill.emoji} ${skill.name}!`, '#ffc24b');
           }
         });
         wrap.appendChild(btn);
@@ -299,7 +299,7 @@ Object.assign(App.prototype, {
       treeBtn.dataset.heroId = hero.id;
       treeBtn.innerHTML = `<span class="skill-emoji">${hero.skillPoints > 0 ? '🌟' : '📊'}</span>`;
       treeBtn.title = `스킬트리 (SP: ${hero.skillPoints})`;
-      if (hero.skillPoints > 0) treeBtn.style.borderColor = '#ffd60a';
+      if (hero.skillPoints > 0) treeBtn.style.borderColor = '#ffc24b';
       treeBtn.addEventListener('click', () => this.openSkillTree(hero));
       wrap.appendChild(treeBtn);
 
@@ -381,7 +381,7 @@ Object.assign(App.prototype, {
           this.missionTracker.check();
           this.SFX.play('buy');
           this.buildTypeUpgradeBar();
-        } else this.showWaveAnnounce('골드 부족!', '#ff6b6b');
+        } else this.showWaveAnnounce('골드 부족!', '#ff5c7a');
       });
       grid.appendChild(btn);
     }
@@ -493,9 +493,9 @@ Object.assign(App.prototype, {
         if (hero.unlockedSkills.has(n.id)) return;
         if (n.requires && !hero.unlockedSkills.has(n.requires)) {
           const req = tree.nodes.find(x => x.id === n.requires);
-          this.showWaveAnnounce(`🔒 먼저 '${req.name}'을(를) 찍어야 해요`, '#ff6b6b'); return;
+          this.showWaveAnnounce(`🔒 먼저 '${req.name}'을(를) 찍어야 해요`, '#ff5c7a'); return;
         }
-        if (hero.skillPoints < n.cost) { this.showWaveAnnounce(`SP가 부족해요 (${n.cost}SP 필요)`, '#ff6b6b'); return; }
+        if (hero.skillPoints < n.cost) { this.showWaveAnnounce(`SP가 부족해요 (${n.cost}SP 필요)`, '#ff5c7a'); return; }
         if (hero.unlockSkillNode(n.id, this.engine)) {
           this.SFX.play('skill');
           render();
@@ -549,7 +549,7 @@ Object.assign(App.prototype, {
       row.className = 'mission-item';
       row.innerHTML = `
         <div>${info?.emoji || ''} ${info?.name || typeKey} (타워 ${towerCount}개)</div>
-        <div style="color:#ffd60a">레어 기준 +${Math.round((window.TYPE_FLAT_PER_TIER?.rare||5)*flatTiers)} · x${mul.toFixed(2)} (강화 ${lv}단계)</div>
+        <div style="color:#ffc24b">레어 기준 +${Math.round((window.TYPE_FLAT_PER_TIER?.rare||5)*flatTiers)} · x${mul.toFixed(2)} (강화 ${lv}단계)</div>
       `;
       list.appendChild(row);
     }
@@ -587,7 +587,7 @@ Object.assign(App.prototype, {
 
     // v27-4: 합치기 레시피 (item3 - 원래 요청하신 "조합표") - 같은 타워 3개 모으면 합쳐지는 표
     const mergeHeader = document.createElement('div');
-    mergeHeader.style.cssText = 'font-size:12px;color:#ffd60a;font-weight:700;margin:4px 0 2px;';
+    mergeHeader.style.cssText = 'font-size:12px;color:#ffc24b;font-weight:700;margin:4px 0 2px;';
     mergeHeader.textContent = '🧬 합치기 (동일 타워 3개 → 상위 등급)';
     list.appendChild(mergeHeader);
 
@@ -602,7 +602,7 @@ Object.assign(App.prototype, {
         const row = document.createElement('div');
         row.className = 'mission-item';
         row.innerHTML = `
-          <div>${fromDef.emoji}${fromDef.name} ×3 → ${toDef.emoji}${toDef.name}${isMergeOnly ? ' <span style=\"color:#ff6b6b;font-size:9px\">(합치기 전용! 뽑기로 안 나옴)</span>' : ''}</div>
+          <div>${fromDef.emoji}${fromDef.name} ×3 → ${toDef.emoji}${toDef.name}${isMergeOnly ? ' <span style=\"color:#ff5c7a;font-size:9px\">(합치기 전용! 뽑기로 안 나옴)</span>' : ''}</div>
           <div style="color:${window.GRADES?.[toDef.grade]?.color || '#fff'};font-size:10px">${window.GRADES?.[toDef.grade]?.name || ''}</div>
         `;
         list.appendChild(row);
@@ -610,14 +610,14 @@ Object.assign(App.prototype, {
     }
 
     const synergyHeader = document.createElement('div');
-    synergyHeader.style.cssText = 'font-size:12px;color:#4fc3f7;font-weight:700;margin:14px 0 2px;';
+    synergyHeader.style.cssText = 'font-size:12px;color:#5b9dff;font-weight:700;margin:14px 0 2px;';
     synergyHeader.textContent = '🔗 배치 시너지 (150px 이내 인접 배치시 발동)';
     list.appendChild(synergyHeader);
 
     // 동일 타입
     const sameRow = document.createElement('div');
     sameRow.className = 'mission-item';
-    sameRow.innerHTML = `<div>⚡⚡ 같은 타입끼리</div><div style="color:#ffd60a">+8 데미지</div>`;
+    sameRow.innerHTML = `<div>⚡⚡ 같은 타입끼리</div><div style="color:#ffc24b">+8 데미지</div>`;
     list.appendChild(sameRow);
 
     if (window.SYNERGY_PAIRS && window.TYPES) {
@@ -629,7 +629,7 @@ Object.assign(App.prototype, {
         row.className = 'mission-item';
         row.innerHTML = `
           <div>${infoA.emoji}${infoB.emoji} ${infoA.name}+${infoB.name} <span style="color:#888;font-size:10px">(${pair.label})</span></div>
-          <div style="color:#ffd60a">+${pair.bonus} 데미지</div>
+          <div style="color:#ffc24b">+${pair.bonus} 데미지</div>
         `;
         list.appendChild(row);
       }
@@ -663,7 +663,7 @@ Object.assign(App.prototype, {
       const allIds = [...window.GRADE_POOLS.normal, ...window.GRADE_POOLS.rare, ...window.GRADE_POOLS.epic, ...window.GRADE_POOLS.legend, ...window.GRADE_POOLS.unique, 'mew'];
       const collected = allIds.filter(id => tracker0.stats.collectedIds.has(id)).length;
       const dexBar = document.createElement('div');
-      dexBar.style.cssText = 'text-align:center;color:#ffd60a;font-size:13px;margin-bottom:8px;';
+      dexBar.style.cssText = 'text-align:center;color:#ffc24b;font-size:13px;margin-bottom:8px;';
       dexBar.textContent = `📖 도감 수집: ${collected}/${allIds.length}종`;
       overlay.appendChild(dexBar);
     }
@@ -733,14 +733,14 @@ Object.assign(App.prototype, {
         <span class="us-meta">${used ? '사용 완료' : left}</span><span class="us-cost">💰${cost}</span>`;
       btn.addEventListener('click', () => {
         if (used) return;
-        if (!this.engine.spendGold(cost)) { this.showWaveAnnounce('골드가 부족합니다', '#ff6b6b'); return; }
+        if (!this.engine.spendGold(cost)) { this.showWaveAnnounce('골드가 부족합니다', '#ff5c7a'); return; }
         const result = item.buy(this.engine);
         if (result === false) { this.engine.addGold(cost); return; } // 대상 없음 등 → 환불
         if (item.scaling) this.engine._shopBuyCount[item.key] = (this.engine._shopBuyCount[item.key] || 0) + 1;
         if (item.perWave) { if (!this.engine._shopWaveUses) this.engine._shopWaveUses = {}; this.engine._shopWaveUses[item.key] = (this.engine._shopWaveUses[item.key] || 0) + 1; }
         if (item.oneTime) { if (!this.engine._oneTimeUsed) this.engine._oneTimeUsed = {}; this.engine._oneTimeUsed[item.key] = true; }
         this.SFX.play('buy');
-        this.showWaveAnnounce(`${item.emoji} ${item.name} 사용!`, '#06d6a0');
+        this.showWaveAnnounce(`${item.emoji} ${item.name} 사용!`, '#34d399');
         this.buildShopBar();
       });
       grid.appendChild(btn);
@@ -760,7 +760,7 @@ Object.assign(App.prototype, {
       im.src = src;
     });
     const rr = (x, y, w, h, r) => { g.beginPath(); g.roundRect ? g.roundRect(x, y, w, h, r) : g.rect(x, y, w, h); };
-    const font = (px, w = 800) => `${w} ${px}px "Noto Sans KR", -apple-system, sans-serif`;
+    const font = (px, w = 800) => `${w} ${px}px "Pretendard Variable", Pretendard, -apple-system, sans-serif`;
     const GR = window.GRADES, ORDER = ['unique','legend','epic','rare','normal'];
 
     // 배경
@@ -772,17 +772,17 @@ Object.assign(App.prototype, {
       g.fillStyle = `rgba(255,255,255,${0.08 + (i % 5) * 0.04})`; g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill();
     }
     const glow = g.createRadialGradient(W / 2, 430, 40, W / 2, 430, 520);
-    glow.addColorStop(0, 'rgba(255,214,10,0.22)'); glow.addColorStop(1, 'rgba(255,214,10,0)');
+    glow.addColorStop(0, 'rgba(255,194,75,0.22)'); glow.addColorStop(1, 'rgba(255,194,75,0)');
     g.fillStyle = glow; g.fillRect(0, 0, W, H);
 
     g.textAlign = 'center'; g.textBaseline = 'middle';
-    g.fillStyle = '#ffd60a'; g.font = font(44, 900); g.fillText('POKÉMON TD', W / 2, 90);
+    g.fillStyle = '#ffc24b'; g.font = font(44, 900); g.fillText('POKÉMON TD', W / 2, 90);
     g.fillStyle = 'rgba(255,255,255,0.55)'; g.font = font(28, 700);
     const d = new Date(); g.fillText(`${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()} · 엔드리스`, W / 2, 140);
 
     // 웨이브 (메인 숫자)
     g.fillStyle = '#fff'; g.font = font(250, 900); g.fillText(String(e.currentWave), W / 2, 360);
-    g.fillStyle = '#4cc9f0'; g.font = font(48, 900); g.fillText('WAVE', W / 2, 510);
+    g.fillStyle = '#6aa8ff'; g.font = font(48, 900); g.fillText('WAVE', W / 2, 510);
     g.fillStyle = 'rgba(255,255,255,0.85)'; g.font = font(40, 800);
     g.fillText(`🏅 ${(e.score || 0).toLocaleString()}점`, W / 2, 580);
 
@@ -805,7 +805,7 @@ Object.assign(App.prototype, {
       else { g.textAlign = 'center'; g.font = font(110, 400); g.fillText(emoji, x + 345, 760); }
       g.textAlign = 'center';
     };
-    card(80, '영웅', heroName, heroImg, '⚡', '#ffd60a');
+    card(80, '영웅', heroName, heroImg, '⚡', '#ffc24b');
     card(560, 'MVP', mvp ? mvp.name : '-', mvpImg, mvp ? mvp.emoji : '❔', mvp ? GR[mvp.grade].color : '#888');
 
     // 덱 6마리 (필드에서 등급 높은 순, 같은 종 1번만)
@@ -842,7 +842,7 @@ Object.assign(App.prototype, {
         const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = file.name;
         document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
       }
-    } catch (err) { console.warn('share card', err); this.showWaveAnnounce('카드 생성 실패', '#ff6b6b'); }
+    } catch (err) { console.warn('share card', err); this.showWaveAnnounce('카드 생성 실패', '#ff5c7a'); }
     if (btn) { btn.disabled = false; btn.textContent = label; }
   },
 

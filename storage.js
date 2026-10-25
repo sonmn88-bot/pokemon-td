@@ -99,7 +99,7 @@ Object.assign(App.prototype, {
       return;
     }
     this._placingId = this._placingId === id ? null : id;
-    if (this._placingId) this.showWaveAnnounce('🎯 빈 슬롯을 탭해서 배치', '#4cc9f0');
+    if (this._placingId) this.showWaveAnnounce('🎯 빈 슬롯을 탭해서 배치', '#6aa8ff');
     this.renderStorageStrip();
   },
 
@@ -260,7 +260,7 @@ Object.assign(App.prototype, {
         this._consumeMaterials(selected);
         this.engine.addGold(sellSum);
         this.SFX.play('buy');
-        this.showWaveAnnounce(`💸 ${n}개 판매 +${sellSum}g`, '#06d6a0');
+        this.showWaveAnnounce(`💸 ${n}개 판매 +${sellSum}g`, '#34d399');
         ui.sel.clear(); render(); this.renderStorageStrip();
       };
       overlay.querySelectorAll('[data-recipe]').forEach(b => b.onclick = () => {

@@ -313,7 +313,7 @@ class App {
     overlay.innerHTML = `
       <div class="skin-picker-title" id="rank-title" style="cursor:default;user-select:none;">🌍 전체 랭킹</div>
       <div style="display:flex;gap:6px;margin-bottom:6px;">
-        <button id="rank-clear-btn" style="display:none;font-size:10px;padding:4px 8px;border-radius:6px;border:1px solid rgba(255,80,80,0.4);background:transparent;color:#ff6b6b;cursor:pointer;">🗑️ 전체 초기화</button>
+        <button id="rank-clear-btn" style="display:none;font-size:10px;padding:4px 8px;border-radius:6px;border:1px solid rgba(255,80,80,0.4);background:transparent;color:#ff5c7a;cursor:pointer;">🗑️ 전체 초기화</button>
       </div>
       <div id="rank-list-body" style="color:#888;padding:20px;">불러오는 중...</div>`;
     const closeBtn = document.createElement('button');
@@ -336,9 +336,9 @@ class App {
       body.innerHTML = rows.map((r, i) => `
         <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:rgba(255,255,255,0.05);border-radius:8px;margin-bottom:6px;">
           <span>#${i+1} ${r.name}</span>
-          <span style="color:#ffd60a">🏅${(r.score||0).toLocaleString()}</span>
-          <span style="color:#4fc3f7">Wave ${r.wave}</span>
-          ${isAdmin ? `<button data-rank-del="${r.id}" style="font-size:10px;padding:2px 6px;border-radius:5px;border:none;background:#ff6b6b;color:#fff;cursor:pointer;">삭제</button>` : ''}
+          <span style="color:#ffc24b">🏅${(r.score||0).toLocaleString()}</span>
+          <span style="color:#5b9dff">Wave ${r.wave}</span>
+          ${isAdmin ? `<button data-rank-del="${r.id}" style="font-size:10px;padding:2px 6px;border-radius:5px;border:none;background:#ff5c7a;color:#fff;cursor:pointer;">삭제</button>` : ''}
         </div>`).join('');
       if (isAdmin) {
         body.querySelectorAll('[data-rank-del]').forEach(btn => {
@@ -400,8 +400,8 @@ class App {
           records.map((r, i) => `
             <div style="display:flex;justify-content:space-between;padding:8px 12px;background:rgba(255,255,255,0.05);border-radius:8px;margin-bottom:6px;">
               <span>#${i+1} · Wave ${r.wave}</span>
-              <span style="color:#ffd60a">🏅${r.score.toLocaleString()}</span>
-              <span style="color:#4fc3f7">⭐${r.mvp}</span>
+              <span style="color:#ffc24b">🏅${r.score.toLocaleString()}</span>
+              <span style="color:#5b9dff">⭐${r.mvp}</span>
               <span style="color:#888">${r.date}</span>
             </div>`).join('')}
       </div>
@@ -443,7 +443,7 @@ class App {
     this._runTraitInfo = trait;
     const badge = document.getElementById('hud-trait');
     if (badge) { badge.title = `${trait.name} — ${trait.desc}`; badge.textContent = trait.name.split(' ')[0]; }
-    setTimeout(() => this.showWaveAnnounce(`${trait.name} — ${trait.desc}`, '#4fc3f7'), 600);
+    setTimeout(() => this.showWaveAnnounce(`${trait.name} — ${trait.desc}`, '#5b9dff'), 600);
   }
 
   bindMapSelect() {
@@ -466,14 +466,14 @@ class App {
     overlay.innerHTML = `
       <div class="skin-picker-title">❓ 게임 방법</div>
       <div style="max-width:420px;text-align:left;color:#ddd;font-size:13px;line-height:1.9;padding:0 16px;max-height:60vh;overflow-y:auto;">
-        <b style="color:#ffd60a">🎯 목표</b> — 라이프가 아니라 <b>필드에 쌓이는 몬스터 수(200마리)</b>로 게임오버가 결정됩니다. 최대한 오래 버티세요.<br><br>
-        <b style="color:#ffd60a">🎰 뽑기</b> — 골드로 타워를 뽑아 빈 슬롯에 배치하세요. 등급이 높을수록 강합니다.<br><br>
-        <b style="color:#ffd60a">🧬 합체</b> — 같은 타워 3개를 모으면 상위 등급으로 합쳐집니다 (🔗 버튼에서 전체 레시피 확인 가능).<br><br>
-        <b style="color:#ffd60a">🔗 시너지</b> — 같은 타입이나 궁합 좋은 타입끼리 150px 이내에 배치하면 데미지가 오릅니다.<br><br>
-        <b style="color:#ffd60a">⭐ 숙련도</b> — 같은 포켓몬을 중복으로 뽑기만 해도 그 포켓몬 전용 데미지가 조금씩 오릅니다.<br><br>
-        <b style="color:#ffd60a">🔥 타입강화</b> — 화면 하단 바에서 타입별로 영구 강화를 살 수 있습니다.<br><br>
-        <b style="color:#ffd60a">👑 왕</b> — 90웨이브에 강력한 왕이 등장합니다. 처치하면 그 자리에서 무한히 강해지는 몹들과 계속 싸우게 됩니다.<br><br>
-        <b style="color:#ffd60a">🎯 미션 / 📖 도감</b> — 상단 버튼에서 확인 가능, 완료시 골드 보상.
+        <b style="color:#ffc24b">🎯 목표</b> — 라이프가 아니라 <b>필드에 쌓이는 몬스터 수(200마리)</b>로 게임오버가 결정됩니다. 최대한 오래 버티세요.<br><br>
+        <b style="color:#ffc24b">🎰 뽑기</b> — 골드로 타워를 뽑아 빈 슬롯에 배치하세요. 등급이 높을수록 강합니다.<br><br>
+        <b style="color:#ffc24b">🧬 합체</b> — 같은 타워 3개를 모으면 상위 등급으로 합쳐집니다 (🔗 버튼에서 전체 레시피 확인 가능).<br><br>
+        <b style="color:#ffc24b">🔗 시너지</b> — 같은 타입이나 궁합 좋은 타입끼리 150px 이내에 배치하면 데미지가 오릅니다.<br><br>
+        <b style="color:#ffc24b">⭐ 숙련도</b> — 같은 포켓몬을 중복으로 뽑기만 해도 그 포켓몬 전용 데미지가 조금씩 오릅니다.<br><br>
+        <b style="color:#ffc24b">🔥 타입강화</b> — 화면 하단 바에서 타입별로 영구 강화를 살 수 있습니다.<br><br>
+        <b style="color:#ffc24b">👑 왕</b> — 90웨이브에 강력한 왕이 등장합니다. 처치하면 그 자리에서 무한히 강해지는 몹들과 계속 싸우게 됩니다.<br><br>
+        <b style="color:#ffc24b">🎯 미션 / 📖 도감</b> — 상단 버튼에서 확인 가능, 완료시 골드 보상.
       </div>
     `;
     const closeBtn = document.createElement('button');
@@ -518,7 +518,7 @@ class App {
       el.style.cssText = 'position:absolute;top:8px;left:50%;transform:translateX(-50%);z-index:150;padding:6px 14px;border-radius:10px;font-weight:bold;font-size:12px;pointer-events:none;transition:opacity 0.3s;white-space:nowrap;';
       document.getElementById('game-screen').appendChild(el);
     }
-    const colors = { 140: ['#3a2f00','#ffd60a'], 160: ['#3a1f00','#ff9800'], 180: ['#3a0000','#ff3b3b'] };
+    const colors = { 140: ['#3a2f00','#ffc24b'], 160: ['#3a1f00','#ff9800'], 180: ['#3a0000','#ff3b3b'] };
     const [bg, fg] = colors[level] || colors[140];
     el.style.background = bg; el.style.color = fg; el.style.border = `1px solid ${fg}`;
     el.textContent = `⚠️ 필드에 몬스터 ${count}마리 (200마리에서 게임오버!)`;
@@ -589,7 +589,7 @@ class App {
           e.preventDefault();
           if (hero.cast(skillIdx, this.engine)) {
             const skill = hero.def.skills[skillIdx];
-            this.showWaveAnnounce(`${skill.emoji} ${skill.name}!`, '#ffd60a');
+            this.showWaveAnnounce(`${skill.emoji} ${skill.name}!`, '#ffc24b');
             this._flashScreenEdge(); // v27-17: 궁극기 발동 화면 테두리 플래시 (요청5)
           }
         }
@@ -659,7 +659,7 @@ class App {
     // v27-63: 카메라 원위치 버튼 (요청 - 화면이 확대/이동된 채 못 돌아오는 문제의 복구 수단)
     const camBtn = document.getElementById('btn-cam-reset');
     if (camBtn) camBtn.addEventListener('click', () => {
-      if (this.engine) { this.engine.resetCamera(); this.showWaveAnnounce('🧭 화면 원위치', '#4fc3f7'); }
+      if (this.engine) { this.engine.resetCamera(); this.showWaveAnnounce('🧭 화면 원위치', '#5b9dff'); }
     });
   }
 
@@ -700,7 +700,7 @@ class App {
 
     const cost = pullKey === 'ten' ? window.PULL_COSTS.ten : window.PULL_COSTS[pullKey];
     if (!this.engine.spendGold(cost)) {
-      this.showWaveAnnounce('골드가 부족합니다', '#ff6b6b');
+      this.showWaveAnnounce('골드가 부족합니다', '#ff5c7a');
       return;
     }
 
@@ -737,7 +737,7 @@ class App {
       // v27-44: 슬롯 없이 뽑았으면 보관함으로 (요청2)
       this._addToStorage([towerDef]);
       const gg = window.GRADES?.[towerDef.grade];
-      this.showWaveAnnounce(`${towerDef.emoji} ${towerDef.name} 획득! → 🎒보관함`, gg?.color || '#4fc3f7');
+      this.showWaveAnnounce(`${towerDef.emoji} ${towerDef.name} 획득! → 🎒보관함`, gg?.color || '#5b9dff');
     } else {
       this._placePulledTower(towerDef, slotIdx);
     }
@@ -749,20 +749,20 @@ class App {
       // v27-5: 에픽 이상은 짧은 서스펜스 연출 후 공개 (요청B: 가챠의 재미)
       let flick = 0;
       const flickInterval = setInterval(() => {
-        this.showWaveAnnounce('❓❓❓', flick % 2 ? '#fff' : '#ffd60a');
+        this.showWaveAnnounce('❓❓❓', flick % 2 ? '#fff' : '#ffc24b');
         flick++;
         if (flick >= 3) {
           clearInterval(flickInterval);
           this.SFX.play(gradeSound[towerDef.grade] || 'pull_normal');
           const g = window.GRADES?.[towerDef.grade];
-          this.showWaveAnnounce(`${towerDef.emoji} ${g?.name||""} ${towerDef.name}`, g?.color||"#ffd60a");
+          this.showWaveAnnounce(`${towerDef.emoji} ${g?.name||""} ${towerDef.name}`, g?.color||"#ffc24b");
         }
       }, 220);
     } else {
       this.SFX.play(gradeSound[towerDef.grade] || 'pull_normal');
       if (towerDef.grade === 'rare') {
         const g = window.GRADES?.[towerDef.grade];
-        this.showWaveAnnounce(`${towerDef.emoji} ${g?.name||""} ${towerDef.name}`, g?.color||"#ffd60a");
+        this.showWaveAnnounce(`${towerDef.emoji} ${g?.name||""} ${towerDef.name}`, g?.color||"#ffc24b");
       }
     }
     // v27-5: 합체 힌트 (요청) - 뽑은 직후 동일 타워 보유수 체크해서 알려줌
@@ -770,7 +770,7 @@ class App {
       // v28: 필드 + 보관함 합산
       const sameCount = this._allMaterials(true).filter(m => m.def.id === towerDef.id).length;
       if (sameCount === 3 && window.MERGE_EVOLUTION[towerDef.id]) {
-        setTimeout(() => this.showWaveAnnounce(`🧬 ${towerDef.emoji} ${towerDef.name} 3마리! 합성 연구소에서 확정 진화 가능`, '#06d6a0'), 900);
+        setTimeout(() => this.showWaveAnnounce(`🧬 ${towerDef.emoji} ${towerDef.name} 3마리! 합성 연구소에서 확정 진화 가능`, '#34d399'), 900);
       }
     }
 
@@ -857,7 +857,7 @@ class App {
       const emoji = btnEl.querySelector('.tower-btn-emoji')?.textContent || '';
       this.showWaveAnnounce(
         alreadyPlaced ? emoji + ' 화면 어디든 탭해서 이동!' : emoji + ' 화면 어디든 탭해서 배치!',
-        '#ffd60a'
+        '#ffc24b'
       );
     }
   }
@@ -922,7 +922,7 @@ class App {
       `;
       card.addEventListener('click', () => {
         if (!unlocked) {
-          this.showWaveAnnounce(`${s.name} 스킨은 잠겨있습니다`, '#ff6b6b');
+          this.showWaveAnnounce(`${s.name} 스킨은 잠겨있습니다`, '#ff5c7a');
           return;
         }
         this.selectedHeroSkins[heroId] = skinId;
@@ -1052,7 +1052,7 @@ class App {
     const origLoseLife = this.engine.loseLife.bind(this.engine);
     this.engine.loseLife = (n) => { this.SFX.play('life_lost'); origLoseLife(n); };
     this.engine.onKingDefeated = () => {
-      this.showWaveAnnounce('👑 왕을 처치했습니다! 무한 강화 모드 진입 - 20웨이브마다 적이 새로운 능력을 얻습니다', '#ffd60a');
+      this.showWaveAnnounce('👑 왕을 처치했습니다! 무한 강화 모드 진입 - 20웨이브마다 적이 새로운 능력을 얻습니다', '#ffc24b');
       this.SFX.play('king_victory'); // v27-18: 왕 처치 전용 승리 징글 (요청H)
       this.BGM.start('infinite'); // v27-7: 무한강화 진입시 전용 BGM으로 전환 (요청5)
       this._recordKingKill(); // v27-17: 왕 처치 기록 갤러리 (요청4)
@@ -1063,7 +1063,7 @@ class App {
       if (every > 0 && wave % every === 0) {
         const d = window.rollTower('premium');
         this._addToStorage([d]);
-        setTimeout(() => this.showWaveAnnounce(`🥚 황금알! ${d.emoji} ${d.name} 획득 → 🎒`, '#ffd60a'), 700);
+        setTimeout(() => this.showWaveAnnounce(`🥚 황금알! ${d.emoji} ${d.name} 획득 → 🎒`, '#ffc24b'), 700);
       }
       if (hudTimer) hudTimer.style.display = 'none';
       this.els.btnWave.disabled = false;
@@ -1074,7 +1074,7 @@ class App {
         // v27-17: 웨이브 클리어 문구 다양화 (요청2) - 필드에 남은 적이 없으면 "완벽 클리어"
         const remaining = this.engine.enemies.length;
         const clearMsg = remaining === 0 ? `✨ 완벽한 클리어! Wave ${wave} +${bonus}g` : `Wave ${wave} 완료! +${bonus}g`;
-        this.showWaveAnnounce(clearMsg, '#ffd60a');
+        this.showWaveAnnounce(clearMsg, '#ffc24b');
       }
       if (this.missionTracker && this.difficulty === 'hard' && !timedOut) {
         this.missionTracker.stats.hardWavesCleared = (this.missionTracker.stats.hardWavesCleared||0) + 1;
@@ -1148,7 +1148,7 @@ class App {
           if (this.missionTracker) this.missionTracker.stats.collectedIds.add(def.id);
         }
         overlay.remove();
-        this.showWaveAnnounce(`${def.emoji} ${def.name}(으)로 시작! (영구 데미지+15% 시그니처)`, '#ffd60a');
+        this.showWaveAnnounce(`${def.emoji} ${def.name}(으)로 시작! (영구 데미지+15% 시그니처)`, '#ffc24b');
       });
       grid.appendChild(card);
     }
@@ -1208,7 +1208,7 @@ class App {
           const cnt = this.engine.enemies.length;
           fcEl.textContent = cnt;
           const cell = document.getElementById('hud-field');
-          const col = cnt >= 160 ? '#ff5252' : cnt >= 120 ? '#ffab40' : cnt >= 80 ? '#ffd60a' : '#06d6a0';
+          const col = cnt >= 160 ? '#ff5252' : cnt >= 120 ? '#ffab40' : cnt >= 80 ? '#ffc24b' : '#34d399';
           if (cell) cell.style.color = cnt >= 80 ? col : '';
           const gauge = document.getElementById('field-gauge'); // v28 세션E: 0~200 진행바
           if (gauge) { gauge.style.width = Math.min(100, cnt / 2) + '%'; gauge.style.background = col; }
@@ -1295,7 +1295,7 @@ class App {
       }
       if (selIdx !== null && !this.engine.towerSlots[selIdx].occupied) {
         document.querySelectorAll('.gacha-btn').forEach(b => b.classList.add('slot-ready'));
-        this.showWaveAnnounce('🎯 뽑기 버튼을 클릭!', '#4cc9f0');
+        this.showWaveAnnounce('🎯 뽑기 버튼을 클릭!', '#6aa8ff');
       } else {
         document.querySelectorAll('.gacha-btn').forEach(b => b.classList.remove('slot-ready'));
       }
@@ -1341,17 +1341,17 @@ class App {
     const e = this.engine;
     const tierDef = BOSS_TIERS.find(t => t.tier === tier);
     if (!e || !tierDef) return;
-    if (e.state !== 'wave') { this.showWaveAnnounce('웨이브 진행 중에만 소환 가능', '#ff6b6b'); return; }
+    if (e.state !== 'wave') { this.showWaveAnnounce('웨이브 진행 중에만 소환 가능', '#ff5c7a'); return; }
     if ((e._bossSummonCooldown || 0) > 0) return;
     // v27-28: 보스 티어별 최소 웨이브 요구 (요청: 초반부터 뮤츠까지 쉽게 소환/처치되던 문제)
     if (e.currentWave < tierDef.minWave) {
-      this.showWaveAnnounce(`🔒 ${tierDef.label}은(는) 웨이브 ${tierDef.minWave} 이후에 소환 가능`, '#ff6b6b');
+      this.showWaveAnnounce(`🔒 ${tierDef.label}은(는) 웨이브 ${tierDef.minWave} 이후에 소환 가능`, '#ff5c7a');
       return;
     }
     const waveMul = bossWaveScaleMul(e.currentWave);
     e._spawnEnemy({ type: tierDef.type, bossTier: tier, hpMul: tierDef.hpMul * waveMul, rewardMul: tierDef.rewardMul });
     e._bossSummonCooldown = BOSS_SUMMON_COOLDOWN;
-    this.showWaveAnnounce(`🔮 ${tierDef.label}(${tier}성) 소환!`, '#ff6b6b');
+    this.showWaveAnnounce(`🔮 ${tierDef.label}(${tier}성) 소환!`, '#ff5c7a');
     if (this.missionTracker) { this.missionTracker.stats.bossSummons = (this.missionTracker.stats.bossSummons||0) + 1; this.missionTracker.check(); }
     this._updateBossSummonUI();
   }
@@ -1360,8 +1360,8 @@ class App {
     const bar = document.getElementById('boss-summon-bar');
     if (!bar || !this.engine) return;
     bar.querySelectorAll('.boss-tier-chip').forEach(chip => {
-      chip.style.borderColor = Number(chip.dataset.tier) === this._bossSummonTier ? '#ffd60a' : 'rgba(255,255,255,0.2)';
-      chip.style.background = Number(chip.dataset.tier) === this._bossSummonTier ? 'rgba(255,214,10,0.25)' : 'rgba(0,0,0,0.4)';
+      chip.style.borderColor = Number(chip.dataset.tier) === this._bossSummonTier ? '#ffc24b' : 'rgba(255,255,255,0.2)';
+      chip.style.background = Number(chip.dataset.tier) === this._bossSummonTier ? 'rgba(255,194,75,0.25)' : 'rgba(0,0,0,0.4)';
     });
     const btn = document.getElementById('boss-summon-btn');
     if (!btn) return;
@@ -1431,7 +1431,7 @@ class App {
         × 스킬${(1+skillBonus).toFixed(2)}
         ${evoMul!==1?`× 진화${evoMul.toFixed(2)}`:''}
         × 타입강화${typeMul.toFixed(2)}
-        = <span style="color:#ffd60a">${Math.round(hero.attackDamage)}</span>
+        = <span style="color:#ffc24b">${Math.round(hero.attackDamage)}</span>
       </div>`;
     panel.innerHTML = `
       <div class="tower-panel-name">${hero.skin.emoji} ${hero.name} Lv${hero.level} ${typeTag}</div>
@@ -1474,7 +1474,7 @@ class App {
       let el = e.target;
       while (el && el !== document.body && !el.title) el = el.parentElement;
       if (el && el.title) {
-        this.showWaveAnnounce(el.title, '#4fc3f7');
+        this.showWaveAnnounce(el.title, '#5b9dff');
       }
     }, { passive: true });
 
@@ -1669,7 +1669,7 @@ class App {
       e.switchZone(zoneMapId, nextZone);
       this.buildTowerBar();
       this.BGM.start(zoneMapId);
-      this.showWaveAnnounce(ZONE_LABELS[nextZone], '#7fe3ff');
+      this.showWaveAnnounce(ZONE_LABELS[nextZone], '#9cc4ff');
     }
 
     const wave = generateWave(nextWave);
@@ -1679,9 +1679,9 @@ class App {
     const isBossWave = nextWave === KING_WAVE || nextWave % 10 === 0;
     if (!isBossWave && nextWave >= 3 && Math.random() < 0.15) {
       const events = [
-        { name:'💰 골드 러쉬', color:'#ffd60a', apply:()=>{ e._globalGoldMul = 2.2; } },
-        { name:'⚡ 스피드 웨이브', color:'#4fc3f7', apply:()=>{ e._waveSpeedMul = 1.5; e._waveHpMul = 0.75; } },
-        { name:'🛡️ 정예 웨이브', color:'#ff6b6b', apply:()=>{ e._waveHpMul = 1.6; e._globalGoldMul = 1.8; } },
+        { name:'💰 골드 러쉬', color:'#ffc24b', apply:()=>{ e._globalGoldMul = 2.2; } },
+        { name:'⚡ 스피드 웨이브', color:'#5b9dff', apply:()=>{ e._waveSpeedMul = 1.5; e._waveHpMul = 0.75; } },
+        { name:'🛡️ 정예 웨이브', color:'#ff5c7a', apply:()=>{ e._waveHpMul = 1.6; e._globalGoldMul = 1.8; } },
       ];
       const ev = events[Math.floor(Math.random() * events.length)];
       ev.apply();
@@ -1693,9 +1693,9 @@ class App {
 
     // 보스 웨이브 경고
     if (nextWave === KING_WAVE) {
-      this.showWaveAnnounce(`👑 왕이 기다리고 있습니다... (Wave ${nextWave})`, '#ffd60a');
+      this.showWaveAnnounce(`👑 왕이 기다리고 있습니다... (Wave ${nextWave})`, '#ffc24b');
     } else if (nextWave % 30 === 0) {
-      this.showWaveAnnounce(`🔮 존 보스 등장! (Wave ${nextWave})`, '#ff6b6b');
+      this.showWaveAnnounce(`🔮 존 보스 등장! (Wave ${nextWave})`, '#ff5c7a');
     } else if (nextWave % 10 === 0) {
       this.showWaveAnnounce(`☠️ 중간보스 등장! (Wave ${nextWave})`, '#ffab40');
     }
@@ -1706,7 +1706,7 @@ class App {
     if (e.startWave(wave, timeLimit)) {
       this.els.btnWave.disabled = false;
       this.els.btnWave.textContent = '⏭ 스킵 (남은 적 놔두고 진행)';
-      setTimeout(() => this.showWaveAnnounce(`Wave ${e.currentWave}`, '#ffd60a'), 100);
+      setTimeout(() => this.showWaveAnnounce(`Wave ${e.currentWave}`, '#ffc24b'), 100);
     }
   }
 
@@ -1764,7 +1764,7 @@ class App {
       info.textContent = `도달 웨이브: ${reached}`;
       overlay.appendChild(info);
       const bestEl = document.createElement('div');
-      bestEl.style.cssText = 'color:#ffd60a;font-size:15px;margin-bottom:8px;';
+      bestEl.style.cssText = 'color:#ffc24b;font-size:15px;margin-bottom:8px;';
       bestEl.textContent = `🏆 최고 기록: ${best != null ? best : reached}`;
       overlay.appendChild(bestEl);
 
@@ -1778,9 +1778,9 @@ class App {
       const varietyCount = this.missionTracker?.stats?.collectedIds?.size || 0;
       // v27-18: 사망 서사 (요청F)
       const dc = this.engine._deathCause;
-      const deathLine = dc ? `<div style="color:#ff6b6b;font-style:italic;margin-top:4px">💀 ${dc.name} ${dc.count}마리에게 둘러싸여 무너졌습니다</div>` : '';
+      const deathLine = dc ? `<div style="color:#ff5c7a;font-style:italic;margin-top:4px">💀 ${dc.name} ${dc.count}마리에게 둘러싸여 무너졌습니다</div>` : '';
       summary.innerHTML = `
-        <div style="color:#ffd60a;font-weight:700;margin-bottom:4px;">📊 이번 판 요약</div>
+        <div style="color:#ffc24b;font-weight:700;margin-bottom:4px;">📊 이번 판 요약</div>
         <div>⭐ MVP 타워: ${mvpDef ? `${mvpDef.emoji} ${mvpDef.name}` : '-'}</div>
         <div>🎲 사용한 포켓몬 종류: ${varietyCount}종</div>
         <div>🏅 최종 점수: ${(this.engine.score||0).toLocaleString()}</div>
@@ -1795,7 +1795,7 @@ class App {
         rankBox.innerHTML = `
           <input id="rank-name-input" maxlength="12" placeholder="이름 입력 (최대 12자)"
             style="flex:1;padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.3);background:rgba(0,0,0,0.4);color:#fff;font-size:13px;">
-          <button id="rank-submit-btn" style="padding:8px 14px;border-radius:8px;border:none;background:#ffd60a;color:#1a1200;font-weight:700;font-size:13px;cursor:pointer;">🏆 랭킹 등록</button>
+          <button id="rank-submit-btn" style="padding:8px 14px;border-radius:8px;border:none;background:#ffc24b;color:#1a1200;font-weight:700;font-size:13px;cursor:pointer;">🏆 랭킹 등록</button>
         `;
         overlay.appendChild(rankBox);
         const submitBtn = rankBox.querySelector('#rank-submit-btn');
@@ -1835,7 +1835,7 @@ class App {
     // v28 세션E: 인스타 4:5 결과 카드 공유
     const shareBtn = document.createElement('button');
     shareBtn.className = 'end-btn';
-    shareBtn.style.cssText = 'background:linear-gradient(135deg,#c084fc,#4cc9f0);margin-bottom:8px;';
+    shareBtn.style.cssText = 'background:linear-gradient(135deg,#a78bfa,#6aa8ff);margin-bottom:8px;';
     shareBtn.textContent = '📸 결과 카드 공유';
     shareBtn.addEventListener('click', () => this.shareResultCard(shareBtn));
     overlay.appendChild(shareBtn);
@@ -1940,7 +1940,7 @@ function initTitleCanvas() {
   canvas.width = W; canvas.height = H;
 
   const particles = [];
-  const COLORS = ['#ffd60a','#4cc9f0','#f48fb1','#06d6a0','#c084fc','#ff6b6b'];
+  const COLORS = ['#ffc24b','#6aa8ff','#f48fb1','#34d399','#a78bfa','#ff5c7a'];
   const EMOJIS = ['⭐','✨','💫','🌟','⚡','💎'];
 
   for (let i = 0; i < 60; i++) {

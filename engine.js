@@ -315,8 +315,8 @@ class GameEngine {
         if (Math.hypot(e2.x - enemy.x, e2.y - enemy.y) <= 90) { e2.takeDamage(novaDmg, 'special'); hitCount++; }
       }
       if (hitCount > 0) {
-        if (window.AoeBurst) this.particles.push(new AoeBurst(enemy.x, enemy.y, 90, '#ffd60a'));
-        this.spawnFloatingText(`✨골드 엘리트 폭발! ${hitCount}마리 추가타격`, enemy.x, enemy.y - 45, '#ffd60a');
+        if (window.AoeBurst) this.particles.push(new AoeBurst(enemy.x, enemy.y, 90, '#ffc24b'));
+        this.spawnFloatingText(`✨골드 엘리트 폭발! ${hitCount}마리 추가타격`, enemy.x, enemy.y - 45, '#ffc24b');
       }
     }
     if (enemy._isKing) this.onKingDefeated && this.onKingDefeated();
@@ -327,9 +327,9 @@ class GameEngine {
     const bonus = Math.floor(baseReward * (effectiveGoldMul - 1));
     // v27-16: 현상금 몬스터 보너스 (요청2)
     let bountyBonus = 0;
-    if (enemy._bounty) { bountyBonus = 40 + Math.round(this.currentWave * 1.5); this.spawnFloatingText(`💰현상금 +${bountyBonus}g!`, enemy.x, enemy.y - 30, '#ffd60a'); }
+    if (enemy._bounty) { bountyBonus = 40 + Math.round(this.currentWave * 1.5); this.spawnFloatingText(`💰현상금 +${bountyBonus}g!`, enemy.x, enemy.y - 30, '#ffc24b'); }
     this.addGold(baseReward + bonus + bountyBonus);
-    this.spawnFloatingText(`+${baseReward + bonus}g`, enemy.x, enemy.y - 10, '#ffd60a');
+    this.spawnFloatingText(`+${baseReward + bonus}g`, enemy.x, enemy.y - 10, '#ffc24b');
 
     // v27-4: 점수 공식 (item 13,19) - 생존이 지배적, 킬은 보너스 수준
     // 일반킬 1-3(엘리트는 조금 더), 미니보스 25, 일반보스 80, 왕 120
@@ -527,7 +527,7 @@ class GameEngine {
     if (interest > 0) {
       this.gold = Math.round(this.gold + interest); // 이자는 골드 배율(토게피 등) 미적용
       this.onGoldChange && this.onGoldChange(this.gold);
-      this.spawnFloatingText(`🏦 이자 +${interest}g`, this.camera.x, this.camera.y - (this.height/2 - 110)/this.camera.zoom, '#06d6a0');
+      this.spawnFloatingText(`🏦 이자 +${interest}g`, this.camera.x, this.camera.y - (this.height/2 - 110)/this.camera.zoom, '#34d399');
     }
     return interest;
   }
@@ -585,7 +585,7 @@ class GameEngine {
     slot.occupied = true; slot.tower = t;
     this.towers.push(t);
     if (window.applyTowerSynergies) window.applyTowerSynergies(this.towers);
-    this.spawnHitParticle(slot.x, slot.y, '#4cc9f0');
+    this.spawnHitParticle(slot.x, slot.y, '#6aa8ff');
     return true;
   }
   sellTower(slotIdx) {
@@ -597,7 +597,7 @@ class GameEngine {
     // 정확한 지출 이력 추적 대신, 신뢰성 있는 등급 기반 고정 판매가로 교체.
     const refund = (window.SELL_VALUE || {})[t.def?.grade] || 40; // v28: 판매가 단일 기준
     this.addGold(refund);
-    this.spawnFloatingText(`+${refund}g`, slot.x, slot.y, '#06d6a0');
+    this.spawnFloatingText(`+${refund}g`, slot.x, slot.y, '#34d399');
     this.towers = this.towers.filter(x=>x!==t);
     slot.occupied = false; slot.tower = null;
     if (window.applyTowerSynergies) window.applyTowerSynergies(this.towers);
@@ -836,10 +836,10 @@ class GameEngine {
       ctx.drawImage(this._getPedestal(), s.x - 26, s.y - 22, 52, 52);
       ctx.beginPath(); ctx.ellipse(s.x, s.y, 20, 15, 0, 0, Math.PI*2);
       if (isHov) {
-        ctx.fillStyle='rgba(76,201,240,0.35)'; ctx.strokeStyle='#4cc9f0'; ctx.lineWidth=2.5;
+        ctx.fillStyle='rgba(106,168,255,0.35)'; ctx.strokeStyle='#6aa8ff'; ctx.lineWidth=2.5;
         ctx.fill(); ctx.stroke();
       } else if (isMouseHover) {
-        ctx.fillStyle='rgba(76,201,240,0.18)'; ctx.strokeStyle='rgba(76,201,240,0.75)'; ctx.lineWidth=2;
+        ctx.fillStyle='rgba(106,168,255,0.18)'; ctx.strokeStyle='rgba(106,168,255,0.75)'; ctx.lineWidth=2;
         ctx.fill(); ctx.stroke();
       } else if (isHL) {
         ctx.strokeStyle='rgba(255,255,255,0.55)'; ctx.lineWidth=1.5; ctx.stroke();
@@ -847,7 +847,7 @@ class GameEngine {
 
       // + 아이콘
       ctx.shadowBlur=0;
-      ctx.strokeStyle=isHov?'#4cc9f0':(isHL?'rgba(255,255,255,0.85)':'rgba(255,255,255,0.28)');
+      ctx.strokeStyle=isHov?'#6aa8ff':(isHL?'rgba(255,255,255,0.85)':'rgba(255,255,255,0.28)');
       ctx.lineWidth=isHov?2.5:1.5; ctx.lineCap='round';
       ctx.beginPath();
       ctx.moveTo(s.x-6,s.y); ctx.lineTo(s.x+6,s.y);
@@ -879,8 +879,8 @@ class GameEngine {
   _drawRange(ctx, tower) {
     ctx.save();
     ctx.beginPath(); ctx.arc(tower.x, tower.y, tower.range, 0, Math.PI*2);
-    ctx.strokeStyle='rgba(255,214,10,0.65)'; ctx.lineWidth=2;
-    ctx.fillStyle='rgba(255,214,10,0.07)';
+    ctx.strokeStyle='rgba(255,194,75,0.65)'; ctx.lineWidth=2;
+    ctx.fillStyle='rgba(255,194,75,0.07)';
     ctx.fill(); ctx.stroke(); ctx.restore();
   }
 
@@ -892,8 +892,8 @@ class GameEngine {
     const range = new TClass(0,0).range;
     ctx.save();
     ctx.beginPath(); ctx.arc(slot.x, slot.y, range, 0, Math.PI*2);
-    ctx.strokeStyle='rgba(76,201,240,0.55)'; ctx.lineWidth=2;
-    ctx.fillStyle='rgba(76,201,240,0.08)';
+    ctx.strokeStyle='rgba(106,168,255,0.55)'; ctx.lineWidth=2;
+    ctx.fillStyle='rgba(106,168,255,0.08)';
     ctx.fill(); ctx.stroke(); ctx.restore();
   }
 
@@ -916,7 +916,7 @@ class GameEngine {
     ctx.fill();
 
     // 이름 + 이모지
-    ctx.font='bold 11px -apple-system,sans-serif';
+    ctx.font='bold 11px Pretendard,-apple-system,sans-serif';
     ctx.fillStyle='#fff'; ctx.textAlign='center';
     ctx.shadowColor='rgba(0,0,0,0.9)'; ctx.shadowBlur=4;
     ctx.fillText(`${boss.def.emoji} ${boss.name}`, bx+bw/2, by-4);
@@ -1012,7 +1012,7 @@ class FloatingText {
   }
   draw(ctx) {
     ctx.save(); ctx.globalAlpha=this.alpha;
-    ctx.font=`bold ${this.fontSize}px -apple-system,sans-serif`;
+    ctx.font=`bold ${this.fontSize}px Pretendard,-apple-system,sans-serif`;
     ctx.fillStyle=this.color; ctx.textAlign='center';
     ctx.shadowColor='rgba(0,0,0,0.9)'; ctx.shadowBlur=5;
     ctx.fillText(this.text,this.x,this.y); ctx.restore();
@@ -1025,7 +1025,7 @@ class RedFlash {
   draw(ctx) {
     ctx.save(); ctx.globalAlpha=Math.max(0,this.alpha);
     const g=ctx.createRadialGradient(this.w/2,this.h/2,this.h*0.3,this.w/2,this.h/2,this.w*0.85);
-    g.addColorStop(0,'rgba(230,57,70,0)'); g.addColorStop(1,'rgba(230,57,70,0.95)');
+    g.addColorStop(0,'rgba(244,63,94,0)'); g.addColorStop(1,'rgba(244,63,94,0.95)');
     ctx.fillStyle=g; ctx.fillRect(0,0,this.w,this.h); ctx.restore();
   }
 }
@@ -1080,10 +1080,10 @@ class ComboFlash {
   draw(ctx){
     ctx.save();ctx.globalAlpha=Math.max(0,this.scale);
     ctx.translate(this.x,this.y);ctx.scale(this.scale,this.scale);
-    ctx.font='bold 22px -apple-system,sans-serif';
+    ctx.font='bold 22px Pretendard,-apple-system,sans-serif';
     ctx.textAlign='center';ctx.textBaseline='middle';
     ctx.strokeStyle='rgba(0,0,0,0.9)';ctx.lineWidth=4;
-    const color=this.combo>=20?'#ff6b6b':this.combo>=10?'#ffd60a':'#06d6a0';
+    const color=this.combo>=20?'#ff5c7a':this.combo>=10?'#ffc24b':'#34d399';
     ctx.strokeText(`${this.combo}콤보!`,0,0);
     ctx.fillStyle=color;ctx.shadowColor=color;ctx.shadowBlur=16;
     ctx.fillText(`${this.combo}콤보!`,0,0);

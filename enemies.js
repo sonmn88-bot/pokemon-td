@@ -108,7 +108,7 @@ const EnemyTypes = {
     type: 'water',
     name: '라프라스', emoji: '🦭',
     hp: 264, speed: 82, reward: 1, size: 22,
-    color: '#ce93d8',
+    color: '#b18cff',
     special: 'iceImmune',
   },
   gyarados: {
@@ -390,7 +390,7 @@ class Enemy {
       if (this.shieldHp <= 0) {
         this.shieldActive = false;
         this.shieldHp = 0;
-        this.engine.spawnFloatingText('방어막 파괴!', this.x, this.y - 30, '#ff6b6b');
+        this.engine.spawnFloatingText('방어막 파괴!', this.x, this.y - 30, '#ff5c7a');
       }
       return;
     }
@@ -432,7 +432,7 @@ class Enemy {
     // v27-7: 데미지 숫자 표시 (요청1 - 지금까지 전혀 없었음). DOT 미세틱(0.x 데미지)은 스팸 방지로 제외
     if ((dmg >= 1 || armored) && this.engine?.spawnFloatingText) {
       const size = dmg >= 30 ? 15 : dmg >= 10 ? 12 : 10;
-      const color = armored ? '#8a8f99' : dmg >= 30 ? '#ff5252' : dmg >= 10 ? '#ffd60a' : '#fff';
+      const color = armored ? '#8a8f99' : dmg >= 30 ? '#ff5252' : dmg >= 10 ? '#ffc24b' : '#fff';
       this.engine.spawnFloatingText(armored ? '🛡' : `-${Math.round(dmg)}`, this.x + (Math.random()*16-8), this.y - 14, color, { fontSize: size, life: 0.5 });
     }
 
@@ -611,8 +611,8 @@ class Enemy {
       ctx.save();
       ctx.beginPath();
       ctx.arc(this.x, drawY, s * 1.3, 0, Math.PI * 2);
-      ctx.strokeStyle = `rgba(255,214,10,${0.6 + Math.sin(Date.now()*0.01)*0.3})`;
-      ctx.lineWidth = 3; ctx.shadowColor = '#ffd60a'; ctx.shadowBlur = 14;
+      ctx.strokeStyle = `rgba(255,194,75,${0.6 + Math.sin(Date.now()*0.01)*0.3})`;
+      ctx.lineWidth = 3; ctx.shadowColor = '#ffc24b'; ctx.shadowBlur = 14;
       ctx.stroke();
       ctx.restore();
       ctx.font = '14px serif'; ctx.textAlign = 'center';

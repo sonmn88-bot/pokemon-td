@@ -45,7 +45,7 @@ function _tree(branches, rows) {
 const SkillTrees = {
   // ⚡ 피카츄 — 전기 몰빵 캐리
   pikachu: _tree(
-    [{ name:'번개딜', emoji:'⚡', color:'#ffd600' }, { name:'전기군단', emoji:'🔋', color:'#ffb300' }, { name:'감전제어', emoji:'🌀', color:'#4fc3f7' }],
+    [{ name:'번개딜', emoji:'⚡', color:'#ffd600' }, { name:'전기군단', emoji:'🔋', color:'#f59e0b' }, { name:'감전제어', emoji:'🌀', color:'#5b9dff' }],
     [
       [ { id:'pk_crit',  name:'급소', emoji:'💥', desc:'기본공격 25% 확률로 2.2배 크리티컬', fx:{critChance:0.25, critMul:0.2} },
         { id:'pk_chain', name:'연쇄번개', emoji:'⛓️', desc:'기본공격이 주변 적 2명에게 튕김(70%)', fx:{chainAtk:2} },
@@ -63,7 +63,7 @@ const SkillTrees = {
 
   // 🥚 토게피 — 행운 · 경제
   togepi: _tree(
-    [{ name:'경제', emoji:'💰', color:'#ffd60a' }, { name:'행운합성', emoji:'🍀', color:'#06d6a0' }, { name:'응원', emoji:'📣', color:'#f48fb1' }],
+    [{ name:'경제', emoji:'💰', color:'#ffc24b' }, { name:'행운합성', emoji:'🍀', color:'#34d399' }, { name:'응원', emoji:'📣', color:'#f48fb1' }],
     [
       [ { id:'tg_gold',  name:'행운', emoji:'🍀', desc:'모든 골드 획득 +15%', fx:{goldBonus:0.15} },
         { id:'tg_int',   name:'저축', emoji:'🏦', desc:'이자 상한 +10 (최대 45)', fx:{interestCap:10} },
@@ -198,13 +198,13 @@ const HeroDefs = {
             engine.spawnFloatingText('🎲전체 피해!', hero.x, hero.y-32, '#ffd54f');
           } else if (roll === 1) {
             for (const e of engine.enemies) { if (!e.dead&&!e.reachedEnd) e.applyStatus('slow',3.5,0.38); }
-            engine.spawnFloatingText('🎲전체 슬로우!', hero.x, hero.y-32, '#4fc3f7');
+            engine.spawnFloatingText('🎲전체 슬로우!', hero.x, hero.y-32, '#5b9dff');
           } else if (roll === 2) {
             for (const e of engine.enemies) { if (!e.dead&&!e.reachedEnd) e.applyStatus('stun',1.5,0); }
             engine.spawnFloatingText('🎲전체 스턴!', hero.x, hero.y-32, '#ba68c8');
           } else {
             engine.addGold(50 + hero.level * 10);
-            engine.spawnFloatingText(`🎲골드 획득! +${50+hero.level*10}g`, hero.x, hero.y-32, '#ffd60a');
+            engine.spawnFloatingText(`🎲골드 획득! +${50+hero.level*10}g`, hero.x, hero.y-32, '#ffc24b');
           }
           }
         }
@@ -284,8 +284,8 @@ HeroDefs.eevee = {
       desc:'짧은 시간 데미지+공속+사거리 대폭 상승',
       cast(hero, engine) {
         hero._burstTimer = 4 + hero.level * 0.12 + hero._skillVal('burstDur', 0); // 레벨이 오를수록 지속시간도 늘어남
-        engine.particles.push(new AoeBurst(hero.x, hero.y, 60, hero._evoColor || '#ce93d8'));
-        engine.spawnFloatingText('🌈다재다능!', hero.x, hero.y-32, '#ce93d8');
+        engine.particles.push(new AoeBurst(hero.x, hero.y, 60, hero._evoColor || '#b18cff'));
+        engine.spawnFloatingText('🌈다재다능!', hero.x, hero.y-32, '#b18cff');
       }
     },
   ],
@@ -416,7 +416,7 @@ class Hero {
       engine.lives += node.value;
       engine.onLivesChange && engine.onLivesChange(engine.lives);
     }
-    engine && engine.spawnFloatingText(`✨ ${node.name}!`, this.x, this.y-40, '#c084fc');
+    engine && engine.spawnFloatingText(`✨ ${node.name}!`, this.x, this.y-40, '#a78bfa');
     return true;
   }
 
@@ -427,8 +427,8 @@ class Hero {
       this.level++;
       this.skillPoints++;
       this.expToNext = Math.floor(this.expToNext * 1.30);
-      engine && engine.spawnFloatingText(`${this.def.name} Lv${this.level}! +SP`, this.x, this.y-42, '#ffd60a');
-      engine && engine.particles && engine.particles.push(new AoeBurst(this.x, this.y, 50, '#ffd60a'));
+      engine && engine.spawnFloatingText(`${this.def.name} Lv${this.level}! +SP`, this.x, this.y-42, '#ffc24b');
+      engine && engine.particles && engine.particles.push(new AoeBurst(this.x, this.y, 50, '#ffc24b'));
 
       // 진화 체크 (스킬트리로 전략 짜다가 한참 뒤에 진화하도록 레벨 게이트)
       const evo = this.def.evolution;
@@ -523,7 +523,7 @@ class Hero {
       status, chain: chainAtk || 0, chainRange: 140, splash,
     });
     engine.projectiles.push(proj);
-    if (isCrit) engine.spawnFloatingText(`💥크리!`, this.attackTarget.x, this.attackTarget.y-20, '#ff6b6b');
+    if (isCrit) engine.spawnFloatingText(`💥크리!`, this.attackTarget.x, this.attackTarget.y-20, '#ff5c7a');
     if (this.rig) this.rig.triggerAttack();
 
     // 스킬트리: doubleShot
@@ -631,11 +631,11 @@ class Hero {
       }
 
       ctx.save();
-      ctx.font = 'bold 10px -apple-system, sans-serif';
+      ctx.font = 'bold 10px Pretendard,-apple-system,sans-serif';
       ctx.textAlign = 'center';
       ctx.shadowColor = 'rgba(0,0,0,0.9)';
       ctx.shadowBlur = 4;
-      ctx.fillStyle = this.skillPoints > 0 ? '#ffd60a' : '#fff';
+      ctx.fillStyle = this.skillPoints > 0 ? '#ffc24b' : '#fff';
       ctx.fillText(`Lv${this.level}${this.skillPoints>0?' ✦':''}`, this.x, this.y+34);
       ctx.restore();
       return;
@@ -671,11 +671,11 @@ class Hero {
 
       // 레벨 + 스킬포인트
       ctx.save();
-      ctx.font = 'bold 10px -apple-system, sans-serif';
+      ctx.font = 'bold 10px Pretendard,-apple-system,sans-serif';
       ctx.textAlign = 'center';
       ctx.shadowColor = 'rgba(0,0,0,0.9)';
       ctx.shadowBlur = 4;
-      ctx.fillStyle = this.skillPoints > 0 ? '#ffd60a' : '#fff';
+      ctx.fillStyle = this.skillPoints > 0 ? '#ffc24b' : '#fff';
       ctx.fillText(`Lv${this.level}${this.skillPoints>0?' ✦':''}`, this.x, this.y+34);
       ctx.restore();
     } else {
@@ -688,7 +688,7 @@ class Hero {
       ctx.strokeStyle = skin.color; ctx.lineWidth = 2.5; ctx.stroke();
       ctx.font = '28px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText(skin.emoji, this.x, this.y);
-      ctx.font = 'bold 10px -apple-system, sans-serif';
+      ctx.font = 'bold 10px Pretendard,-apple-system,sans-serif';
       ctx.fillStyle = '#fff'; ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 3;
       ctx.textBaseline = 'alphabetic';
       ctx.fillText(`Lv${this.level}`, this.x, this.y+34);
