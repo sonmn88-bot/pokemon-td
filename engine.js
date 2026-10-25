@@ -3,7 +3,7 @@
 // 난이도별 적 스탯/보상/제한시간 배율
 const DifficultyMods = {
   easy:   { name:'이지',  hpMul:0.72, speedMul:0.88, rewardMul:1.20, livesStart:26, goldStart:300, timeBonus:12 },
-  normal: { name:'노말',  hpMul:1.00, speedMul:1.00, rewardMul:1.00, livesStart:20, goldStart:250, timeBonus:0  },
+  normal: { name:'노말',  hpMul:1.00, speedMul:1.00, rewardMul:1.00, livesStart:20, goldStart:300, timeBonus:0  },
   hard:   { name:'하드',  hpMul:1.40, speedMul:1.15, rewardMul:0.88, livesStart:15, goldStart:220, timeBonus:-8 },
 };
 window.DifficultyMods = DifficultyMods;
@@ -17,7 +17,7 @@ class GameEngine {
 
     // 상태
     this.state = 'idle';
-    this.gold = 180; // v27-31: 시작골드 하향 (요청: 초반 골드가 너무 여유로움, 아슬아슬하게 가야함)
+    this.gold = 180; // 실제 시작 골드는 DifficultyMods.goldStart가 덮어씀
     this.lives = 20;
     this.currentWave = 0;
     this.totalWaves = 20;
@@ -321,7 +321,7 @@ class GameEngine {
     }
     if (enemy._isKing) this.onKingDefeated && this.onKingDefeated();
     // v28 (설계서 §5): 킬 골드가 웨이브에 따라 성장 (기본보상 × (1 + 웨이브/30))
-    const baseReward = Math.max(1, Math.round(enemy.reward * (1 + this.currentWave / 30)));
+    const baseReward = Math.max(1, Math.round(enemy.reward * (1.5 + this.currentWave / 20))); // v3.0: 처치 골드 상향 (웨이브10 기준 ×1.33→×2.0)
     const traitGoldMul = this._runTrait?.key === 'goldBoom' ? 1.2 : 1;
     const effectiveGoldMul = this._globalGoldMul * (this._goldenTimeActive ? this._goldenTimeGoldMul : 1) * traitGoldMul;
     const bonus = Math.floor(baseReward * (effectiveGoldMul - 1));
@@ -505,7 +505,7 @@ class GameEngine {
     this.state = 'idle';
     // v28 (설계서 §5): 웨이브 클리어 보너스 10 + 웨이브×1.5 (최대 150). 위험보너스는 이자와 역할이
     // 겹쳐서 제거 (단순화).
-    let bonus = Math.round(Math.min(150, Math.round(10 + this.currentWave * 1.5)) * (this._waveBonusMul || 1));
+    let bonus = Math.round(Math.min(220, Math.round(25 + this.currentWave * 3)) * (this._waveBonusMul || 1)); // v3.0: 10+1.5w→25+3w
     if (this._nextWaveGoldMul) { bonus = Math.round(bonus * this._nextWaveGoldMul); this._nextWaveGoldMul = null; }
     this._peakFieldCount = 0;
     this.addGold(bonus);

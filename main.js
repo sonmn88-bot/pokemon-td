@@ -1807,7 +1807,9 @@ class App {
           const res = await window.Leaderboard.submitScore(nameInput.value, this.engine.score || 0, reached);
           window.removeEventListener('beforeunload', blockUnload);
           if (!submitBtn.isConnected) return; // v27-26: 등록 대기 중 화면이 닫혔으면 안전하게 중단
-          submitBtn.textContent = res.ok ? '✅ 등록 완료!' : '❌ 등록 실패';
+          // 실패 원인을 화면에 표시 (permission-denied = Firestore 보안 규칙 만료/차단)
+          submitBtn.textContent = res.ok ? '✅ 등록 완료!' : res.code === 'permission-denied' ? '❌ 서버 권한 오류' : '❌ 등록 실패';
+          if (!res.ok) { submitBtn.disabled = false; submitBtn.title = res.reason || ''; console.warn('[랭킹]', res.code, res.reason); }
         });
       } else {
         // v27-20: 조용히 안 보이던 것 대신 명확한 안내 (요청6 - 등록UI가 아예 안보여서 헷갈렸음)

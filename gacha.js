@@ -840,7 +840,7 @@ function applyTowerSynergies(towers) {
 // v28 (설계서 §5): % 곱연산 → '등급별 절대값 + 6%'. 노말(8뎀)도 올리면 확실히 체감되고,
 // 무한강화는 선형이라 후반 화력 폭주를 막음. flat = 등급별 고정치 배수, val = 타워 %, heroVal = 영웅 %.
 const TYPE_FLAT_PER_TIER = { normal:2, rare:5, epic:12, legend:28, unique:65 };
-const _TU_COSTS = [200, 450, 850, 1400, 2200];
+const _TU_COSTS = [120, 300, 600, 1000, 1600]; // v3.0: 첫 강화 문턱 낮춤 (200→120)
 const _TU_NAMES = { fire:'대화염', water:'대해일', electric:'초전도', grass:'대자연', psychic:'초능력', normal:'만능' };
 const _TU_KR = { fire:'불꽃', water:'물', electric:'전기', grass:'풀', psychic:'에스퍼', normal:'노말' };
 const TypeUpgrades = {};

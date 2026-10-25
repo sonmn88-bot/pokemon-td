@@ -40,7 +40,7 @@ window.Leaderboard = (function () {
       return { ok: true };
     } catch (e) {
       console.warn('[랭킹] 점수 제출 실패:', e);
-      return { ok: false, reason: e.message };
+      return { ok: false, reason: e.message, code: e.code };
     }
   }
 
