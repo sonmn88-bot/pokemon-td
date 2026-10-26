@@ -109,8 +109,8 @@ const HeroDefs = {
       { id:'raichu', name:'라이츄', color:'#ff9800', dmgMul:1.35, rangeMul:1.15, fireRateMul:1.0 },
     ]},
     attack:{
-      baseRange:119, baseDamage:10, baseFireRate:1.1,
-      rangePerLevel:7, damagePerLevel:3,
+      baseRange:119, baseDamage:11, baseFireRate:1.1, // v3.4: 피카츄는 딜러형 → 세 영웅 중 공격력 최고
+      rangePerLevel:7, damagePerLevel:3.6,
       projColor:'#fff176', projEmoji:'⚡', dmgType:'special',
       status:{type:'stun', duration:0.15},
     },
@@ -169,8 +169,8 @@ const HeroDefs = {
       { id:'togetic', name:'토게틱', color:'#f8bbd0', dmgMul:1.15, rangeMul:1.35, fireRateMul:1.10 },
     ]},
     attack:{
-      baseRange:112, baseDamage:9, baseFireRate:1.0,
-      rangePerLevel:6, damagePerLevel:4, // v27-46: damagePerLevel 2→4 (요청5: 성장이 너무 약했음)
+      baseRange:112, baseDamage:6, baseFireRate:1.0, // v3.4: 토게피는 경제·행운 지원형 → 공격력은 피카츄의 약 60%
+      rangePerLevel:6, damagePerLevel:2.5, // v27-46: damagePerLevel 2→4 (요청5: 성장이 너무 약했음)
       projColor:'#fff59d', projEmoji:'✨', dmgType:'special',
     },
     passiveApply(engine, hero) {
