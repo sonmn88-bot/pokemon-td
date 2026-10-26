@@ -338,7 +338,7 @@ class Hero {
     // v3.2: 적 체력이 웨이브마다 지수로 오르니 영웅도 같은 곡선으로 성장 (예전엔 레벨 비례 직선이라 후반에 무의미)
     const w = window.app?.engine?.currentWave || 0;
     const waveScale = Math.pow(1.04, Math.max(0, w - 5));
-    return base * this._typeUpgradeDmgMul() * waveScale * (this._formMul || 1);
+    return base * this._typeUpgradeDmgMul() * waveScale * (this._formMul || 1) * (window.app?.engine?._cardMods?.heroDmg || 1);
   }
 
   // v27-8: 영웅도 해당 속성의 타입강화 영향을 받도록 추가 (기존엔 전혀 반영 안 되고 있었음)
@@ -382,7 +382,7 @@ class Hero {
     const base = this.def.skills[idx].baseCooldown;
     let reduce = this._skillVal('cdReduce', 0);
     if (this.id === 'eevee' && idx === 1) reduce += this._skillVal('burstCd', 0); // 쥬피썬더 각성
-    return base * Math.max(0.3, 1 - reduce);
+    return base * Math.max(0.3, 1 - reduce) * (window.app?.engine?._cardMods?.heroCd || 1);
   }
 
   // v28: 영웅이 타워에 주는 효과를 '전용 배율'로 매 프레임 새로 계산 → 덮어쓰기/누적 버그 원천 차단

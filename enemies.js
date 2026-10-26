@@ -412,6 +412,7 @@ class Enemy {
     // v28 (설계서 §2): 방어력 - 타격당 고정 차감, 최소 15%는 들어감. 스플래시·화상·독·연쇄 부가타는
     // 방어 50%만 적용 (저데미지 부가타가 0이 되는 것 방지). 막혔으면 데미지 숫자를 회색으로 → 합성 필요 신호.
     if (this._vulnTimer > 0) dmg *= (this._vulnMul || 1);
+    if (this.engine && this.engine._cardMods && window.CARDS) dmg *= window.CARDS.cardHitMul(this.engine, this, this.engine._dmgSrc); // v3.5 카드
     let armored = false;
     if (this.armor > 0 && type !== 'true') { // 'true' = 방어무시 태그
       const a = (type === 'splash' || type === 'fire' || type === 'poison') ? this.armor * 0.5 : this.armor;
@@ -456,6 +457,7 @@ class Enemy {
   }
 
   applyStatus(status, duration, factor) {
+    if (this.engine && this.engine._cardMods) duration *= this.engine._cardMods.statusDur; // v3.5 카드
     switch (status) {
       case 'slow':
         if (this.def.special === 'iceImmune') return;

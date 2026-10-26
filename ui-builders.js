@@ -729,8 +729,9 @@ Object.assign(App.prototype, {
     for (const item of window.ShopItems) {
       const cost = window.shopItemCost(item, this.engine);
       const waveUses = (this.engine._shopWaveUses || {})[item.key] || 0;
-      const used = (item.oneTime && this.engine._oneTimeUsed?.[item.key]) || (item.perWave && waveUses >= item.perWave);
-      const left = item.perWave ? `${item.perWave - waveUses}/${item.perWave}회` : item.oneTime ? '1회' : '';
+      const pw = item.perWave ? item.perWave + (item.key === 'monsterball' ? (this.engine._cardMods?.ballExtra || 0) : 0) : 0; // v3.5 카드 '볼 주머니'
+      const used = (item.oneTime && this.engine._oneTimeUsed?.[item.key]) || (pw && waveUses >= pw);
+      const left = pw ? `${pw - waveUses}/${pw}회` : item.oneTime ? '1회' : '';
       const btn = document.createElement('button');
       btn.className = 'us-card shop';
       btn.disabled = used || this.engine.gold < cost;

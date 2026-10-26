@@ -28,6 +28,7 @@ class Projectile {
     this.onHit = opts.onHit || null;
     this.engine = opts.engine;
     this.src = opts.engine ? opts.engine._dmgSrc : null; // v3.2: 이 투사체를 쏜 타워 (데미지 집계용)
+    this.strike = opts.engine ? opts.engine._dmgStrike || 0 : 0; // v3.5 카드 강타
     this.done = false;
     this.trail = [];
     this.emoji = opts.emoji || null;
@@ -92,8 +93,8 @@ class Projectile {
 
   hit(enemy) {
     if (!enemy || enemy.dead) return;
-    const prevSrc = this.engine && this.engine._dmgSrc;
-    if (this.engine) this.engine._dmgSrc = this.src;
+    const prevSrc = this.engine && this.engine._dmgSrc, prevStrike = this.engine && this.engine._dmgStrike;
+    if (this.engine) { this.engine._dmgSrc = this.src; this.engine._dmgStrike = this.strike; }
     enemy.takeDamage(this.damage, this.dmgType);
     // v27-10: 스턴은 지금까지 맞을 때마다 100% 발동이었음 - 확률제(35%)로 변경해서
     // 전기타워 연사에 계속 멈춰있던 문제를 근본적으로 완화 (다른 상태이상은 그대로 100% 유지)
@@ -115,7 +116,7 @@ class Projectile {
     if (this.chain > 0 && this.engine) this._doChain(enemy, this.chain);
     this.engine && this.engine.spawnHitParticle(enemy.x, enemy.y, this.color);
     this.onHit && this.onHit(enemy);
-    if (this.engine) this.engine._dmgSrc = prevSrc;
+    if (this.engine) { this.engine._dmgSrc = prevSrc; this.engine._dmgStrike = prevStrike; }
   }
 
   _doChain(from, rem) {

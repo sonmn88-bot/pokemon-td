@@ -115,7 +115,8 @@ function canFeed(app, t) {
 function feedTower(app, t) {
   const feedId = t.def.mega ? t.def.megaOf : t.def.id;
   if (!app._takeFromStorageById(feedId)) return false;
-  t.def = { ...t.def, _stack: towerStack(t) + 1 };
+  const plus = (app.engine._cardMods && Math.random() < app.engine._cardMods.feed2) ? 2 : 1; // v3.5 카드 '포식'
+  t.def = { ...t.def, _stack: Math.min(STACK_MAX, towerStack(t) + plus) };
   return true;
 }
 function canMega(app, t) {
@@ -168,7 +169,7 @@ Object.assign(App.prototype, {
 
   _rollMegaStone(en) {
     const e = this.engine, w = e.currentWave;
-    const chance = en._isKing ? 1 : megaStoneChance(w);
+    const chance = en._isKing ? 1 : Math.min(0.95, megaStoneChance(w) + (e._cardMods ? e._cardMods.stoneAdd : 0));
     let n = Math.random() < chance ? 1 : 0;
     if (n && w >= 100 && Math.random() < 0.25) n = 2;
     if (Math.random() < 0.2) this._dropHeroItem('보스');

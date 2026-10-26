@@ -482,6 +482,7 @@ class App {
         <b style="color:#ffc24b">👹 보스</b> — 왼쪽 아래에서 직접 소환하면 큰 보상. 30웨이브마다 구역이 바뀌고 전설 보스가, 90웨이브엔 왕 루기아가 나와요.<br><br>
         <b style="color:#ffc24b">💎 메가진화</b> — 리자몽·거북왕·이상해꽃·갸라도스·쁘사이저·독침붕·프테라·캥카·피죤투·후딘·팬텀·썬더를 필드에 두고 누르면 <b>🍖 먹이기</b>로 보관함의 같은 포켓몬을 흡수해 ★이 올라요(★당 +35%). ★3 + 메가스톤이면 메가진화, 이후 ★5까지 계속 키울 수 있어요. 메가스톤은 <b>20웨이브마다 나오는 보스</b>에서 확률로만 나와요(30%부터 점점 올라감).<br><br>
         <b style="color:#ffc24b">🧭 이번 판 편성</b> — 시작할 때 이번 판에 많이 나오는 몬스터 특성 2가지와 추천 메가를 알려줘요. 유니크·메가는 같은 종 1마리만 배치할 수 있고, 필드에 서로 다른 타입이 4·5·6종이면 전체 공격력 +10·20·30%(상단 🌈).<br><br>
+        <b style="color:#ffc24b">🃏 강화 카드</b> — 10웨이브마다 카드 3장 중 1장을 골라요(일반·희귀·영웅·전설·신화). 이미 고른 계열이 더 잘 나와서 한 방향으로 키울 수 있고, 같은 카드는 레벨업, 두 계열을 모으면 조합 카드도 나와요. 카드 1장마다 몬스터도 체력 +4%씩 적응해요. 상단 🃏를 누르면 내 카드 목록.<br><br>
         <b style="color:#ffc24b">✨ 영웅 변신</b> — 15웨이브 이후 가끔(또는 20웨이브 보스에서) 영웅 전용 아이템이 떨어지면 변신해요. 피카츄→거다이맥스, 토게틱→토게키스, 이브이 계열은 금빛 각성.<br><br>
         <b style="color:#ffc24b">💿 기술머신</b> — 에픽·레전드 타워를 누르면 1500골드에 특성 1개를 배울 수 있어요(타워당 1번).
       </div>
@@ -708,7 +709,8 @@ class App {
     // v28: 빈 슬롯을 선택한 상태면 바로 배치, 아니면(미선택/점유 슬롯) 보관함으로 - 막지 않음
     const noSlotSelected = slotIdx === null || !!this.engine.towerSlots[slotIdx]?.occupied;
 
-    const cost = pullKey === 'ten' ? window.PULL_COSTS.ten : window.PULL_COSTS[pullKey];
+    let cost = pullKey === 'ten' ? window.PULL_COSTS.ten : window.PULL_COSTS[pullKey];
+    if (pullKey === 'gamble' && this.engine._cardMods?.jackpot) cost = Math.round(cost * 0.7); // v3.5 카드 '잭팟'
     if (!this.engine.spendGold(cost)) {
       this.showWaveAnnounce('골드가 부족합니다', '#ff5c7a');
       return;
@@ -1048,6 +1050,8 @@ class App {
       // v27: 콤보 HUD 제거 (모바일에서 배속버튼 가리던 문제) - 내부 콤보 로직/미션 트래킹은 그대로 유지, 표시만 안 함
     };
     this.engine.onBossAppear = (boss) => {
+      const ts = this.engine._cardMods && this.engine._cardMods.timestop; // v3.5 카드 '시간 정지'
+      if (ts) { for (const en of this.engine.enemies) { en.stunned = ts; en._stunImmune = 0; } this.showWaveAnnounce(`⏱ 시간 정지 ${ts}초!`, '#ffc24b'); }
       this.SFX.play('boss');
       // v27-16: 보스 약점 타입 힌트 (요청1 - 타입상성 이제 실제 작동하니 시각화)
       let weakHint = '';
@@ -1078,6 +1082,7 @@ class App {
     };
     this.engine.onWaveComplete = (wave, bonus, timedOut) => {
       this._megaWaveClear && this._megaWaveClear(wave);
+      if (wave % 10 === 0 && this._offerCards) this._offerCards(wave); // v3.5: 10웨이브마다 강화 카드
       // v28: 토게피 '황금알' - N웨이브마다 무료 프리미엄 뽑기
       const every = this.engine._freePullEvery || 0;
       if (every > 0 && wave % every === 0) {
@@ -1135,6 +1140,7 @@ class App {
     this.startHeroLoop();
     this._applyRunSeedTrait(); // v27-18: 이번 판 한정 랜덤 시드특성 (요청G)
     this._megaRunInit && this._megaRunInit(); // v3.2: 메가스톤·편성·영웅 아이템
+    this._cardsInit && this._cardsInit(); // v3.5: 강화 카드
     this._showStarterTowerPicker(); // v27-5: 시작 시 스타터 타워 3택1 (요청B - 초반 결정 유도)
   }
 
@@ -1341,6 +1347,7 @@ class App {
     this.els.btnWave.textContent = `▶ Wave ${nextWave}`;
     this._autoWaveTimer = setTimeout(() => {
       if (!this.engine || this.engine.state !== 'idle') return;
+      if (this._cardOpen) { this._pendingAutoWave = true; return; } // 카드 고르는 중엔 대기
       this.sendWave();
     }, 150); // 최소한의 시각적 여유(0.15초)만 두고 즉시 진행
   }

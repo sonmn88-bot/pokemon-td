@@ -500,6 +500,9 @@ class GameEngine {
       enemy._spawnGraceTimer = 7;
     }
 
+    // v3.5: 카드 1장당 몬스터 적응 (체력 +4%) - 카드로 너무 쉬워지는 것 방지
+    if (this._cardCount) { enemy.maxHp = Math.round(enemy.maxHp * Math.pow(1.04, this._cardCount)); enemy.hp = enemy.maxHp; }
+
     // 엘리트 변형 (10% 확률, 수동소환 보스는 제외)
     const eliteChance = this._runTrait?.key === 'eliteEra' ? 0.20 : 0.10;
     if (!enemy.isBoss && Math.random() < eliteChance) {
@@ -538,7 +541,7 @@ class GameEngine {
     this.state = 'idle';
     // v28 (설계서 §5): 웨이브 클리어 보너스 10 + 웨이브×1.5 (최대 150). 위험보너스는 이자와 역할이
     // 겹쳐서 제거 (단순화).
-    let bonus = Math.round(Math.min(220, Math.round(25 + this.currentWave * 3)) * (this._waveBonusMul || 1)); // v3.0: 10+1.5w→25+3w
+    let bonus = Math.round(Math.min(220, Math.round(25 + this.currentWave * 3)) * (this._waveBonusMul || 1) * (this._cardMods ? this._cardMods.waveGold : 1)); // v3.0: 10+1.5w→25+3w · v3.5 카드
     if (this._nextWaveGoldMul) { bonus = Math.round(bonus * this._nextWaveGoldMul); this._nextWaveGoldMul = null; }
     this._peakFieldCount = 0;
     this.addGold(bonus);
@@ -555,7 +558,8 @@ class GameEngine {
   _payInterest(cleared) {
     // 스킵 연타로 이자만 빼먹는 것 방지: 시간초과/스킵은 웨이브가 20초 이상 진행됐을 때만 지급
     if (!cleared && (this._waveElapsed || 0) < 20) return 0;
-    const cap = Math.min(45, 30 + (this._interestCapBonus || 0));
+    const cc = this._cardMods ? this._cardMods.interestCap : 0; // v3.5 카드 '저축왕'
+    const cap = Math.min(45 + cc, 30 + (this._interestCapBonus || 0) + cc);
     const interest = Math.min(cap, Math.floor(this.gold / 10));
     if (interest > 0) {
       this.gold = Math.round(this.gold + interest); // 이자는 골드 배율(토게피 등) 미적용

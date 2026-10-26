@@ -601,13 +601,13 @@ function _createGachaTower(def, x, y, engine) {
     synergyBonus:0, buffRangeMul:muls.range, buffDmgMul:muls.dmg, _shopSpeedMul:muls.speed, target:null, masteryMul,
     flatDmg:(TYPE_FLAT_PER_TIER[def.grade]||2)*muls.flatTiers, // v28: 이미 산 타입강화 소급 적용
     _tempDmgMul:1, _pokecenterTimer:0, _auraDmgMul:1, // v27-29: 임시버프+오라 전용 필드 (영구곱연산 버그 수정)
-    get range(){ return (def.range+(this.synergyBonus*2))*Math.min(this.buffRangeMul, BUFF_CAPS.range)*(this._heroRangeMul||1); },
+    get range(){ return (def.range+(this.synergyBonus*2))*Math.min(this.buffRangeMul, BUFF_CAPS.range)*(this._heroRangeMul||1)*(this._cardRng||1); },
     get damage(){
-      const base = (def.damage+this.synergyBonus+(this.flatDmg||0))*Math.min(this.buffDmgMul, BUFF_CAPS.damage)*this.masteryMul*(this._tempDmgMul||1)*(this._auraDmgMul||1)*(this._heroDmgMul||1)*(this._divMul||1)*(1+0.35*(((this.def&&this.def._stack)||1)-1)); // v3.2: 타입 다양성 · 각성 ★
+      const base = (def.damage+this.synergyBonus+(this.flatDmg||0))*Math.min(this.buffDmgMul, BUFF_CAPS.damage)*this.masteryMul*(this._tempDmgMul||1)*(this._auraDmgMul||1)*(this._heroDmgMul||1)*(this._divMul||1)*(1+0.35*(((this.def&&this.def._stack)||1)-1))*(this._cardDmg||1); // v3.2: 타입 다양성 · 각성 ★ · v3.5 카드
       const mul = window.typeEffectiveness ? window.typeEffectiveness(def.type, this.target && this.target.typeTag) : 1;
       return base * mul;
     },
-    get fireRate(){ return def.fireRate*Math.min(this._shopSpeedMul||1, BUFF_CAPS.speed)*(this._tempSpeedMul||1)*(this._heroSpeedMul||1); },
+    get fireRate(){ return def.fireRate*Math.min(this._shopSpeedMul||1, BUFF_CAPS.speed)*(this._tempSpeedMul||1)*(this._heroSpeedMul||1)*(this._cardSpd||1); },
     upgradeCost(){ return null; },
     findTarget(enemies){
       // v27-62 최적화: Math.hypot(제곱근)을 거리² 비교로 대체 - 결과는 완전히 동일하고 sqrt 비용만 제거
@@ -650,7 +650,9 @@ function _createGachaTower(def, x, y, engine) {
       if(this.target&&this.cooldown<=0){
         this.cooldown=1/this.fireRate;
         this.fireFlash=0.1;
-        engine._dmgSrc = this; def.fire(this,engine); engine._dmgSrc = null; // v3.2: 실제 데미지 귀속 (MVP 정확도)
+        this._shots = (this._shots || 0) + 1; // v3.5 카드 '강타': 3번째 공격마다 배율
+        engine._dmgStrike = (this._cardStrike && this._shots % 3 === 0) ? this._cardStrike : 0;
+        engine._dmgSrc = this; def.fire(this,engine); engine._dmgSrc = null; engine._dmgStrike = 0; // v3.2: 실제 데미지 귀속 (MVP 정확도)
       }
     },
     draw(ctx){
@@ -828,6 +830,7 @@ function applyTowerSynergies(towers) {
   const _div = _types >= 6 ? 1.3 : _types >= 5 ? 1.2 : _types >= 4 ? 1.1 : 1;
   for (const t of towers) t._divMul = _div;
   if (window.app && window.app._onDiversityChange) window.app._onDiversityChange(_types, _div);
+  if (window.CARDS && window.app && window.app.engine) window.CARDS.applyCardsToTowers(window.app.engine, towers); // v3.5 카드
   for(let i=0;i<towers.length;i++){
     for(let j=i+1;j<towers.length;j++){
       const a=towers[i],b=towers[j];
