@@ -972,6 +972,9 @@ class App {
     this.BGM.start(mapId);
 
     this.engine = new GameEngine(this.els.canvas);
+    // v3.4: 절전 모드 기본값 - 폰·태블릿은 켜짐(30fps), PC는 꺼짐. 일시정지 메뉴에서 바꾸면 기억함
+    try { const ps = localStorage.getItem('pokemontd_powersave'); this.engine.powerSave = ps === null ? matchMedia('(pointer: coarse)').matches : ps === '1'; }
+    catch (_) { this.engine.powerSave = true; }
     this.engine.heroes = [];
     this.engine.spellMgr = this.spellMgr;
     this.spellMgr.cooldowns = { trainingCamp: 0, netTrap: 0 }; // v27-46: 포켓몬센터/마스터볼→훈련소/그물망함정으로 개명
@@ -1186,6 +1189,10 @@ class App {
       if (this.engine._bossSummonCooldown > 0) this.engine._bossSummonCooldown -= this.engine.dt;
       if (this.engine.state === 'wave') this._waveTimer += this.engine.dt;
       if (this.engine._isLastSubstep === false) return;
+      // v3.4: 화면 아래 버튼·HUD 글자 갱신은 초당 6번이면 충분 (매 프레임 DOM 수정 = 배터리 소모)
+      const _now = performance.now();
+      if (_now - (this._uiAt || 0) < 160) return;
+      this._uiAt = _now;
       if (this.engine.state === 'wave' || this.engine.state === 'idle') {
         this.updateSpellBarUI();
         this.updateHeroSkillBarUI();
@@ -1943,8 +1950,13 @@ class App {
       const ov = document.createElement('div');
       ov.className = 'pause-overlay';
       ov.innerHTML = `<div class="po-card"><div class="po-title">⏸ 일시정지</div>
-        <button class="po-btn go">▶ 계속하기</button><button class="po-btn quit">🏠 타이틀로</button>${(this.engine._errLog || []).length ? `<div class="po-err">오류 기록 ${this.engine._errCount}건 (스크린샷 보내주세요)<br>${this.engine._errLog.map(m => m.replace(/</g, '&lt;')).join('<br>')}</div>` : ''}</div>`;
+        <button class="po-btn go">▶ 계속하기</button><button class="po-btn ps">${this.engine.powerSave ? '🔋 절전 모드 켜짐 (30fps)' : '⚡ 부드럽게 (60fps)'}</button><button class="po-btn quit">🏠 타이틀로</button>${(this.engine._errLog || []).length ? `<div class="po-err">오류 기록 ${this.engine._errCount}건 (스크린샷 보내주세요)<br>${this.engine._errLog.map(m => m.replace(/</g, '&lt;')).join('<br>')}</div>` : ''}</div>`;
       ov.querySelector('.go').onclick = () => this.togglePause();
+      ov.querySelector('.ps').onclick = (ev) => {
+        this.engine.powerSave = !this.engine.powerSave;
+        try { localStorage.setItem('pokemontd_powersave', this.engine.powerSave ? '1' : '0'); } catch (_) {}
+        ev.target.textContent = this.engine.powerSave ? '🔋 절전 모드 켜짐 (30fps)' : '⚡ 부드럽게 (60fps)';
+      };
       ov.querySelector('.quit').onclick = () => { if (confirm('타이틀로 돌아가시겠습니까? 진행 중인 게임은 저장되지 않습니다.')) { ov.remove(); this.backToMapSelect(); } };
       document.getElementById('game-screen').appendChild(ov);
     } else if (this.engine.state === 'paused') {

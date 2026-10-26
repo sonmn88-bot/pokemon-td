@@ -140,8 +140,9 @@ class GameEngine {
     this.width = this._logicalWidth;
     this.height = this._logicalHeight;
     // v27-47: 월드는 뷰포트보다 넓게 (요청A: 카메라로 팬/줌해서 보는 넓은 맵)
-    this.worldWidth = this.width * 1.7;
-    this.worldHeight = this.height * 1.7;
+    // v3.4: 정수로 반올림 - 소수(예: 1434.8)면 캔버스(1434)와 크기가 영영 안 맞아서 배경을 매 프레임 다시 그리고 있었음 (발열 주범)
+    this.worldWidth = Math.round(this.width * 1.7);
+    this.worldHeight = Math.round(this.height * 1.7);
     if (!this._cameraInited) {
       this._cameraInited = true;
       this.camera.x = this.worldWidth / 2;
@@ -210,7 +211,12 @@ class GameEngine {
 
   loop(ts) {
     if (!this.running) return;
-    const raw = Math.min((ts - this.lastTime) / 1000, 0.05);
+    // v3.4 절전 모드: 화면 갱신과 계산을 30fps로 (한 프레임 걸러 처리, 시간은 그대로 누적되니 게임 속도는 동일)
+    if (this.powerSave) {
+      this._psSkip = !this._psSkip;
+      if (this._psSkip) { requestAnimationFrame(t=>this.loop(t)); return; }
+    }
+    const raw = Math.min((ts - this.lastTime) / 1000, this.powerSave ? 0.07 : 0.05);
     this.lastTime = ts;
     // v28: 서브스텝 시뮬레이션 (3배속 끊김의 근본수정, v27-62 복구) - 배속을 dt에 한 번에 곱하면
     // 한 프레임에 이동거리가 3배가 되어 뚝뚝 끊겨보임. 최대 1/50초 단위로 잘게 쪼개서 여러 번 실행.
@@ -285,7 +291,8 @@ class GameEngine {
       if (this.projectiles[i].done) this.projectiles.splice(i,1);
     }
     // 파티클 캡
-    if (this.particles.length > 150) this.particles.splice(0, this.particles.length - 150);
+    const pCap = this.powerSave ? 80 : 150;
+    if (this.particles.length > pCap) this.particles.splice(0, this.particles.length - pCap);
     for (let i = this.particles.length - 1; i >= 0; i--) {
       try { this.particles[i].update(this.dt); } catch (err) { this.particles[i].dead = true; }
       if (this.particles[i].dead) this.particles.splice(i,1);
