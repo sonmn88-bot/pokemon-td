@@ -176,7 +176,7 @@ Object.assign(App.prototype, {
     if (!n) { e.spawnFloatingText(`💎 메가스톤 안 나옴 (${Math.round(chance * 100)}%)`, en.x, en.y - 30, '#9aa3b2'); return; }
     e._megaStones = (e._megaStones || 0) + n;
     this.SFX && this.SFX.play('pull_epic');
-    this.showWaveAnnounce(`💎 메가스톤 ${n}개 획득! (보유 ${e._megaStones})`, '#b18cff');
+    this.showWaveAnnounce(`메가스톤 ${n}개 획득! (보유 ${e._megaStones})`, '#b18cff');
     this._refreshMegaHud();
   },
 
@@ -236,7 +236,7 @@ Object.assign(App.prototype, {
     el.style.display = types >= 2 ? '' : 'none';
     el.querySelector('span').textContent = `${types}종${mul > 1 ? ' +' + Math.round((mul - 1) * 100) + '%' : ''}`;
     el.style.color = mul > 1 ? '#34d399' : '';
-    if (this._lastDivMul && mul > this._lastDivMul) this.showWaveAnnounce(`🌈 타입 ${types}종! 전체 공격력 +${Math.round((mul - 1) * 100)}%`, '#34d399');
+    if (this._lastDivMul && mul > this._lastDivMul) this.showWaveAnnounce(`타입 ${types}종! 전체 공격력 +${Math.round((mul - 1) * 100)}%`, '#34d399');
     this._lastDivMul = mul;
   },
 

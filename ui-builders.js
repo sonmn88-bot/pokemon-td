@@ -178,13 +178,13 @@ Object.assign(App.prototype, {
         this.engine.selectedTower = null;
         panel.remove();
         this._addToStorage([{ ...def, _starLevel: 1 }]);
-        this.showWaveAnnounce(`🎒 ${def.name} 보관함으로`, '#a78bfa');
+        this.showWaveAnnounce(`${def.name} 보관함으로`, '#a78bfa');
       });
 
       this._bindMegaPanel && this._bindMegaPanel(panel, t, slotIdx);
       // v28 세션D: 기술머신 - 에픽·레전드에 랜덤 태그 1개 (회수해도 유지)
       panel.querySelector('[data-action="tm"]')?.addEventListener('click', () => {
-        if (!this.engine.spendGold(window.TM_COST)) { this.showWaveAnnounce('💰 골드가 부족해요', '#ff5c7a'); return; }
+        if (!this.engine.spendGold(window.TM_COST)) { this.showWaveAnnounce('골드가 부족해요', '#ff5c7a'); return; }
         const tag = window.applyTM(t);
         this.engine.spawnFloatingText(`💿 ${window.DEX_TAGS[tag]} 습득!`, t.x, t.y - 36, '#6aa8ff');
         this.SFX && this.SFX.play && this.SFX.play('merge');

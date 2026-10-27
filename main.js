@@ -676,7 +676,7 @@ class App {
     // v27-63: 카메라 원위치 버튼 (요청 - 화면이 확대/이동된 채 못 돌아오는 문제의 복구 수단)
     const camBtn = document.getElementById('btn-cam-reset');
     if (camBtn) camBtn.addEventListener('click', () => {
-      if (this.engine) { this.engine.resetCamera(); this.showWaveAnnounce('🧭 화면 원위치', '#5b9dff'); }
+      if (this.engine) { this.engine.resetCamera(); this.showWaveAnnounce('화면 원위치', '#5b9dff'); }
     });
   }
 
@@ -788,7 +788,7 @@ class App {
       // v28: 필드 + 보관함 합산
       const sameCount = this._allMaterials(true).filter(m => m.def.id === towerDef.id).length;
       if (sameCount === 3 && window.MERGE_EVOLUTION[towerDef.id]) {
-        setTimeout(() => this.showWaveAnnounce(`🧬 ${towerDef.emoji} ${towerDef.name} 3마리! 합성 연구소에서 확정 진화 가능`, '#34d399'), 900);
+        setTimeout(() => this.showWaveAnnounce(`${towerDef.name} 3마리! 합성 연구소에서 확정 진화 가능`, '#34d399'), 900);
       }
     }
 

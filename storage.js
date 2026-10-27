@@ -296,7 +296,7 @@ Object.assign(App.prototype, {
         this._consumeMaterials(selected);
         this.engine.addGold(sellSum);
         this.SFX.play('buy');
-        this.showWaveAnnounce(`💸 ${n}개 판매 +${sellSum}g`, '#34d399');
+        this.showWaveAnnounce(`${n}개 판매 +${sellSum}g`, '#34d399');
         ui.sel.clear(); render(); this.renderStorageStrip();
       };
       overlay.querySelectorAll('[data-recipe]').forEach(b => b.onclick = () => {
