@@ -23,10 +23,10 @@ Object.assign(App.prototype, {
 
     // 뽑기 버튼 3종 (v27 fix: cost를 여기 하드코딩하지 말고 실제 과금 기준인 PULL_COSTS에서 읽어오도록 - 안 그러면 가격 바꿀 때마다 표시랑 실제가 어긋남)
     const pulls = [
-      { key:'normal',  label:'일반 뽑기',  color:'#a7adba', icon:'capsule', hotkey:'1' },
+      { key:'normal',  label:'일반',  color:'#a7adba', icon:'capsule', hotkey:'1' },
       { key:'premium', label:'프리미엄',   color:'#5b9dff', icon:'capsuleBlue', hotkey:'2' },
-      { key:'gamble',  label:'도박 뽑기',  color:'#ffc24b', icon:'dice', hotkey:'3' },
-      { key:'ten',     label:'10연 뽑기',  color:'#b18cff', icon:'capsules', ten:true, hotkey:'4' },
+      { key:'gamble',  label:'도박',  color:'#ffc24b', icon:'dice', hotkey:'3' },
+      { key:'ten',     label:'10연',  color:'#b18cff', icon:'capsules', ten:true, hotkey:'4' },
     ];
 
     for (const p of pulls) {
@@ -69,7 +69,7 @@ Object.assign(App.prototype, {
       btn.innerHTML = `
         <span class="tower-btn-emoji"><img class="pk" src="assets/heroes/${heroId}.png" width="30" height="30" alt=""></span>
         <span class="tower-btn-name">${def.name}</span>
-        <span class="tower-btn-cost">👆 이동</span>
+        <span class="tower-btn-cost">이동</span>
       `;
       btn.title = def.passive;
       btn.addEventListener('click', () => this.selectHeroToPlace(heroId, btn));

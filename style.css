@@ -1473,3 +1473,8 @@ img.title-pkm.lead { width:88px; height:88px; }
 .mg-btn.sell { background:rgba(244,63,94,.12); color:#ff8da1; box-shadow:inset 0 0 0 1px rgba(244,63,94,.35) !important; }
 .mg-n { font-family:var(--font-px); opacity:.8; }
 .mg-r-text small { word-break:keep-all; line-height:1.45; }
+/* 하단 뽑기 버튼: 좁은 화면에서도 이름 표시 */
+.gacha-btn .tower-btn-name { display:block !important; font-size:10.5px; font-weight:800; line-height:1.1; }
+.gacha-btn .tower-btn-cost { font-family:var(--font-px); font-size:11px; }
+.gacha-btn .hotkey-badge { display:none; }
+@media (hover:hover) { .gacha-btn .hotkey-badge { display:block; } }
