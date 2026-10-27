@@ -287,13 +287,9 @@ function makeImageDrawFn(imgPath, opts = {}) {
 
     if (info.flash) {
       // 피격 플래시: 흰색 실루엣 오버레이
-      ctx.save();
-      ctx.globalCompositeOperation = 'source-over';
+      // v3.6: source-atop을 메인 캔버스에 쓰면 배경까지 하얀 네모가 됨 → 오프스크린 실루엣 사용
       ctx.drawImage(img, -w / 2, -h / 2, w, h);
-      ctx.globalCompositeOperation = 'source-atop';
-      ctx.fillStyle = 'rgba(255,255,255,0.7)';
-      ctx.fillRect(-w / 2, -h / 2, w, h);
-      ctx.restore();
+      ctx.drawImage(tintedSprite(img, img.src, null, 'rgba(255,255,255,0.7)'), -w / 2, -h / 2, w, h);
     } else {
       ctx.drawImage(img, -w / 2, -h / 2, w, h);
     }

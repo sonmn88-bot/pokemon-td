@@ -208,20 +208,20 @@ Object.assign(App.prototype, {
     const rerollCost = e._cardRerolls === 0 ? 0 : Math.round((80 + e.currentWave * 6) * e._cardRerolls);
     const skipGold = 100 + e.currentWave * 5;
     const adapt = Math.round((Math.pow(1 + ADAPT_PER_CARD, e._cardCount) - 1) * 100);
-    ov.innerHTML = `<div class="co-head"><b>🃏 강화 카드 — ${e._cardDoppel ? '도플갱어! 3장 모두 획득' : '1장 선택'}</b>
-        <small>웨이브 ${e.currentWave} · 몬스터 적응 체력 +${adapt}% → 다음 +${Math.round((Math.pow(1 + ADAPT_PER_CARD, e._cardCount + 1) - 1) * 100)}%</small></div>
+    ov.innerHTML = `<div class="co-head"><span class="co-kicker">웨이브 ${e.currentWave} 보상</span><b>${e._cardDoppel ? '도플갱어 — 3장 모두 획득' : '강화 카드 1장 선택'}</b>
+        <small>카드를 고를수록 몬스터 체력이 적응해요 <em>+${adapt}%</em> → <em>+${Math.round((Math.pow(1 + ADAPT_PER_CARD, e._cardCount + 1) - 1) * 100)}%</em></small></div>
       <div class="co-row">${cards.map((c, i) => {
         const T = CARD_TIERS[c.tier], lv = (e._cards[c.id] || 0) + 1;
-        return `<button class="co-card" data-i="${i}" style="--tc:${T.color}">
-          <span class="co-tier">${T.name}${lv > 1 ? ` · Lv${lv}` : ''}</span>
-          <span class="co-icon">${ICON(c.icon, 46)}</span>
+        return `<button class="co-card" data-i="${i}" data-tier="${c.tier}" style="--tc:${T.color}">
+          <span class="co-tier">${T.name}${lv > 1 ? `<i>Lv ${lv}</i>` : ''}</span>
+          <span class="co-icon">${ICON(c.icon, 40)}</span>
           <b class="co-name">${c.name}</b>
-          <span class="co-desc">${c.desc(lv)}</span>
+          <span class="co-desc">${String(c.desc(lv)).replace(/([+\-×]?\d+(?:\.\d+)?(?:%p|%|배|초|회)?)/g, '<em>$1</em>')}</span>
           <span class="co-tags">${c.tags.filter(t => t !== 'all').map(t => `<i>${TYPE_KR[t] || { gold:'경제', hero:'영웅', mega:'메가', status:'상태이상', boss:'보스' }[t] || t}</i>`).join('')}</span>
         </button>`; }).join('')}</div>
       <div class="co-actions">
-        <button class="co-btn reroll" ${e.gold < rerollCost ? 'disabled' : ''}>🔄 다시 뽑기 ${rerollCost ? ICON('coin', 12) + rerollCost : '(무료)'}</button>
-        <button class="co-btn skip">건너뛰기 +${skipGold}g</button>
+        <button class="co-btn reroll" ${e.gold < rerollCost ? 'disabled' : ''}>${ICON('refresh', 16)}다시 뽑기 <span class="co-cost">${rerollCost ? ICON('coin', 14) + rerollCost : '무료'}</span></button>
+        <button class="co-btn skip">건너뛰기 <span class="co-cost">+${ICON('coin', 14)}${skipGold}</span></button>
       </div>`;
     document.getElementById('game-screen').appendChild(ov);
     const close = () => { ov.remove(); this._cardOpen = false; this.engine.start(); if (this._pendingAutoWave) { this._pendingAutoWave = false; this.sendWave(); } };
@@ -248,7 +248,7 @@ Object.assign(App.prototype, {
     if (c.id === 'clone') this._cardClone();
     window.applyTowerSynergies && window.applyTowerSynergies(e.towers);
     this.SFX && this.SFX.play(c.tier === 'legend' || c.tier === 'myth' ? 'pull_epic' : 'buy');
-    this.showWaveAnnounce(`🃏 ${c.name}${e._cards[c.id] > 1 ? ' Lv' + e._cards[c.id] : ''}!`, CARD_TIERS[c.tier].color);
+    this.showWaveAnnounce(`${c.name}${e._cards[c.id] > 1 ? ' Lv' + e._cards[c.id] : ''}!`, CARD_TIERS[c.tier].color);
     this._refreshCardHud();
   },
 
@@ -277,9 +277,9 @@ Object.assign(App.prototype, {
     const ov = document.createElement('div');
     ov.className = 'card-overlay card-list';
     const ids = Object.keys(e._cards || {});
-    ov.innerHTML = `<div class="co-head"><b>🃏 내 카드 ${e._cardCount}장</b><small>몬스터 적응 체력 +${Math.round((Math.pow(1 + ADAPT_PER_CARD, e._cardCount) - 1) * 100)}% · 탭해서 닫기</small></div>
+    ov.innerHTML = `<div class="co-head"><b>내 강화 카드 ${e._cardCount}장</b><small>몬스터 적응 체력 +${Math.round((Math.pow(1 + ADAPT_PER_CARD, e._cardCount) - 1) * 100)}% · 탭해서 닫기</small></div>
       <div class="cl-grid">${ids.map(id => { const c = CARD_DEFS.find(x => x.id === id), T = CARD_TIERS[c.tier], lv = e._cards[id];
-        return `<div class="cl-item" style="--tc:${T.color}">${ICON(c.icon, 26)}<div><b>${c.name}${lv > 1 ? ' Lv' + lv : ''}</b><small>${c.desc(lv)}</small></div></div>`; }).join('') || '아직 없어요'}</div>`;
+        return `<div class="cl-item" style="--tc:${T.color}"><span class="cl-ic">${ICON(c.icon, 24)}</span><div><b>${c.name}${lv > 1 ? ' Lv' + lv : ''}</b><small>${c.desc(lv)}</small></div></div>`; }).join('') || '아직 없어요'}</div>`;
     ov.onclick = () => ov.remove();
     document.getElementById('game-screen').appendChild(ov);
   },

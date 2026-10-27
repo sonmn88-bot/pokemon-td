@@ -1027,7 +1027,7 @@ class GameEngine {
 // ===== 파티클 클래스들 =====
 class FloatingText {
   constructor(text, x, y, color, opts={}) {
-    this.text=text; this.x=x; this.y=y; this.color=color;
+    this.text=text; this.x=x+(Math.random()-0.5)*10; this.y=y; this.color=color; // 겹침 완화용 좌우 흔들림
     this.alpha=1; this.vy=opts.vy||-75; this.life=0;
     this.maxLife=opts.life||1.0; this.fontSize=opts.fontSize||14; this.dead=false;
   }
@@ -1037,11 +1037,13 @@ class FloatingText {
     if(this.life>=this.maxLife) this.dead=true;
   }
   draw(ctx) {
+    // v3.6: shadowBlur(번짐·고비용) 대신 또렷한 외곽선, 숫자는 Outfit
     ctx.save(); ctx.globalAlpha=this.alpha;
-    ctx.font=`bold ${this.fontSize}px Pretendard,-apple-system,sans-serif`;
-    ctx.fillStyle=this.color; ctx.textAlign='center';
-    ctx.shadowColor='rgba(0,0,0,0.9)'; ctx.shadowBlur=5;
-    ctx.fillText(this.text,this.x,this.y); ctx.restore();
+    ctx.font=`800 ${this.fontSize}px Outfit,Pretendard,-apple-system,sans-serif`;
+    ctx.textAlign='center'; ctx.lineJoin='round';
+    ctx.lineWidth=Math.max(2.5,this.fontSize*0.22); ctx.strokeStyle='rgba(8,10,16,0.85)';
+    ctx.strokeText(this.text,this.x,this.y);
+    ctx.fillStyle=this.color; ctx.fillText(this.text,this.x,this.y); ctx.restore();
   }
 }
 

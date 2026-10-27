@@ -502,8 +502,8 @@ class App {
     if (!label) return;
     try {
       const val = parseInt(localStorage.getItem('pokemontd_best_wave') || '0', 10);
-      label.textContent = `🏆 최고 도달 웨이브: ${val || 0}`;
-    } catch (e) { label.textContent = '🏆 최고 도달 웨이브: -'; }
+      label.innerHTML = `${ICON('trophy', 15)} 최고 기록 <b>${val || 0}</b> 웨이브`;
+    } catch (e) { label.textContent = '최고 기록 -'; }
   }
 
   _recordBestWave() {
@@ -554,7 +554,7 @@ class App {
         document.querySelectorAll('#starter-hero-select .diff-btn').forEach(b => b.classList.toggle('active', b === btn));
         // v27-50: 이상해씨/파이리/꼬부기 선택처럼 영웅도 특징을 간략히 보여줌 (요청3)
         const descEl = document.getElementById('starter-hero-desc');
-        if (descEl) descEl.textContent = `${btn.textContent.split(' ')[0]} ${btn.title}`;
+        if (descEl) descEl.textContent = btn.title;
       });
     });
   }
@@ -658,9 +658,15 @@ class App {
   }
 
   bindSpeedButtons() {
-    document.querySelectorAll('.speed-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
+    document.querySelectorAll('.speed-btn').forEach(b0 => {
+      b0.addEventListener('click', () => {
         if (!this.engine) return;
+        let btn = b0;
+        // 좁은 화면은 현재 배속 버튼 하나만 보임 → 누르면 1→2→3 순환
+        if (btn.classList.contains('active') && matchMedia('(max-width:560px)').matches) {
+          const all = [...document.querySelectorAll('.speed-btn')];
+          btn = all[(all.indexOf(btn) + 1) % all.length];
+        }
         const speed = parseFloat(btn.dataset.speed);
         this.engine.speedMul = speed;
         document.querySelectorAll('.speed-btn').forEach(b => b.classList.remove('active'));
@@ -836,7 +842,7 @@ class App {
     overlay.className = 'tenpull-overlay';
     const title = document.createElement('div');
     title.className = 'skilltree-title';
-    title.textContent = canPlace ? '🌟 10연 뽑기 — 하나를 탭하면 선택한 슬롯에 배치 (나머지는 보관함)' : '🌟 10연 뽑기 — 전부 보관함에 들어갔어요';
+    title.innerHTML = `<small>10연 뽑기 결과</small>${canPlace ? '하나를 누르면 선택한 자리에 배치 · 나머지는 보관함' : '모두 보관함에 넣었어요'}`;
     overlay.appendChild(title);
     const grid = document.createElement('div');
     grid.className = 'tenpull-grid';
@@ -845,9 +851,8 @@ class App {
       const grade = window.GRADES[def.grade];
       const card = document.createElement('div');
       card.className = `tenpull-card grade-${def.grade}`;
-      card.style.borderColor = grade.color;
-      card.style.boxShadow = `0 0 12px ${grade.glow}`;
-      card.innerHTML = `<div class="tp-emoji">${PKM(def, 40)}</div><div class="tp-name" style="color:${grade.color}">${def.name}</div><div class="tp-grade">${'★'.repeat(grade.stars)}</div><div class="tp-grade-name">${grade.name}</div>`;
+      card.style.setProperty('--gc', grade.color);
+      card.innerHTML = `<div class="tp-emoji">${PKM(def, 40)}</div><div class="tp-name">${def.name}</div><div class="tp-grade">${'★'.repeat(grade.stars)} ${grade.name}</div>`;
       if (canPlace) card.addEventListener('click', () => { overlay.remove(); this._placeFromStorage(def.id, slotIdx); });
       grid.appendChild(card);
     }
@@ -1128,7 +1133,7 @@ class App {
     this.els.livesVal.textContent = this.engine.lives;
     this.els.waveVal.textContent = 0;
     this.els.waveTotal.textContent = '∞';
-    this.els.btnWave.textContent = '▶ 웨이브 1';
+    this.els.btnWave.textContent = '웨이브 1 시작';
     this.els.btnWave.disabled = false;
 
     this.bindCanvasInput();
@@ -1223,8 +1228,8 @@ class App {
       if (this.engine.state === 'wave' && this.els.btnWave) {
         const backlog = this.engine.spawnQueue ? this.engine.spawnQueue.length : 0;
         this.els.btnWave.textContent = backlog > 0
-          ? `⏭ 스킵 · 대기 ${backlog}`
-          : '⏭ 다음 웨이브';
+          ? `다음 웨이브 · 대기 ${backlog}`
+          : '다음 웨이브';
       }
       // v27-6: 필드 위험 비네트 (요청2, 절제된 연출)
       if (this.engine.endless) {
@@ -1344,7 +1349,7 @@ class App {
   _startAutoWaveCountdown(nextWave) {
     if (this._autoWaveTimer) clearTimeout(this._autoWaveTimer);
     this._showWavePreview(nextWave);
-    this.els.btnWave.textContent = `▶ Wave ${nextWave}`;
+    this.els.btnWave.textContent = `웨이브 ${nextWave} 시작`;
     this._autoWaveTimer = setTimeout(() => {
       if (!this.engine || this.engine.state !== 'idle') return;
       if (this._cardOpen) { this._pendingAutoWave = true; return; } // 카드 고르는 중엔 대기
@@ -1737,8 +1742,8 @@ class App {
     const timeLimit = isBossOrKingWave ? 22 : waveTimeLimit(wave, this.difficulty, this.engine);
     if (e.startWave(wave, timeLimit)) {
       this.els.btnWave.disabled = false;
-      this.els.btnWave.textContent = '⏭ 스킵 (남은 적 놔두고 진행)';
-      setTimeout(() => this.showWaveAnnounce(`Wave ${e.currentWave}`, '#ffc24b'), 100);
+      this.els.btnWave.textContent = '다음 웨이브';
+      setTimeout(() => this.showWaveAnnounce(`웨이브 ${e.currentWave}`, '#ffc24b'), 100);
     }
   }
 
@@ -1993,7 +1998,6 @@ function initTitleCanvas() {
 
   const particles = [];
   const COLORS = ['#ffc24b','#6aa8ff','#f48fb1','#34d399','#a78bfa','#ff5c7a'];
-  const EMOJIS = ['⭐','✨','💫','🌟','⚡','💎'];
 
   for (let i = 0; i < 60; i++) {
     particles.push({
@@ -2002,7 +2006,7 @@ function initTitleCanvas() {
       r: 1 + Math.random() * 2.5,
       alpha: 0.3 + Math.random() * 0.5,
       color: COLORS[Math.floor(Math.random()*COLORS.length)],
-      emoji: Math.random() < 0.15 ? EMOJIS[Math.floor(Math.random()*EMOJIS.length)] : null,
+      emoji: null, // v3.6: 이모지 파티클 제거 (빛 점만)
       size: 10 + Math.random() * 14,
       spin: (Math.random()-0.5) * 0.05,
       rot: Math.random() * Math.PI * 2,

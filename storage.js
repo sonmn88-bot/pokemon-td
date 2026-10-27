@@ -167,9 +167,9 @@ Object.assign(App.prototype, {
       const recipeHtml = (window.RECIPES || []).map(r => {
         const ok = !!r.pick(allDefs, { miracle: this.engine._miracle }) && this.engine.gold >= r.cost;
         return `<button class="mg-recipe ${ok ? 'ready' : ''}" data-recipe="${r.id}" ${ok ? '' : 'disabled'}>
-          <span class="mg-r-emoji">${r.emoji}</span>
+          <span class="mg-r-emoji">${window.GachaTowerDefs?.[r.id] ? PKM(window.GachaTowerDefs[r.id], 40) : r.emoji}</span>
           <span class="mg-r-text"><b>${r.name}</b><small>${r.desc}</small></span>
-          <span class="mg-r-go">${ok ? '제작' : '🔒'}</span></button>`;
+          <span class="mg-r-go">${ok ? '제작' : ICON('lock', 16)}</span></button>`;
       }).join('');
 
       const tabs = window.MERGE_ORDER.map(g => {
@@ -182,8 +182,8 @@ Object.assign(App.prototype, {
       const G = window.GRADES[ui.grade];
       const cards = list.length ? list.map(m => `
         <button class="mg-card ${ui.sel.has(m.key) ? 'sel' : ''}" data-key="${m.key}" style="--gc:${G.color}">
-          ${m.kind === 'field' ? '<span class="mg-field">📍필드</span>' : ''}
-          ${window.MEGA_OF?.[m.def.id] ? '<span class="mg-megabadge">💎메가</span>' : ''}<span class="mg-emoji">${PKM(m.def, 34)}</span><span class="mg-name">${m.def.name}</span>
+          ${m.kind === 'field' ? '<span class="mg-field">필드</span>' : ''}
+          ${window.MEGA_OF?.[m.def.id] ? '<span class="mg-megabadge">메가</span>' : ''}<span class="mg-emoji">${PKM(m.def, 34)}</span><span class="mg-name">${m.def.name}</span>
         </button>`).join('') : `<div class="mg-empty">이 등급의 포켓몬이 없어요</div>`;
 
       const n = selected.length;
@@ -194,21 +194,21 @@ Object.assign(App.prototype, {
       const nextG = window.NEXT_GRADE[ui.grade] ? window.GRADES[window.NEXT_GRADE[ui.grade]] : null;
 
       overlay.innerHTML = `
-        <div class="mg-head"><div class="mg-title">${ICON('flask', 20)} 합성 연구소</div><button class="mg-x" data-act="close">✕</button></div>
+        <div class="mg-head"><div class="mg-title">${ICON('flask', 20)} 합성 연구소</div><button class="mg-x" data-act="close" aria-label="닫기">${ICON('close', 18)}</button></div>
         <div class="mg-recipes">${recipeHtml}</div>
         <div class="mg-tabs">${tabs}</div>
         <div class="mg-opts">
           <label><input type="checkbox" data-act="field" ${ui.field ? 'checked' : ''}> 필드 타워도 재료로</label>
-          <button class="mg-auto" data-act="auto">⚡ 자동 3개</button>
-          <button class="mg-auto all" data-act="all" ${window.NEXT_GRADE[ui.grade] ? '' : 'disabled'}>⚡⚡ 한 번에 전부</button>
+          <button class="mg-auto" data-act="auto">자동 3개</button>
+          <button class="mg-auto all" data-act="all" ${window.NEXT_GRADE[ui.grade] ? '' : 'disabled'}>한 번에 전부</button>
         </div>
         <div class="mg-grid">${cards}</div>
         ${(this.engine._luckyCoins || 0) > 0 ? `<div class="mg-coin">🪙 행운의 동전 ${this.engine._luckyCoins}개 — 다음 랜덤 합성은 2개 중 선택</div>` : ''}
         <div class="mg-hint">${nextG ? `같은 등급 아무거나 3개 → <b style="color:${nextG.color}">${nextG.name}</b> 랜덤 · 같은 종 3개면 확정 진화도 가능` : '이 등급은 랜덤 합성이 없어요 (유니크는 위 레시피로)'}</div>
         <div class="mg-actions">
-          <button class="mg-btn rnd" data-act="random" ${canRandom ? '' : 'disabled'}>🎰 랜덤 합성 (${n}/3)</button>
-          <button class="mg-btn evo" data-act="evolve" ${evoId ? '' : 'disabled'}>✨ 확정 진화${evoId ? ' → ' + [].concat(evoId).map(x => window.GachaTowerDefs[x].name).join('/') + (Array.isArray(evoId) ? ' 중 1' : '') : ''}</button>
-          <button class="mg-btn sell" data-act="sell" ${n ? '' : 'disabled'}>💸 판매 +${sellSum}</button>
+          <button class="mg-btn rnd" data-act="random" ${canRandom ? '' : 'disabled'}>${ICON('dice', 16)}랜덤 합성 <span class="mg-n">${n}/3</span></button>
+          <button class="mg-btn evo" data-act="evolve" ${evoId ? '' : 'disabled'}>${ICON('sparkle', 15)}확정 진화${evoId ? ' → ' + [].concat(evoId).map(x => window.GachaTowerDefs[x].name).join('/') + (Array.isArray(evoId) ? ' 중 1' : '') : ''}</button>
+          <button class="mg-btn sell" data-act="sell" ${n ? '' : 'disabled'}>판매 +${sellSum}</button>
         </div>`;
 
       overlay.querySelector('[data-act="close"]').onclick = () => { overlay.remove(); this.renderStorageStrip(); };

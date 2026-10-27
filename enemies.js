@@ -28,6 +28,19 @@ const EnemySpriteImages = {
   hooh: 'assets/enemies/hooh.png',
 };
 
+// 스프라이트 실루엣 틴트 캐시 (피격 흰색·흑화 엘리트) — 경로·색·크롭 여부별 1회 생성
+const _tintCache = {};
+function tintedSprite(img, path, b, color) {
+  const k = path + '|' + color + '|' + (b ? 1 : 0);
+  if (_tintCache[k]) return _tintCache[k];
+  const w = b ? b.w : img.naturalWidth, h = b ? b.h : img.naturalHeight;
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  const x = c.getContext('2d');
+  if (b) x.drawImage(img, b.x, b.y, b.w, b.h, 0, 0, w, h); else x.drawImage(img, 0, 0);
+  x.globalCompositeOperation = 'source-atop'; x.fillStyle = color; x.fillRect(0, 0, w, h);
+  return (_tintCache[k] = c);
+}
+
 // ===== 경로 진행도 계산 유틸 =====
 function pathProgress(path, distTraveled) {
   let remaining = distTraveled;
@@ -680,27 +693,12 @@ class Enemy {
       const drawSize = s * 1.7;
       // v27-10: 이미지 여백 자동크롭 적용
       const b = window.SpriteBoundsCache?.[imgPath];
-      if (this.flashTimer > 0) {
-        // 피격 시 흰색 실루엣 오버레이
-        ctx.save();
-        if (b) ctx.drawImage(img, b.x, b.y, b.w, b.h, this.x - drawSize / 2, drawY - drawSize / 2, drawSize, drawSize);
-        else ctx.drawImage(img, this.x - drawSize / 2, drawY - drawSize / 2, drawSize, drawSize);
-        ctx.globalCompositeOperation = 'source-atop';
-        ctx.fillStyle = 'rgba(255,255,255,0.75)';
-        ctx.fillRect(this.x - drawSize / 2, drawY - drawSize / 2, drawSize, drawSize);
-        ctx.restore();
-      } else {
-        if (b) ctx.drawImage(img, b.x, b.y, b.w, b.h, this.x - drawSize / 2, drawY - drawSize / 2, drawSize, drawSize);
-        else ctx.drawImage(img, this.x - drawSize / 2, drawY - drawSize / 2, drawSize, drawSize);
-        if (isDarkElite) {
-          // v27-38: 골드 엘리트 흑화 연출 - filter 대신 저비용 색조 오버레이
-          ctx.save();
-          ctx.globalCompositeOperation = 'source-atop';
-          ctx.fillStyle = 'rgba(60,0,90,0.55)';
-          ctx.fillRect(this.x - drawSize / 2, drawY - drawSize / 2, drawSize, drawSize);
-          ctx.restore();
-        }
-      }
+      const dx = this.x - drawSize / 2, dy = drawY - drawSize / 2;
+      if (b) ctx.drawImage(img, b.x, b.y, b.w, b.h, dx, dy, drawSize, drawSize);
+      else ctx.drawImage(img, dx, dy, drawSize, drawSize);
+      // v3.6: 메인 캔버스에 source-atop을 쓰면 배경까지 칠해져 네모 박스가 보였음 → 오프스크린 실루엣을 덧그림
+      const tint = this.flashTimer > 0 ? 'rgba(255,255,255,0.75)' : isDarkElite ? 'rgba(60,0,90,0.55)' : null;
+      if (tint) ctx.drawImage(tintedSprite(img, imgPath, b, tint), dx, dy, drawSize, drawSize);
     } else {
       // 폴백: 도형 + 이모지
       ctx.beginPath();

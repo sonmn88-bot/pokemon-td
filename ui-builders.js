@@ -113,22 +113,22 @@ Object.assign(App.prototype, {
       const dmgPct = Math.round(((t.buffDmgMul||1) - 1) * 100);
       const rangePct = Math.round(((t.buffRangeMul||1) - 1) * 100);
       const spdPct = Math.round(((t._shopSpeedMul||1) - 1) * 100);
-      const dmgTag = dmgPct !== 0 ? ` <span style="color:#5b9dff">(+${dmgPct}%)</span>` : '';
-      const rangeTag = rangePct !== 0 ? ` <span style="color:#5b9dff">(+${rangePct}%)</span>` : '';
-      const spdTag = spdPct !== 0 ? ` <span style="color:#5b9dff">(+${spdPct}%)</span>` : '';
+      const dmgTag = dmgPct !== 0 ? `<i>+${dmgPct}%</i>` : '';
+      const rangeTag = rangePct !== 0 ? `<i>+${rangePct}%</i>` : '';
+      const spdTag = spdPct !== 0 ? `<i>+${spdPct}%</i>` : '';
       const masteryTag = ''; // v28 세션E: 숙련도 제거
       const flavor = window.FLAVOR_TEXT?.[def.id];
-      const flavorTag = flavor ? `<div style="font-size:9.5px;color:#777;font-style:italic;margin-top:3px;max-width:220px;">"${flavor}"</div>` : '';
+      const flavorTag = flavor ? `<div class="tp-flavor">${flavor}</div>` : '';
       const tuLevel = window.TypeUpgradeLevels?.[def.type] || 0;
       const tuNext = window.TypeUpgrades?.[def.type]?.[tuLevel];
       const upgradeHint = tuNext
-        ? `<div style="font-size:10px;color:#9cc4ff;margin-top:2px">💡 🛠강화 시트에서 "${tuNext.label}"(💰${tuNext.cost}) 올리면 이 타워가 강해져요</div>`
-        : `<div style="font-size:10px;color:#888;margin-top:2px">💡 이 타입 강화 최대 단계 달성</div>`;
+        ? `<div class="tp-hint">${ICON('upgrade', 14)}<span>강화 → <b>${tuNext.label}</b> ${ICON('coin', 12)}${tuNext.cost}</span></div>`
+        : `<div class="tp-hint done">${ICON('upgrade', 14)}<span>이 타입 강화 최대 단계</span></div>`;
       // v27-23: 데미지 배율 breakdown (요청1) - 여러 배율이 어디서 왔는지 한눈에
       const teMul = window.typeEffectiveness && t.target ? window.typeEffectiveness(def.type, t.target.typeTag) : 1;
       const breakdown = `
-        <div style="font-size:9.5px;color:#999;margin-top:4px;line-height:1.5;border-top:1px dashed rgba(255,255,255,0.1);padding-top:3px;">
-          📐 데미지 breakdown: 기본${def.damage}${t.flatDmg>0?`+강화${Math.round(t.flatDmg)}`:''}
+        <div class="tp-calc">
+          <span>데미지 계산</span> 기본${def.damage}${t.flatDmg>0?`+강화${Math.round(t.flatDmg)}`:''}
           × 타입강화${(t.buffDmgMul||1).toFixed(2)}
           ${(t._auraDmgMul||1)>1?`× 지원오라${t._auraDmgMul.toFixed(2)}`:''}
           ${(t._heroDmgMul||1)>1?`× 영웅${t._heroDmgMul.toFixed(2)}`:''}
@@ -137,28 +137,36 @@ Object.assign(App.prototype, {
         </div>`;
 
       panel.innerHTML = `
-        <div class="tower-panel-name" style="color:${grade.color}">
-          ${def.emoji} ${def.name} ${'★'.repeat(grade.stars)} <span style="font-size:10px">${def.mega ? "메가" : grade.name}</span>
+        <div class="tp-head" style="--gc:${grade.color}">
+          <span class="tp-thumb">${window.PKM ? PKM(def, 44) : ''}</span>
+          <div class="tp-title">
+            <b class="tower-panel-name">${def.name}</b>
+            <span class="tp-grade">${'★'.repeat(grade.stars)} ${def.mega ? '메가' : grade.name}</span>
+          </div>
         </div>
-        <div class="tower-panel-stats">⚔️${Math.round(t.damage)}${dmgTag} · ⏱️${t.fireRate.toFixed(1)}/s${spdTag} · DPS:${dps} · 📏${Math.round(t.range)}${rangeTag} ${synergyInfo}</div>
+        <div class="tp-stats">
+          <div><small>${ICON('sword', 13)}공격력</small><b>${Math.round(t.damage)}${dmgTag}</b></div>
+          <div><small>${ICON('timer', 13)}공격 속도</small><b>${t.fireRate.toFixed(1)}/s${spdTag}</b></div>
+          <div><small>${ICON('bolt', 13)}초당 피해</small><b>${dps}</b></div>
+          <div><small>${ICON('range', 13)}사거리</small><b>${Math.round(t.range)}${rangeTag}</b></div>
+        </div>
+        ${def.desc ? `<div class="tp-desc">${def.desc}</div>` : ''}
         ${upgradeHint}
-        ${masteryTag}
         ${flavorTag}
         ${breakdown}
-        <div style="font-size:10px;color:#aaa;margin:2px 0">${def.desc||''}</div>
-        <div style="font-size:10px;margin:3px 0;color:${canMerge?'#ffc24b':'#888'}">
+        <div class="tp-merge ${canMerge ? 'ready' : ''}">
           ${canMerge
-            ? `✅ 합치기 가능! (${sameCount}/3)${evolveDef?' → '+evolveDef.emoji+evolveDef.name:''}`
-            : `동일 타워 ${sameCount}/3${evolveDef?' (목표: '+evolveDef.emoji+evolveDef.name+')':''}`}
+            ? `합치기 가능 ${sameCount}/3${evolveDef ? ' → <b>' + evolveDef.name + '</b>' : ''}`
+            : `같은 타워 ${sameCount}/3${evolveDef ? ' · 목표 <b>' + evolveDef.name + '</b>' : ''}`}
         </div>
         ${this._megaPanelHtml ? `<div class="mega-box">${this._megaPanelHtml(t)}</div>` : ''}
         <div class="tower-panel-btns">
           ${canMerge
-            ? `<button class="tp-btn tp-upgrade" data-action="merge">✨ 합치기 진화!</button>`
+            ? `<button class="tp-btn tp-upgrade" data-action="merge">${ICON('sparkle', 15)}합치기 진화</button>`
             : `<button class="tp-btn tp-maxed" disabled>합치기 ${sameCount}/3</button>`}
-          <button class="tp-btn" data-action="recall" style="background:linear-gradient(135deg,#7c4dff,#4527a0)">${ICON('bag', 14)} 회수</button>
-          ${window.canUseTM && window.canUseTM(t) ? `<button class="tp-btn" data-action="tm" style="background:linear-gradient(135deg,#00b4d8,#0077b6)" title="태그 1개를 랜덤으로 배움 (타워당 1회)">💿 기술머신 ${window.TM_COST}g</button>` : ''}
-          <button class="tp-btn tp-sell" data-action="sell">${ICON('sell', 14)} +${refund}g</button>
+          <button class="tp-btn tp-recall" data-action="recall">${ICON('bag', 15)}보관함으로</button>
+          ${window.canUseTM && window.canUseTM(t) ? `<button class="tp-btn" data-action="tm" title="태그 1개를 랜덤으로 배움 (타워당 1회)">${ICON('disc', 15)}기술머신 ${window.TM_COST}</button>` : ''}
+          <button class="tp-btn tp-sell" data-action="sell">${ICON('sell', 15)}판매 +${refund}</button>
         </div>
       `;
       // v28: 필드 타워를 보관함으로 회수 (무료) - 합성 재료로 쓰거나 자리 재배치용

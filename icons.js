@@ -43,6 +43,23 @@ const _IC = {
   dice2:  '<rect x="4" y="4" width="16" height="16" rx="4" fill="#4cc9f0" opacity=".9"/><circle cx="9" cy="9" r="1.6" fill="#0b0d12"/><circle cx="15" cy="15" r="1.6" fill="#0b0d12"/><circle cx="12" cy="12" r="1.6" fill="#0b0d12"/>',
   bag:    '<path fill="#a78bfa" d="M7 8h10l1.4 11.2c.1.9-.6 1.8-1.6 1.8H7.2c-1 0-1.7-.9-1.6-1.8z"/><path fill="none" stroke="#a78bfa" stroke-width="1.8" d="M9 9V6.6a3 3 0 0 1 6 0V9"/>',
   sell:   '<circle cx="12" cy="12" r="8.6" fill="#ffc24b"/><path fill="#5a3a06" d="M11.2 6.5h1.6v1.2c1.2.2 2.1.9 2.3 2.1h-1.7c-.2-.5-.6-.8-1.4-.8-.8 0-1.2.3-1.2.8 0 .4.4.6 1.6.9 1.9.4 2.9 1 2.9 2.4 0 1.2-.9 2-2.3 2.2v1.2h-1.6v-1.2c-1.4-.2-2.3-1-2.4-2.2h1.7c.1.6.7.9 1.5.9.9 0 1.4-.3 1.4-.8 0-.4-.4-.6-1.6-.9-1.9-.4-2.8-1-2.8-2.3 0-1.1.8-1.9 2-2.1z"/>',
+  // v3.6 선 아이콘 (currentColor, 선 1.8 통일) — 이모지 대체용
+  card:   '<g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="7.4" y="3.6" width="11" height="15.4" rx="2.2" transform="rotate(10 12.9 11.3)"/><rect x="4.6" y="5" width="11" height="15.4" rx="2.2" fill="#14171f"/></g><path fill="currentColor" d="M10.1 9.2l1.1 2.3 2.5.3-1.8 1.7.5 2.5-2.3-1.2-2.2 1.2.4-2.5-1.8-1.7 2.5-.3z"/>',
+  gem:    '<path fill="currentColor" opacity=".28" d="M7 4h10l4 5-9 11L3 9z"/><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" d="M7 4h10l4 5-9 11L3 9zM3 9h18M9.6 4 8 9l4 11 4-11-1.6-5"/>',
+  prism:  '<circle cx="9" cy="9.4" r="5.2" fill="#ff6b6b" opacity=".85"/><circle cx="15" cy="9.4" r="5.2" fill="#ffc24b" opacity=".75"/><circle cx="12" cy="14.6" r="5.2" fill="#5b9dff" opacity=".75"/>',
+  heart:  '<path fill="currentColor" d="M12 20.2s-7.6-4.6-7.6-10.3A4.4 4.4 0 0 1 12 7.2a4.4 4.4 0 0 1 7.6 2.7c0 5.7-7.6 10.3-7.6 10.3z"/>',
+  refresh:'<path fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" d="M19.4 11a7.4 7.4 0 0 0-13.2-3.6M4.6 13a7.4 7.4 0 0 0 13.2 3.6M6 3.8v3.8h3.8M18 20.2v-3.8h-3.8"/>',
+  sword:  '<path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M19.5 4.5h-4L7 13l4 4 8.5-8.5zM5.4 14.6l4 4M4 20l2.6-2.6"/>',
+  bolt:   '<path fill="currentColor" d="M13.4 2.8 5.8 13.2h5.1l-1.4 8 8.6-11h-5.3z"/>',
+  range:  '<g fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8.2" stroke-dasharray="2.6 2.4"/><circle cx="12" cy="12" r="2.4" fill="currentColor"/></g>',
+  crown:  '<path fill="currentColor" d="M3.6 8.2l4.4 3.6L12 5l4 6.8 4.4-3.6-1.6 10H5.2z"/><rect x="5.2" y="19" width="13.6" height="1.8" rx=".6" fill="currentColor"/>',
+  globe:  '<g fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="8.4"/><path d="M3.6 12h16.8M12 3.6c2.4 2.4 3.4 5.2 3.4 8.4s-1 6-3.4 8.4c-2.4-2.4-3.4-5.2-3.4-8.4s1-6 3.4-8.4z"/></g>',
+  help:   '<circle cx="12" cy="12" r="8.4" fill="none" stroke="currentColor" stroke-width="1.8"/><path fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" d="M9.6 9.6a2.5 2.5 0 1 1 3.4 2.3c-.7.3-1 .8-1 1.5v.4"/><circle cx="12" cy="16.6" r="1.1" fill="currentColor"/>',
+  trophy: '<path fill="currentColor" d="M7 3.8h10v5.4a5 5 0 0 1-10 0z"/><path fill="none" stroke="currentColor" stroke-width="1.7" d="M7 6H4.2v1.6A3.2 3.2 0 0 0 7.4 10.8M17 6h2.8v1.6a3.2 3.2 0 0 1-3.2 3.2"/><path fill="currentColor" d="M10.8 14h2.4v3.4h-2.4zM7.6 17.6h8.8v2.6H7.6z"/>',
+  lock:   '<rect x="5.4" y="10.4" width="13.2" height="10" rx="2.4" fill="currentColor"/><path fill="none" stroke="currentColor" stroke-width="1.9" d="M8.4 10.4V8a3.6 3.6 0 0 1 7.2 0v2.4"/>',
+  sparkle:'<path fill="currentColor" d="M12 2.8c.6 4.6 2.6 6.6 7.2 7.2-4.6.6-6.6 2.6-7.2 7.2-.6-4.6-2.6-6.6-7.2-7.2 4.6-.6 6.6-2.6 7.2-7.2zM18.6 15.4c.3 2 1.1 2.8 3 3-1.9.3-2.7 1.1-3 3-.3-1.9-1.1-2.7-3-3 1.9-.2 2.7-1 3-3z"/>',
+  back:   '<path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M14.8 5.6 8.4 12l6.4 6.4"/>',
+  close:  '<path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" d="M6.4 6.4l11.2 11.2M17.6 6.4 6.4 17.6"/>',
   disc:   '<circle cx="12" cy="12" r="8.6" fill="#6aa8ff"/><circle cx="12" cy="12" r="8.6" fill="none" stroke="#cfe0ff" stroke-width="1"/><circle cx="12" cy="12" r="2.6" fill="#0b0d12"/><path fill="none" stroke="#cfe0ff" stroke-width="1" opacity=".7" d="M12 5.8a6.2 6.2 0 0 1 6.2 6.2M12 7.6a4.4 4.4 0 0 1 4.4 4.4"/>',
 };
 

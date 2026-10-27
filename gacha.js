@@ -702,31 +702,33 @@ function _createGachaTower(def, x, y, engine) {
         ctx.beginPath(); ctx.arc(this.x,this.y,35+Math.sin(Date.now()*0.004)*2,0,Math.PI*2); ctx.stroke();
         ctx.restore();
       }
-      // 등급 오라 - v27-62 최적화: 타워마다 매 프레임 createRadialGradient를 만들던 것을
-      // 등급별 1회 생성해 전역 캐시하고 translate로 위치만 이동 (그라디언트 생성은 비싼 연산)
-      if(def.grade!=='normal'){
-        if(!window._gradeAuraCache) window._gradeAuraCache = {};
-        let aura = window._gradeAuraCache[def.grade];
-        if(!aura){
-          aura = ctx.createRadialGradient(0,0,4,0,0,28);
-          aura.addColorStop(0,grade.color+'28'); aura.addColorStop(1,'transparent');
-          window._gradeAuraCache[def.grade] = aura;
-        }
-        ctx.save(); ctx.translate(this.x,this.y);
-        ctx.beginPath(); ctx.arc(0,0,28,0,Math.PI*2);
-        ctx.fillStyle=aura; ctx.fill(); ctx.restore();
-      }
-      // v27-5: 합체진화 직후 확장 링 연출 (item1 - 영웅 진화처럼 임팩트 있게)
+      // 합체·메가진화 직후 연출 (v3.6: 빛기둥 + 방사 광선 + 이중 확장 링, 스프라이트는 아래에서 흰 실루엣→원래 색)
       if(this._evolveGlowTimer>0){
         const p = Math.min(1, Math.max(0, 1 - this._evolveGlowTimer/1.2)); // 0→1 진행도 (범위 고정 - 음수 반지름 방지)
+        const ease = 1 - Math.pow(1 - p, 3);
         ctx.save();
+        // 빛기둥
+        const pillarA = Math.max(0, 1 - p * 1.4);
+        if (pillarA > 0) {
+          const pw = 26 * (1 - p * 0.6);
+          const g = ctx.createLinearGradient(0, this.y - 90, 0, this.y + 20);
+          g.addColorStop(0, grade.color + '00'); g.addColorStop(0.6, grade.color + 'aa'); g.addColorStop(1, '#ffffff');
+          ctx.globalAlpha = pillarA * 0.7; ctx.fillStyle = g;
+          ctx.fillRect(this.x - pw / 2, this.y - 90, pw, 110);
+        }
+        // 방사 광선
+        ctx.globalAlpha = Math.max(0, 1 - p) * 0.8; ctx.strokeStyle = grade.color; ctx.lineWidth = 2; ctx.lineCap = 'round';
+        for (let i = 0; i < 8; i++) {
+          const ang = i * Math.PI / 4 + p * 0.6, r0 = 18 + ease * 16, r1 = r0 + 10 * (1 - p);
+          ctx.beginPath(); ctx.moveTo(this.x + Math.cos(ang) * r0, this.y + Math.sin(ang) * r0);
+          ctx.lineTo(this.x + Math.cos(ang) * r1, this.y + Math.sin(ang) * r1); ctx.stroke();
+        }
+        // 확장 링
         ctx.globalAlpha = Math.max(0, 1 - p);
-        ctx.beginPath(); ctx.arc(this.x,this.y,20+p*40,0,Math.PI*2);
-        ctx.strokeStyle = grade.color; ctx.lineWidth = 3.5;
-        ctx.shadowColor = grade.color; ctx.shadowBlur=0; ctx.stroke();
-        ctx.beginPath(); ctx.arc(this.x,this.y,12+p*24,0,Math.PI*2);
-        ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.globalAlpha = Math.max(0,(1-p)*0.7);
-        ctx.stroke();
+        ctx.beginPath(); ctx.arc(this.x, this.y, 22 + ease * 34, 0, Math.PI * 2);
+        ctx.lineWidth = 3 * (1 - p) + 1; ctx.stroke();
+        ctx.beginPath(); ctx.arc(this.x, this.y, 14 + ease * 20, 0, Math.PI * 2);
+        ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.globalAlpha = Math.max(0, (1 - p) * 0.7); ctx.stroke();
         ctx.restore();
       }
       // 타입 강화 직후 색깔 링 (어떤 타워가 방금 버프받았는지 명확히 표시)
@@ -742,21 +744,9 @@ function _createGachaTower(def, x, y, engine) {
         ctx.beginPath(); ctx.arc(this.x,this.y,26,0,Math.PI*2);
         ctx.fillStyle=typeInfo.color; ctx.fill(); ctx.restore();
       }
-      // 베이스 패드
+      // 베이스 패드 (v3.6: 등급별로 1회 그려둔 메달 받침 - 그림자·입체 테두리·하이라이트)
       ctx.save();
-      ctx.beginPath(); ctx.arc(this.x,this.y+3,22,0,Math.PI*2);
-      ctx.fillStyle='rgba(0,0,0,0.3)'; ctx.fill();
-      ctx.beginPath(); ctx.arc(this.x,this.y,21,0,Math.PI*2);
-      ctx.fillStyle=grade.bg+'cc';
-      ctx.strokeStyle=grade.color; ctx.lineWidth=def.grade==='unique'?3:2;
-      // v27-38: shadowBlur는 캔버스에서 가장 무거운 연산 중 하나인데, 레어+ 타워 전부가 매 프레임 이걸
-      // 그리고 있어서 보드가 커질수록 발열/버벅임의 원인이 되고 있었음 (요청: 발열 검토). 시각적으로
-      // 비슷해 보이는 이중 테두리 방식으로 교체 - shadowBlur 없이 훨씬 저렴함.
-      ctx.fill(); ctx.stroke();
-      if(def.grade!=='normal'){
-        ctx.beginPath(); ctx.arc(this.x,this.y,23,0,Math.PI*2);
-        ctx.globalAlpha=0.35; ctx.lineWidth=1.5; ctx.stroke(); ctx.globalAlpha=1;
-      }
+      ctx.drawImage(towerBaseSprite(def.grade), this.x-30, this.y-30, 60, 60);
       // 포켓몬 이미지: 진화단계 전용(id) 이미지 우선, 없으면 라인 공통(pokemonId) 이미지로 폴백
       // v27 fix: towers 폴더에 이미지가 없으면 같은 이름의 enemies 폴더 이미지로 자동 폴백 (파일 중복 업로드 불필요)
       const imgPath=window.TowerSpriteImages?.[def.id] || window.TowerSpriteImages?.[def.pokemonId]
@@ -775,6 +765,11 @@ function _createGachaTower(def, x, y, engine) {
         const bobY = Math.sin(this._rotAngle*2.2 + this._bobPhase) * 2.2;
         if (b) ctx.drawImage(img, b.x, b.y, b.w, b.h, this.x-dw/2, this.y-dh/2+bobY, dw, dh);
         else ctx.drawImage(img,this.x-dw/2,this.y-dh/2+bobY,dw,dh);
+        if (this._evolveGlowTimer > 0.6 && window.tintedSprite) { // 진화 직후 0.6초: 흰 실루엣이 걷히며 새 모습 등장
+          ctx.globalAlpha = Math.min(1, (this._evolveGlowTimer - 0.6) / 0.6);
+          ctx.drawImage(tintedSprite(img, imgPath, b, '#ffffff'), this.x-dw/2, this.y-dh/2+bobY, dw, dh);
+          ctx.globalAlpha = 1;
+        }
       } else {
         const ti = window.ICON_IMG && ICON_IMG(def.type); // v3.0: 이미지 없는 포켓몬 = 타입 배지 + 이름 첫 글자
         if (ti && ti.complete) ctx.drawImage(ti, this.x - sz*0.42, this.y - sz*0.42, sz*0.84, sz*0.84);
@@ -782,23 +777,72 @@ function _createGachaTower(def, x, y, engine) {
         ctx.lineWidth=3; ctx.strokeStyle='rgba(0,0,0,0.55)'; ctx.strokeText(def.name[0], this.x, this.y + sz*0.42);
         ctx.fillStyle='#fff'; ctx.fillText(def.name[0], this.x, this.y + sz*0.42);
       }
-      // 등급 별 - v27-62 최적화: shadowBlur(값이 작아도 캔버스 슬로우패스 유발)를 타워 전부가
-      // 매 프레임 쓰고 있었음 → 어두운 텍스트를 1px 아래 먼저 그리는 저렴한 가짜 그림자로 교체
-      ctx.font='bold 8px Pretendard,-apple-system,sans-serif';
-      ctx.textAlign='center';
-      const starStr='★'.repeat(GRADES[def.grade].stars);
-      ctx.fillStyle='rgba(0,0,0,0.9)';
-      ctx.fillText(starStr,this.x,this.y-22);
-      ctx.fillStyle=grade.color;
-      ctx.fillText(starStr,this.x,this.y-23);
+      // 등급 별 (v3.6: 텍스트 ★ 대신 받침 아래 작은 별 리본)
+      ctx.drawImage(towerStarSprite(def.grade), this.x-20, this.y+14, 40, 12);
       // 타입 배지
       const tb = window.ICON_IMG && ICON_IMG(def.type);
-      if (tb && tb.complete) ctx.drawImage(tb, this.x+12, this.y-24, 12, 12);
+      if (tb && tb.complete) {
+        ctx.beginPath(); ctx.arc(this.x+17, this.y-16, 7.5, 0, Math.PI*2); ctx.fillStyle='rgba(12,14,20,0.85)'; ctx.fill();
+        ctx.drawImage(tb, this.x+11, this.y-22, 12, 12);
+      }
       ctx.restore();
     },
   };
   if (engine && window.applyShopBuffs) window.applyShopBuffs(t, engine);
   return t;
+}
+
+// ===== v3.6 타워 받침·별 스프라이트 (등급별 1회 렌더, 3배 해상도) =====
+const _towerSpriteCache = {};
+function _shade(hex, amt) { // amt -1..1 : 어둡게/밝게
+  const n = parseInt(hex.slice(1), 16), f = amt < 0 ? 0 : 255, t = Math.abs(amt);
+  const c = sh => Math.round(((n >> sh) & 255) * (1 - t) + f * t);
+  return `rgb(${c(16)},${c(8)},${c(0)})`;
+}
+function towerBaseSprite(gradeKey) {
+  const k = 'base_' + gradeKey;
+  if (_towerSpriteCache[k]) return _towerSpriteCache[k];
+  const G = GRADES[gradeKey] || GRADES.normal, S = 3, c = document.createElement('canvas');
+  c.width = c.height = 60 * S;
+  const x = c.getContext('2d'); x.scale(S, S); x.translate(30, 30);
+  // 바닥 그림자
+  x.fillStyle = 'rgba(0,0,0,0.38)'; x.beginPath(); x.ellipse(0, 15, 20, 6.5, 0, 0, Math.PI * 2); x.fill();
+  // 등급 오라 (노말 제외)
+  if (gradeKey !== 'normal') {
+    const a = x.createRadialGradient(0, 0, 14, 0, 0, 29);
+    a.addColorStop(0, G.color + '40'); a.addColorStop(1, G.color + '00');
+    x.fillStyle = a; x.beginPath(); x.arc(0, 0, 29, 0, Math.PI * 2); x.fill();
+  }
+  // 테두리 (위 밝고 아래 어두운 금속 링)
+  const rim = x.createLinearGradient(0, -23, 0, 23);
+  rim.addColorStop(0, _shade(G.color, 0.45)); rim.addColorStop(0.5, G.color); rim.addColorStop(1, _shade(G.color, -0.45));
+  x.fillStyle = rim; x.beginPath(); x.arc(0, 0, 22.5, 0, Math.PI * 2); x.fill();
+  // 안쪽 면 (위쪽 빛)
+  const face = x.createRadialGradient(0, -8, 2, 0, 0, 20);
+  face.addColorStop(0, _shade(G.bg, 0.16)); face.addColorStop(1, _shade(G.bg, -0.35));
+  x.fillStyle = face; x.beginPath(); x.arc(0, 0, 19.5, 0, Math.PI * 2); x.fill();
+  // 안쪽 그림자 링 + 상단 하이라이트
+  x.strokeStyle = 'rgba(0,0,0,0.45)'; x.lineWidth = 1.2; x.beginPath(); x.arc(0, 0, 19.3, 0, Math.PI * 2); x.stroke();
+  x.strokeStyle = 'rgba(255,255,255,0.35)'; x.lineWidth = 1; x.beginPath(); x.arc(0, 0, 22, Math.PI * 1.15, Math.PI * 1.85); x.stroke();
+  return (_towerSpriteCache[k] = c);
+}
+function towerStarSprite(gradeKey) {
+  const k = 'star_' + gradeKey;
+  if (_towerSpriteCache[k]) return _towerSpriteCache[k];
+  const G = GRADES[gradeKey] || GRADES.normal, n = G.stars, S = 3, c = document.createElement('canvas');
+  c.width = 40 * S; c.height = 12 * S;
+  const x = c.getContext('2d'); x.scale(S, S);
+  const w = 6 + n * 7, l = 20 - w / 2;
+  x.fillStyle = 'rgba(10,12,18,0.88)'; x.beginPath(); x.roundRect(l, 1, w, 10, 5); x.fill();
+  x.strokeStyle = G.color + '88'; x.lineWidth = 0.8; x.stroke();
+  x.fillStyle = G.color;
+  for (let i = 0; i < n; i++) {
+    const cx = l + 6.5 + i * 7, cy = 6;
+    x.beginPath();
+    for (let j = 0; j < 10; j++) { const r = j % 2 ? 1.35 : 3.1, a = -Math.PI / 2 + j * Math.PI / 5; x.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r); }
+    x.closePath(); x.fill();
+  }
+  return (_towerSpriteCache[k] = c);
 }
 
 // ===== 시너지 (타입별) =====
