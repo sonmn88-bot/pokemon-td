@@ -659,29 +659,20 @@ function _createGachaTower(def, x, y, engine) {
       const grade=GRADES[def.grade];
       const typeInfo=TYPES[def.type]||TYPES.normal;
 
-      // 합치기 가능 링 (3개 모임 - 초록)
-      if(this.engine){
-        // v27-62 최적화: 매 프레임 towerSlots 전체 filter(타워 30개면 프레임당 1500회+)를
-        // 0.5초 캐시로 교체 - 합체 카운트는 타워 배치/판매 때만 바뀌므로 0.5초 지연은 체감 불가
+      // v3.6 행동 가능 링: 합성은 보관함에서 하므로 '같은 타워 3개' 대신 메가진화(골드)·먹이기(초록) 가능할 때만
+      if(this.engine && window.MEGA && window.app){
         const nowMs2 = Date.now();
-        if(!this._sameCountAt || nowMs2 - this._sameCountAt > 500){
-          this._sameCountAt = nowMs2;
-          this._sameCount = this.engine.towerSlots.filter(s=>s.occupied&&s.tower?._gachaId===def.id).length;
+        if(!this._actAt || nowMs2 - this._actAt > 500){
+          this._actAt = nowMs2;
+          this._act = MEGA.canMega(app, this) ? 'mega' : MEGA.canFeed(app, this) > 0 ? 'feed' : null;
         }
-        const sameCount=this._sameCount||0;
-        if(sameCount>=3){
-          // v27-62 최적화: shadowBlur 제거 - 굵은 반투명 링 + 얇은 링 이중으로 글로우 대체
+        if(this._act){
+          const c = this._act === 'mega' ? '255,194,75' : '52,211,153';
           ctx.save(); ctx.beginPath(); ctx.arc(this.x,this.y,30,0,Math.PI*2);
-          ctx.strokeStyle=`rgba(52,211,153,0.25)`; ctx.lineWidth=6; ctx.stroke();
-          ctx.beginPath(); ctx.arc(this.x,this.y,30,0,Math.PI*2);
-          ctx.strokeStyle=`rgba(52,211,153,${0.5+Math.sin(Date.now()*0.006)*0.3})`;
-          ctx.lineWidth=2.5; ctx.stroke(); ctx.restore();
-        } else if(sameCount===2){
-          // v27-5: 1개만 더 모으면 합체 가능 - 노란색 링으로 미리 표시 (요청: 조합 힌트)
-          ctx.save(); ctx.beginPath(); ctx.arc(this.x,this.y,30,0,Math.PI*2);
-          ctx.strokeStyle=`rgba(255,194,75,${0.35+Math.sin(Date.now()*0.006)*0.2})`;
-          ctx.lineWidth=2; ctx.setLineDash([4,3]); ctx.stroke();
-          ctx.setLineDash([]); ctx.restore();
+          ctx.strokeStyle=`rgba(${c},0.22)`; ctx.lineWidth=6; ctx.stroke();
+          ctx.strokeStyle=`rgba(${c},${0.55+Math.sin(nowMs2*0.006)*0.3})`; ctx.lineWidth=2.2;
+          if(this._act === 'feed') ctx.setLineDash([4,3]);
+          ctx.stroke(); ctx.restore();
         }
       }
       // 유니크 무지개 링
