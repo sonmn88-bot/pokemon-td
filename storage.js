@@ -99,7 +99,7 @@ Object.assign(App.prototype, {
       return;
     }
     this._placingId = this._placingId === id ? null : id;
-    if (this._placingId) this.showWaveAnnounce('🎯 빈 슬롯을 탭해서 배치', '#6aa8ff');
+    if (this._placingId) this.showWaveAnnounce('빈 슬롯을 탭해서 배치', '#6aa8ff');
     this.renderStorageStrip();
   },
 

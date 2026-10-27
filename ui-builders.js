@@ -506,7 +506,7 @@ Object.assign(App.prototype, {
         if (hero.unlockedSkills.has(n.id)) return;
         if (n.requires && !hero.unlockedSkills.has(n.requires)) {
           const req = tree.nodes.find(x => x.id === n.requires);
-          this.showWaveAnnounce(`🔒 먼저 '${req.name}'을(를) 찍어야 해요`, '#ff5c7a'); return;
+          this.showWaveAnnounce(`먼저 '${req.name}'을(를) 찍어야 해요`, '#ff5c7a'); return;
         }
         if (hero.skillPoints < n.cost) { this.showWaveAnnounce(`SP가 부족해요 (${n.cost}SP 필요)`, '#ff5c7a'); return; }
         if (hero.unlockSkillNode(n.id, this.engine)) {

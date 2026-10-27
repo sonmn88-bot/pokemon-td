@@ -767,7 +767,7 @@ class App {
       // v27-5: 에픽 이상은 짧은 서스펜스 연출 후 공개 (요청B: 가챠의 재미)
       let flick = 0;
       const flickInterval = setInterval(() => {
-        this.showWaveAnnounce('❓❓❓', flick % 2 ? '#fff' : '#ffc24b');
+        this.showWaveAnnounce('', flick % 2 ? '#fff' : '#ffc24b');
         flick++;
         if (flick >= 3) {
           clearInterval(flickInterval);
@@ -1037,7 +1037,7 @@ class App {
     };
     this.engine.onWaveTimeout = (penalty, survivorCount) => {
       if (hudTimer) hudTimer.style.display = 'none';
-      this.showWaveAnnounce(`⏱ 시간 초과! 남은 ${survivorCount}마리는 필드에 그대로 (페널티 없음)`, '#ffab40');
+      this.showWaveAnnounce(`시간 초과! 남은 ${survivorCount}마리는 필드에 그대로 (페널티 없음)`, '#ffab40');
       if (this.missionTracker) { this.missionTracker.stats.timeouts = (this.missionTracker.stats.timeouts||0) + 1; }
     };
     this.engine.onFieldWarning = (count, level) => this._showFieldWarning(count, level);
@@ -1056,7 +1056,7 @@ class App {
     };
     this.engine.onBossAppear = (boss) => {
       const ts = this.engine._cardMods && this.engine._cardMods.timestop; // v3.5 카드 '시간 정지'
-      if (ts) { for (const en of this.engine.enemies) { en.stunned = ts; en._stunImmune = 0; } this.showWaveAnnounce(`⏱ 시간 정지 ${ts}초!`, '#ffc24b'); }
+      if (ts) { for (const en of this.engine.enemies) { en.stunned = ts; en._stunImmune = 0; } this.showWaveAnnounce(`시간 정지 ${ts}초!`, '#ffc24b'); }
       this.SFX.play('boss');
       // v27-16: 보스 약점 타입 힌트 (요청1 - 타입상성 이제 실제 작동하니 시각화)
       let weakHint = '';
@@ -1080,7 +1080,7 @@ class App {
     const origLoseLife = this.engine.loseLife.bind(this.engine);
     this.engine.loseLife = (n) => { this.SFX.play('life_lost'); origLoseLife(n); };
     this.engine.onKingDefeated = () => {
-      this.showWaveAnnounce('👑 왕을 처치했습니다! 무한 강화 모드 진입 - 20웨이브마다 적이 새로운 능력을 얻습니다', '#ffc24b');
+      this.showWaveAnnounce('왕을 처치했습니다! 무한 강화 모드 진입 - 20웨이브마다 적이 새로운 능력을 얻습니다', '#ffc24b');
       this.SFX.play('king_victory'); // v27-18: 왕 처치 전용 승리 징글 (요청H)
       this.BGM.start('infinite'); // v27-7: 무한강화 진입시 전용 BGM으로 전환 (요청5)
       this._recordKingKill(); // v27-17: 왕 처치 기록 갤러리 (요청4)
@@ -1093,7 +1093,7 @@ class App {
       if (every > 0 && wave % every === 0) {
         const d = window.rollTower('premium');
         this._addToStorage([d]);
-        setTimeout(() => this.showWaveAnnounce(`🥚 황금알! ${d.emoji} ${d.name} 획득 → 🎒`, '#ffc24b'), 700);
+        setTimeout(() => this.showWaveAnnounce(`황금알! ${d.emoji} ${d.name} 획득 → 🎒`, '#ffc24b'), 700);
       }
       if (hudTimer) hudTimer.style.display = 'none';
       this.els.btnWave.disabled = false;
@@ -1333,7 +1333,7 @@ class App {
       }
       if (selIdx !== null && !this.engine.towerSlots[selIdx].occupied) {
         document.querySelectorAll('.gacha-btn').forEach(b => b.classList.add('slot-ready'));
-        this.showWaveAnnounce('🎯 뽑기 버튼을 클릭!', '#6aa8ff');
+        this.showWaveAnnounce('뽑기 버튼을 클릭!', '#6aa8ff');
       } else {
         document.querySelectorAll('.gacha-btn').forEach(b => b.classList.remove('slot-ready'));
       }
@@ -1384,13 +1384,13 @@ class App {
     if ((e._bossSummonCooldown || 0) > 0) return;
     // v27-28: 보스 티어별 최소 웨이브 요구 (요청: 초반부터 뮤츠까지 쉽게 소환/처치되던 문제)
     if (e.currentWave < tierDef.minWave) {
-      this.showWaveAnnounce(`🔒 ${tierDef.label}은(는) 웨이브 ${tierDef.minWave} 이후에 소환 가능`, '#ff5c7a');
+      this.showWaveAnnounce(`${tierDef.label}은(는) 웨이브 ${tierDef.minWave} 이후에 소환 가능`, '#ff5c7a');
       return;
     }
     const waveMul = bossWaveScaleMul(e.currentWave);
     e._spawnEnemy({ type: tierDef.type, bossTier: tier, hpMul: tierDef.hpMul * waveMul, rewardMul: tierDef.rewardMul });
     e._bossSummonCooldown = BOSS_SUMMON_COOLDOWN;
-    this.showWaveAnnounce(`🔮 ${tierDef.label}(${tier}성) 소환!`, '#ff5c7a');
+    this.showWaveAnnounce(`${tierDef.label}(${tier}성) 소환!`, '#ff5c7a');
     if (this.missionTracker) { this.missionTracker.stats.bossSummons = (this.missionTracker.stats.bossSummons||0) + 1; this.missionTracker.check(); }
     this._updateBossSummonUI();
   }
@@ -1688,7 +1688,7 @@ class App {
   _skipWave() {
     if (!this.engine || this.engine.state !== 'wave') return;
     this.engine.timeoutWave();
-    this.showWaveAnnounce('⏭ 웨이브 스킵! (남은 적은 필드에 그대로 남음)', '#ffab40');
+    this.showWaveAnnounce('웨이브 스킵! (남은 적은 필드에 그대로 남음)', '#ffab40');
   }
 
   sendWave() {
@@ -1730,11 +1730,11 @@ class App {
 
     // 보스 웨이브 경고
     if (nextWave === KING_WAVE) {
-      this.showWaveAnnounce(`👑 왕이 기다리고 있습니다... (Wave ${nextWave})`, '#ffc24b');
+      this.showWaveAnnounce(`왕이 기다리고 있습니다... (Wave ${nextWave})`, '#ffc24b');
     } else if (nextWave % 30 === 0) {
-      this.showWaveAnnounce(`🔮 존 보스 등장! (Wave ${nextWave})`, '#ff5c7a');
+      this.showWaveAnnounce(`존 보스 등장! (Wave ${nextWave})`, '#ff5c7a');
     } else if (nextWave % 10 === 0) {
-      this.showWaveAnnounce(`☠️ 중간보스 등장! (Wave ${nextWave})`, '#ffab40');
+      this.showWaveAnnounce(`중간보스 등장! (Wave ${nextWave})`, '#ffab40');
     }
 
     // v27-9: 왕/보스 웨이브는 시간제한을 짧게 고정 - 못 잡아도 빠르게 다음 웨이브로 넘어가도록 (요청3)
