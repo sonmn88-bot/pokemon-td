@@ -477,7 +477,7 @@ class App {
     const TABS = [
       ['기본', [
         ['target', '목표', '필드에 몬스터가 <b>200마리</b> 쌓이면 끝나요. 웨이브는 끝이 없어요 — 최대한 오래 버티세요.'],
-        ['capsule', '뽑기', '하단 캡슐 버튼. 빈 자리를 먼저 누르고 뽑으면 바로 배치, 아니면 보관함으로. <b>일반</b> 1성 · <b>프리미엄</b> 1~3성 · <b>도박</b> 2~5성 · <b>10연</b>.'],
+        ['capsule', '뽑기', '하단 캡슐 버튼. 빈 자리를 먼저 누르고 뽑으면 바로 배치, 아니면 보관함으로. <b>일반</b> 1성 · <b>프리미엄</b> 1~3성 · <b>도박</b> 2~5성 · <b>10연</b>. 도박에서만 아주 드물게 나오는 <b>히든 포켓몬</b>이 있다는 소문이…'],
         ['flask', '합성', '같은 등급 아무거나 3마리 → 다음 등급 랜덤. 같은 포켓몬 3마리 → 진화 확정. <b>한 번에 전부</b>는 보관함의 그 등급을 모두 합성해요(배치된 타워는 그대로).'],
         ['psychic', '유니크', '뮤 = 서로 다른 레전드 3마리. 뮤츠 = 뮤 + 레전드 2마리 + 2000골드. 합성 연구소 위쪽 레시피에서 만들어요.'],
       ]],
@@ -779,10 +779,13 @@ class App {
 
     // 단일 뽑기
     let towerDef = window.rollTower(pullKey);
-    if (pullKey === 'gamble' && Math.random() < 0.01 && window.GachaTowerDefs.shiny_gyarados) { // v3.8 히든: 도박 1%
-      towerDef = { ...window.GachaTowerDefs.shiny_gyarados, _starLevel: 1 };
-      this.engine.triggerScreenShake && this.engine.triggerScreenShake(12, 0.6);
-      setTimeout(() => this.showWaveAnnounce('히든 포켓몬! 붉은 갸라도스', '#ff4d5e'), 900);
+    if (pullKey === 'gamble') { // v3.9 히든 3종: 도박에서만 합계 1.2% (갸라도스 0.5 · 리자몽 0.4 · 망나뇽 0.3)
+      const roll = Math.random(), hid = roll < 0.003 ? 'shiny_dragonite' : roll < 0.007 ? 'shiny_charizard' : roll < 0.012 ? 'shiny_gyarados' : null;
+      if (hid && window.GachaTowerDefs[hid]) {
+        towerDef = { ...window.GachaTowerDefs[hid], _starLevel: 1 };
+        this.engine.triggerScreenShake && this.engine.triggerScreenShake(12, 0.6);
+        setTimeout(() => this.showWaveAnnounce(`히든 포켓몬! ${towerDef.name}`, '#ff4d5e'), 900);
+      }
     }
     if (noSlotSelected) {
       // v27-44: 슬롯 없이 뽑았으면 보관함으로 (요청2)

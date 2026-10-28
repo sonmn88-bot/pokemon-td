@@ -396,6 +396,36 @@ const GachaTowerDefs = {
         e.particles.push(new AoeBurst(t.x,t.y,t.range*0.7,'#ff4d5e')); e.spawnFloatingText('역린!',t.x,t.y-34,'#ff4d5e'); }
     }
   },
+  // v3.9 히든 2: 검은 리자몽 — 6초마다 유성 화염(적 위치 6곳 대폭발 + 화상)
+  shiny_charizard: {
+    id:'shiny_charizard', name:'검은 리자몽', emoji:'', grade:'unique', type:'fire', pokemonId:'charizard', hidden:true,
+    damage:120, range:270, fireRate:1.2, desc:'히든 · 화염 숨결(3마리 관통·화상) + 6초마다 블래스트번(유성 6발 대폭발)',
+    fire(t,e){
+      const tg=e.enemies.filter(en=>!en.dead&&!en.reachedEnd&&Math.hypot(en.x-t.x,en.y-t.y)<=t.range).sort((a,b)=>b.distTraveled-a.distTraveled).slice(0,3);
+      for(const en of tg){ e.projectiles.push(new Projectile(t.x,t.y,en,{engine:e,color:'#ff7a2e',size:6,beam:true,beamLife:0.2})); en.takeDamage(t.damage,'special'); en.applyStatus('burn',3,t.damage*0.12); }
+      t._metT=(t._metT||0)+1/t.fireRate;
+      if(t._metT>=6){ t._metT=0;
+        const pool=e.enemies.filter(en=>!en.dead&&!en.reachedEnd).sort(()=>Math.random()-0.5).slice(0,6);
+        pool.forEach((p,k)=>setTimeout(()=>{ if(!e.enemies) return; e.particles.push(new AoeBurst(p.x,p.y,90,'#ff7a2e'));
+          for(const en of e.enemies) if(!en.dead&&!en.reachedEnd&&Math.hypot(en.x-p.x,en.y-p.y)<=90){ en.takeDamage(t.damage*2.5,'special'); en.applyStatus('burn',4,t.damage*0.15); } }, k*120));
+        e.triggerScreenShake&&e.triggerScreenShake(7,0.5); e.spawnFloatingText('블래스트번!',t.x,t.y-36,'#ff7a2e',{fontSize:16,life:1}); }
+    }
+  },
+  // v3.9 히든 3: 분홍 망나뇽 — 8초마다 용성군(필드 전체 피해 + 뒤로 밀기)
+  shiny_dragonite: {
+    id:'shiny_dragonite', name:'분홍 망나뇽', emoji:'', grade:'unique', type:'psychic', pokemonId:'dragonite', hidden:true,
+    damage:110, range:300, fireRate:1.0, desc:'히든 · 2마리 강타(넉백) + 8초마다 용성군(필드 전체 1.5배 피해·뒤로 밀기)',
+    fire(t,e){
+      const tg=e.enemies.filter(en=>!en.dead&&!en.reachedEnd&&Math.hypot(en.x-t.x,en.y-t.y)<=t.range).sort((a,b)=>b.distTraveled-a.distTraveled).slice(0,2);
+      for(const en of tg){ e.projectiles.push(new Projectile(t.x,t.y,en,{engine:e,color:'#ff8fd0',size:7,beam:true,beamLife:0.2})); en.takeDamage(t.damage*1.3,'special'); if(Math.random()<0.4) en.distTraveled=Math.max(0,en.distTraveled-30); }
+      t._dracoT=(t._dracoT||0)+1/t.fireRate;
+      if(t._dracoT>=8){ t._dracoT=0;
+        for(const en of e.enemies){ if(en.dead||en.reachedEnd) continue; en.takeDamage(t.damage*1.5,'special'); if(!en.isBoss) en.distTraveled=Math.max(0,en.distTraveled-60); }
+        const cx=e.camera?e.camera.x:t.x, cy=e.camera?e.camera.y:t.y;
+        for(let k=0;k<4;k++) setTimeout(()=>e.particles.push(new AoeBurst(cx+(Math.random()-0.5)*300,cy+(Math.random()-0.5)*500,160,'#ff8fd0')),k*90);
+        e.triggerScreenShake&&e.triggerScreenShake(10,0.6); e.spawnFloatingText('용성군!',t.x,t.y-36,'#ff8fd0',{fontSize:16,life:1}); }
+    }
+  },
   mew: {
     id:'mew', name:'뮤', emoji:'💗', grade:'unique', type:'psychic', pokemonId:'mew',
     damage:80, range:330, fireRate:1.4, desc:'전체버프+변신',
@@ -533,7 +563,7 @@ function _pityKey(def) { return def.role || def.type; }
 //   쁘사이저·프테라·캥카처럼 진화 단계가 없는 종은 같은 종을 모을 방법이 우연뿐이라 먹이 버튼이 사실상 안 떴음
 function _megaPull(grade) {
   const e = window.app && app.engine; if (!e || !window.MEGA_OF || Math.random() >= 0.25) return null;
-  const ids = [...new Set(e.towers.filter(t => t.def && MEGA_OF[t.def.id] && t.def.grade === grade && ((t.def._stack || 1) < 5)).map(t => t.def.id))];
+  const ids = [...new Set(e.towers.filter(t => t.def && (MEGA_OF[t.def.id] || t.def.grade === 'legend') && t.def.grade === grade && ((t.def._stack || 1) < 5)).map(t => t.def.id))]; // 메가 원본·레전드
   return ids.length ? ids[Math.floor(Math.random() * ids.length)] : null;
 }
 function rollRandomMerge(grade, state = {}) {
@@ -1025,29 +1055,39 @@ window.TowerSpriteImages = {
 window.GRADES=GRADES; window.TYPES=TYPES;
 window.GachaTowerDefs=GachaTowerDefs;
 window.GRADE_POOLS=GRADE_POOLS;
-// v3.8 붉은 갸라도스 스프라이트: 갸라도스의 파란 몸통만 빨갛게 (픽셀 색상 변환, 1회)
-(function makeShinyGyarados(){
+// v3.9 히든 이로치 스프라이트: 원본 그림의 특정 색 범위만 바꿔 1회 생성 (붉은 갸라도스·검은 리자몽·분홍 망나뇽)
+(function makeShinySprites(){
   if (typeof document === 'undefined') return;
   window.TowerSpriteImages = window.TowerSpriteImages || {};
-  window.TowerSpriteImages.shiny_gyarados = 'assets/towers/gyarados.png'; // 변환 전 임시
-  const im = new Image();
-  im.onload = () => { try {
-    const c = document.createElement('canvas'); c.width = im.naturalWidth; c.height = im.naturalHeight;
-    const x = c.getContext('2d'); x.drawImage(im, 0, 0);
-    const d = x.getImageData(0, 0, c.width, c.height), p = d.data;
-    for (let i = 0; i < p.length; i += 4) {
-      const r = p[i] / 255, g = p[i+1] / 255, b = p[i+2] / 255, mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2, dd = mx - mn;
-      if (p[i+3] < 10 || dd < 0.12) continue;
-      let h = mx === r ? ((g - b) / dd) % 6 : mx === g ? (b - r) / dd + 2 : (r - g) / dd + 4; h *= 60; if (h < 0) h += 360;
-      if (h < 170 || h > 260) continue; // 파란 계열만
-      const sat = dd / (1 - Math.abs(2 * l - 1)), nh = (h + 150) % 360 / 60, C = (1 - Math.abs(2 * l - 1)) * Math.min(1, sat * 1.1), X = C * (1 - Math.abs(nh % 2 - 1)), m = l - C / 2;
-      const [rr, gg, bb] = nh < 1 ? [C, X, 0] : nh < 2 ? [X, C, 0] : nh < 3 ? [0, C, X] : nh < 4 ? [0, X, C] : nh < 5 ? [X, 0, C] : [C, 0, X];
-      p[i] = (rr + m) * 255; p[i+1] = (gg + m) * 255; p[i+2] = (bb + m) * 255;
-    }
-    x.putImageData(d, 0, 0);
-    window.TowerSpriteImages.shiny_gyarados = c.toDataURL();
-  } catch (_) {} };
-  im.src = 'assets/towers/gyarados.png';
+  const RULES = {
+    shiny_gyarados:  { src:'gyarados',  map:[{ h:[170,260], shift:150 }] },                       // 파랑 → 빨강
+    shiny_charizard: { src:'charizard', map:[{ h:[8,40], lmax:0.7, dark:0.32 }, { h:[160,230], shift:180 }] }, // 주황 몸 → 검정(밝은 꼬리 불꽃은 유지), 청록 날개 안쪽 → 빨강
+    shiny_dragonite: { src:'dragonite', map:[{ h:[18,55], shift:-55, sat:1.1 }] },                 // 주황 → 분홍
+  };
+  const hsl2rgb = (h, s, l) => { const C = (1 - Math.abs(2 * l - 1)) * s, hp = ((h % 360) + 360) % 360 / 60, X = C * (1 - Math.abs(hp % 2 - 1)), m = l - C / 2;
+    const [r, g, b] = hp < 1 ? [C, X, 0] : hp < 2 ? [X, C, 0] : hp < 3 ? [0, C, X] : hp < 4 ? [0, X, C] : hp < 5 ? [X, 0, C] : [C, 0, X]; return [(r + m) * 255, (g + m) * 255, (b + m) * 255]; };
+  for (const [id, R] of Object.entries(RULES)) {
+    window.TowerSpriteImages[id] = `assets/towers/${R.src}.png`; // 변환 전 임시
+    const im = new Image();
+    im.onload = () => { try {
+      const c = document.createElement('canvas'); c.width = im.naturalWidth; c.height = im.naturalHeight;
+      const x = c.getContext('2d'); x.drawImage(im, 0, 0);
+      const d = x.getImageData(0, 0, c.width, c.height), p = d.data;
+      for (let i = 0; i < p.length; i += 4) {
+        if (p[i+3] < 10) continue;
+        const r = p[i] / 255, g = p[i+1] / 255, b = p[i+2] / 255, mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2, dd = mx - mn;
+        if (dd < 0.12) continue;
+        let h = mx === r ? ((g - b) / dd) % 6 : mx === g ? (b - r) / dd + 2 : (r - g) / dd + 4; h *= 60; if (h < 0) h += 360;
+        const sat = dd / (1 - Math.abs(2 * l - 1) || 1);
+        const rule = R.map.find(m => h >= m.h[0] && h <= m.h[1] && (!m.lmax || l <= m.lmax)); if (!rule) continue;
+        const out = rule.dark ? hsl2rgb(h, sat * 0.12, l * rule.dark + 0.06) : hsl2rgb(h + rule.shift, Math.min(1, sat * (rule.sat || 1)), l);
+        p[i] = out[0]; p[i+1] = out[1]; p[i+2] = out[2];
+      }
+      x.putImageData(d, 0, 0);
+      window.TowerSpriteImages[id] = c.toDataURL();
+    } catch (_) {} };
+    im.src = `assets/towers/${R.src}.png`;
+  }
 })();
 window.PULL_COSTS=PULL_COSTS;
 window.PULL_TABLES=PULL_TABLES;

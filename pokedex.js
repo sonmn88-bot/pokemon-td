@@ -233,7 +233,7 @@ const DEX_KEEP_FIRE = ['articuno','zapdos','moltres','dragonite','gengar','mewtw
     if (DEX_HAS_IMG.has(r.id)) window.TowerSpriteImages[r.id] = `assets/towers/${r.id}.png`; // v3.1: 151종 공식 일러스트로 통일 (예전 enemies/heroes 경로보다 우선)
     else if (!window.TowerSpriteImages[r.id] && ['pikachu','raichu','eevee','vaporeon','jolteon','flareon'].includes(r.id)) window.TowerSpriteImages[r.id] = `assets/heroes/${r.id}.png`; // 영웅 이미지 재사용
   }
-  if (old.shiny_gyarados) GachaTowerDefs.shiny_gyarados = old.shiny_gyarados; // v3.8 히든(도감 행 없음, 등급 풀 제외)
+  for (const k in old) if (old[k].hidden) GachaTowerDefs[k] = old[k]; // 히든(도감 행 없음, 등급 풀 제외)
 
   // 확정 진화: 같은 라인의 다음 단계 (이브이는 3갈래 중 랜덤)
   const byLine = {};
