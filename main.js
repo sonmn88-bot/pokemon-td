@@ -1182,7 +1182,7 @@ class App {
           if (this.missionTracker) this.missionTracker.stats.collectedIds.add(def.id);
         }
         overlay.remove();
-        this.showWaveAnnounce(`${def.emoji} ${def.name}(으)로 시작! (영구 데미지+15% 시그니처)`, '#ffc24b');
+        this.showWaveAnnounce(`${def.name}(으)로 시작! (영구 데미지+15% 시그니처)`, '#ffc24b');
       });
       grid.appendChild(card);
     }

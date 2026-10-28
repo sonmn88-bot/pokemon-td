@@ -1519,3 +1519,10 @@ img.title-pkm.lead { width:88px; height:88px; }
   .spell-btn .spell-emoji .ic { width:20px; height:20px; }
 }
 .bc-text .bc-weak b { font-size:inherit; font-weight:800; letter-spacing:0; }
+
+/* v3.6 발열: 움직이는 캔버스 위의 backdrop-filter는 매 프레임 블러를 다시 계산함 → 게임 화면 안에서는 끄고 불투명 배경으로 */
+#game-screen #hud-top, #game-screen #tower-panel, #game-screen #hero-panel, #game-screen #upgrade-sheet,
+#game-screen .card-overlay, #game-screen .pause-overlay, #game-screen .merge-overlay, #game-screen .mission-overlay,
+#game-screen .shop-overlay, #game-screen .skilltree-overlay, #game-screen .skin-picker, #game-screen .end-overlay, #game-screen *[class*="overlay"] {
+  backdrop-filter:none !important; -webkit-backdrop-filter:none !important; }
+#game-screen #hud-top { background:rgb(13,15,21); }

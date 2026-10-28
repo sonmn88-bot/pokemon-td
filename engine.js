@@ -112,7 +112,7 @@ class GameEngine {
     // 캐시
     this._bgCanvas = null;
     this._bgDirty = true;
-    this._dpr = Math.min(window.devicePixelRatio || 1, 2);
+    this._dpr = Math.min(window.devicePixelRatio || 1, matchMedia('(pointer:coarse)').matches ? 1.75 : 2); // v3.6: 폰은 1.75배로 (채울 픽셀 23%↓, 발열↓)
   }
 
   init(mapId) {

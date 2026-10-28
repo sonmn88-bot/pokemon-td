@@ -73,7 +73,7 @@ Object.assign(App.prototype, {
       `;
       btn.title = def.passive;
       btn.addEventListener('click', () => this.selectHeroToPlace(heroId, btn));
-      scroll.appendChild(btn);
+      scroll.prepend(btn); // v3.6: 보관함이 쌓여도 바로 누를 수 있게 맨 왼쪽
     }
 
     this.els.towerBar.appendChild(scroll);
