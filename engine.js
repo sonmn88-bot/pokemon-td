@@ -209,6 +209,23 @@ class GameEngine {
   start() { this.running = true; this.lastTime = performance.now(); requestAnimationFrame(t=>this.loop(t)); }
   stop() { this.running = false; }
 
+  // v3.6 성능 측정: 계산(update)·그리기(draw) ms를 1초 평균/최대로 표시. 일시정지 메뉴에서 켬/끔
+  setPerf(on) {
+    this._perf = on; try { localStorage.setItem('pokemontd_perf', on ? '1' : '0'); } catch (_) {}
+    let el = document.getElementById('perf-hud');
+    if (!on) { el && el.remove(); return; }
+    if (!el) { el = document.createElement('div'); el.id = 'perf-hud'; document.getElementById('game-screen').appendChild(el); }
+    this._pfAcc = { n: 0, u: 0, d: 0, uMax: 0, dMax: 0, t0: performance.now() };
+  }
+  _perfTick(u, d, ts) {
+    const a = this._pfAcc; if (!a) return;
+    a.n++; a.u += u; a.d += d; a.uMax = Math.max(a.uMax, u); a.dMax = Math.max(a.dMax, d);
+    const span = ts - a.t0; if (span < 1000) return;
+    const el = document.getElementById('perf-hud');
+    if (el) el.textContent = `fps ${Math.round(a.n * 1000 / span)} · 계산 ${(a.u / a.n).toFixed(1)}ms(최대 ${a.uMax.toFixed(0)}) · 그리기 ${(a.d / a.n).toFixed(1)}ms(최대 ${a.dMax.toFixed(0)}) · 적 ${this.enemies.length} · 타워 ${this.towers.length} · 파티클 ${this.particles.length} · 배율 ${this._dpr}${this.powerSave ? ' · 절전' : ''}`;
+    this._pfAcc = { n: 0, u: 0, d: 0, uMax: 0, dMax: 0, t0: ts };
+  }
+
   loop(ts) {
     if (!this.running) return;
     // v3.4 절전 모드: 화면 갱신과 계산을 30fps로 (한 프레임 걸러 처리, 시간은 그대로 누적되니 게임 속도는 동일)
@@ -223,12 +240,14 @@ class GameEngine {
     const total = raw * this.speedMul;
     const MAX_STEP = this.enemies.length > 80 ? 1 / 30 : 1 / 50; // v3.3: 적이 많으면 계산 횟수 줄임
     let remaining = total;
+    const _pf = this._perf, _t0 = _pf ? performance.now() : 0;
     while (remaining > 0.0001) {
       this.dt = Math.min(remaining, MAX_STEP);
       remaining -= this.dt;
       this._isLastSubstep = remaining <= 0.0001; // main.js의 UI 갱신은 마지막 서브스텝에서만
       try { this.update(); } catch (err) { this._logError('update', err); break; }
     }
+    const _t1 = _pf ? performance.now() : 0;
     this.dt = total;
     // 유휴 절전: idle + 필드에 아무것도 없으면 렌더링 절반(≈30fps)
     const isQuiet = this.state === 'idle' && this.enemies.length === 0 &&
@@ -237,6 +256,7 @@ class GameEngine {
     if (!isQuiet || this._frameSkip % 2 === 0) {
       try { this.draw(); } catch (err) { this._logError('draw', err); this._ctxDirty = true; }
     }
+    if (_pf) this._perfTick(_t1 - _t0, performance.now() - _t1, ts);
     requestAnimationFrame(t=>this.loop(t));
   }
 
