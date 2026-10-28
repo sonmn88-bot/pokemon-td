@@ -135,47 +135,100 @@ class Projectile {
     this._doChain(nearest, rem - 1);
   }
 
+  // v3.6 공격 연출: 이모지 글자 대신 타입별 미리 그린 스프라이트 + 꼬리 1획 (fillText·shadowBlur 없음 → 더 가벼움)
+  _type() {
+    if (this._ty) return this._ty;
+    const t = this.src && this.src.def && this.src.def.type;
+    return (this._ty = PROJ_STYLE[t] ? t : 'normal');
+  }
   draw(ctx) {
+    const ty = this._type(), st = PROJ_STYLE[ty];
     if (this.beam) {
-      const alpha = 1 - this.life / this.beamLife;
-      ctx.save();
-      ctx.globalAlpha = Math.max(0, alpha);
-      ctx.strokeStyle = this.color;
-      ctx.lineWidth = this.size;
-      ctx.lineCap = 'round';
-      ctx.beginPath();
-      ctx.moveTo(this.bx1, this.by1);
-      ctx.lineTo(this.bx2, this.by2);
-      ctx.stroke();
-      ctx.globalAlpha *= 0.35; ctx.lineWidth = this.size * 2.6; ctx.stroke(); // 번짐 대신 굵은 반투명 선 (v3.3 발열 최적화)
+      const alpha = Math.max(0, 1 - this.life / this.beamLife);
+      const x1 = this.bx1, y1 = this.by1, x2 = this.bx2, y2 = this.by2;
+      ctx.save(); ctx.globalAlpha = alpha; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      ctx.beginPath(); ctx.moveTo(x1, y1);
+      if (ty === 'electric' || ty === 'psychic') { // 번개는 지그재그, 에스퍼는 물결
+        const dx = x2 - x1, dy = y2 - y1, len = Math.hypot(dx, dy) || 1, nx = -dy / len, ny = dx / len, N = 8;
+        for (let i = 1; i < N; i++) {
+          const k = i / N, off = ty === 'electric' ? (Math.random() - 0.5) * 16 : Math.sin(k * Math.PI * 4 + this.life * 40) * 6;
+          ctx.lineTo(x1 + dx * k + nx * off, y1 + dy * k + ny * off);
+        }
+      }
+      ctx.lineTo(x2, y2);
+      ctx.strokeStyle = st.glow; ctx.lineWidth = this.size * 2.6; ctx.globalAlpha = alpha * 0.35; ctx.stroke();
+      ctx.strokeStyle = st.core; ctx.lineWidth = Math.max(1.5, this.size * 0.7); ctx.globalAlpha = alpha; ctx.stroke();
       ctx.restore();
       return;
     }
-    // 트레일
-    for (let i = 0; i < this.trail.length; i++) {
-      const p = this.trail[i];
-      const a = (i / this.trail.length) * 0.3;
-      ctx.save();
-      ctx.globalAlpha = a;
-      ctx.fillStyle = this.color;
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, this.size * 0.55, 0, Math.PI * 2);
-      ctx.fill();
+    // 꼬리: 지나온 점들을 한 번에 이어 그림 (점 6개 원 → 선 1획)
+    const tr = this.trail;
+    if (tr.length > 1) {
+      ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      ctx.beginPath(); ctx.moveTo(tr[0].x, tr[0].y);
+      for (let i = 1; i < tr.length; i++) {
+        const j = ty === 'electric' ? (Math.random() - 0.5) * 6 : 0;
+        ctx.lineTo(tr[i].x + j, tr[i].y + j);
+      }
+      ctx.lineTo(this.x, this.y);
+      ctx.strokeStyle = st.glow; ctx.globalAlpha = st.trailA; ctx.lineWidth = this.size * st.trailW; ctx.stroke();
       ctx.restore();
     }
-    ctx.save();
-    if (this.emoji) {
-      ctx.font = `${this.size * 2.4}px serif`;
-      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText(this.emoji, this.x, this.y);
-    } else {
-      ctx.fillStyle = this.color;
-      ctx.beginPath();
-      ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-      ctx.fill();
-    }
+    const spr = projSprite(ty), d = this.size * 3.4;
+    ctx.save(); ctx.translate(this.x, this.y);
+    ctx.rotate(st.spin ? performance.now() * 0.014 : Math.atan2(this.vy, this.vx));
+    ctx.drawImage(spr, -d / 2, -d / 2, d, d);
     ctx.restore();
   }
+}
+
+// 타입별 투사체 모양 (3배 해상도로 1회 렌더 후 재사용)
+const PROJ_STYLE = {
+  fire:     { core:'#fff3c4', glow:'#ff7a2e', trailA:0.45, trailW:1.3 },
+  water:    { core:'#e6f6ff', glow:'#3aa8ff', trailA:0.35, trailW:0.9 },
+  grass:    { core:'#eaffd9', glow:'#5fcf63', trailA:0.25, trailW:0.6, spin:true },
+  electric: { core:'#fffbe0', glow:'#ffd84a', trailA:0.6,  trailW:0.5 },
+  psychic:  { core:'#ffe9ff', glow:'#c77dff', trailA:0.35, trailW:1.0 },
+  normal:   { core:'#ffffff', glow:'#c3c8d2', trailA:0.3,  trailW:0.7 },
+};
+const _projCache = {};
+function projSprite(ty) {
+  if (_projCache[ty]) return _projCache[ty];
+  const c = document.createElement('canvas'); c.width = c.height = 48;
+  const x = c.getContext('2d'), st = PROJ_STYLE[ty]; x.translate(24, 24);
+  const glow = (r, a) => { const g = x.createRadialGradient(0, 0, 0, 0, 0, r); g.addColorStop(0, st.glow + 'cc'); g.addColorStop(1, st.glow + '00'); x.globalAlpha = a; x.fillStyle = g; x.beginPath(); x.arc(0, 0, r, 0, Math.PI * 2); x.fill(); x.globalAlpha = 1; };
+  if (ty === 'fire') { // 진행 방향(+x)으로 뾰족한 불덩이
+    glow(22, 0.8);
+    const g = x.createRadialGradient(4, 0, 1, 0, 0, 13); g.addColorStop(0, '#fffbe8'); g.addColorStop(0.35, '#ffc247'); g.addColorStop(0.75, '#ff6a1f'); g.addColorStop(1, '#d9300f00');
+    x.fillStyle = g; x.beginPath(); x.moveTo(14, 0); x.quadraticCurveTo(4, -10, -12, -4); x.quadraticCurveTo(-6, 0, -12, 4); x.quadraticCurveTo(4, 10, 14, 0); x.fill();
+  } else if (ty === 'water') { // 물방울 (+x가 둥근 앞쪽)
+    glow(18, 0.55);
+    const g = x.createLinearGradient(0, -9, 0, 9); g.addColorStop(0, '#b9e6ff'); g.addColorStop(1, '#1f7fe0');
+    x.fillStyle = g; x.beginPath(); x.moveTo(-13, 0); x.quadraticCurveTo(-2, -9, 6, -7); x.arc(6, 0, 7, -Math.PI / 2, Math.PI / 2); x.quadraticCurveTo(-2, 9, -13, 0); x.fill();
+    x.fillStyle = 'rgba(255,255,255,.85)'; x.beginPath(); x.ellipse(7, -3, 2.6, 1.6, -0.4, 0, Math.PI * 2); x.fill();
+  } else if (ty === 'grass') { // 회전하는 잎
+    glow(16, 0.45);
+    const g = x.createLinearGradient(-12, 0, 12, 0); g.addColorStop(0, '#2f9a4a'); g.addColorStop(1, '#9be86a');
+    x.fillStyle = g; x.beginPath(); x.moveTo(-13, 0); x.quadraticCurveTo(0, -11, 13, 0); x.quadraticCurveTo(0, 11, -13, 0); x.fill();
+    x.strokeStyle = 'rgba(230,255,210,.8)'; x.lineWidth = 1.2; x.beginPath(); x.moveTo(-11, 0); x.lineTo(11, 0); x.stroke();
+  } else if (ty === 'electric') { // 밝은 핵 + 가시 4개
+    glow(20, 0.8);
+    x.fillStyle = '#fff8c8'; x.beginPath();
+    for (let i = 0; i < 8; i++) { const r = i % 2 ? 4 : 14, a = i * Math.PI / 4; x.lineTo(Math.cos(a) * r, Math.sin(a) * r); }
+    x.closePath(); x.fill();
+    x.fillStyle = '#fff'; x.beginPath(); x.arc(0, 0, 4.5, 0, Math.PI * 2); x.fill();
+  } else if (ty === 'psychic') { // 보랏빛 구슬 + 고리
+    glow(20, 0.7);
+    const g = x.createRadialGradient(-3, -3, 1, 0, 0, 10); g.addColorStop(0, '#fff'); g.addColorStop(0.4, '#e3a6ff'); g.addColorStop(1, '#8e3fd6');
+    x.fillStyle = g; x.beginPath(); x.arc(0, 0, 9, 0, Math.PI * 2); x.fill();
+    x.strokeStyle = 'rgba(240,200,255,.8)'; x.lineWidth = 1.5; x.beginPath(); x.ellipse(0, 0, 15, 5, 0.5, 0, Math.PI * 2); x.stroke();
+  } else { // 노말: 흰 파편 별
+    glow(16, 0.5);
+    x.fillStyle = '#f4f6fb'; x.beginPath();
+    for (let i = 0; i < 10; i++) { const r = i % 2 ? 4.5 : 11, a = -Math.PI / 2 + i * Math.PI / 5; x.lineTo(Math.cos(a) * r, Math.sin(a) * r); }
+    x.closePath(); x.fill();
+  }
+  return (_projCache[ty] = c);
 }
 
 // ===== 비주얼 이펙트 =====

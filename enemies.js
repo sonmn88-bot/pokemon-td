@@ -760,24 +760,26 @@ class Enemy {
   }
 
   drawStatusIcons(ctx, drawY) {
-    let icons = [];
-    if (this.slowed > 0)   icons.push('🔵');
-    if (this.stunned > 0)  icons.push('⭐');
-    if (this.burning > 0)  icons.push('🔥');
-    if (this.poisoned > 0) icons.push('☠️');
-    if (this.frozen > 0)   icons.push('❄️');
-    if (this.rageStacks > 0) icons.push('😡');
-    if (icons.length === 0) return;
-
-    ctx.font = '10px serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    const iconY = drawY + this.size * 0.7 + 8;
-    icons.forEach((ic, i) => {
-      ctx.fillText(ic, this.x + (i - (icons.length-1)/2) * 13, iconY);
-    });
+    // v3.6: 이모지 글자(적 100마리면 프레임당 수백 번 fillText) 대신 색 점 — 감속 파랑·스턴 노랑·화상 주황·독 보라·빙결 하늘·분노 빨강
+    const c = STATUS_PIP;
+    let n = 0; const pips = this._pips || (this._pips = []);
+    if (this.slowed > 0) pips[n++] = c.slow;
+    if (this.stunned > 0) pips[n++] = c.stun;
+    if (this.burning > 0) pips[n++] = c.burn;
+    if (this.poisoned > 0) pips[n++] = c.poison;
+    if (this.frozen > 0) pips[n++] = c.freeze;
+    if (this.rageStacks > 0) pips[n++] = c.rage;
+    if (!n) return;
+    const y = drawY + this.size * 0.7 + 7;
+    ctx.save(); ctx.lineWidth = 1.5; ctx.strokeStyle = 'rgba(8,10,16,0.9)';
+    for (let i = 0; i < n; i++) {
+      ctx.beginPath(); ctx.arc(this.x + (i - (n - 1) / 2) * 9, y, 3.4, 0, Math.PI * 2);
+      ctx.fillStyle = pips[i]; ctx.fill(); ctx.stroke();
+    }
+    ctx.restore();
   }
 }
+const STATUS_PIP = { slow:'#5b9dff', stun:'#ffd84a', burn:'#ff7a2e', poison:'#b16cff', freeze:'#7fe3ff', rage:'#ff4d5e' };
 
 // ===== 유틸 =====
 function roundRect(ctx, x, y, w, h, r) {
