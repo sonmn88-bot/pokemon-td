@@ -653,7 +653,7 @@ class GameEngine {
     // v27-46 버그수정: totalSpent가 초기화만 되고 어디서도 증가하지 않아서 판매 환불이 항상 0골드였음
     // (요청8 - "1성/2성 팔았을 때 돈이 너무 적게 들어오는지 체크해봐" → 사실은 0원이었음).
     // 정확한 지출 이력 추적 대신, 신뢰성 있는 등급 기반 고정 판매가로 교체.
-    const refund = (window.SELL_VALUE || {})[t.def?.grade] || 40; // v28: 판매가 단일 기준
+    const refund = window.sellValue ? sellValue(t.def) : 40; // v3.9 히든·★ 반영
     this.addGold(refund);
     this.spawnFloatingText(`+${refund}g`, slot.x, slot.y, '#34d399');
     this.towers = this.towers.filter(x=>x!==t);
@@ -983,7 +983,14 @@ class GameEngine {
     const W = this.width;
     const bw = Math.min(W * 0.5, 400);
     const bx = (W - bw) / 2;
-    const by = 60; // HUD 아래
+    // v3.9: 스킵(다음 웨이브) 버튼 아래로 내려서 안 겹치게 (위치는 2초마다만 측정)
+    const now = performance.now();
+    if (!this._bossBarAt || now - this._bossBarAt > 2000) {
+      this._bossBarAt = now;
+      const wb = document.getElementById('btn-wave'), cv = this.canvas || document.getElementById('game-canvas');
+      this._bossBarY = wb && cv ? Math.round(wb.getBoundingClientRect().bottom - cv.getBoundingClientRect().top + 30) : 60; // 이름 줄(18px)까지 스킵 버튼 아래로
+    }
+    const by = this._bossBarY || 60;
     const bh = 14;
     const ratio = Math.max(0, boss.hp / boss.maxHp);
     const isRage = ratio < 0.5;
@@ -999,7 +1006,7 @@ class GameEngine {
     ctx.font='bold 11px Pretendard,-apple-system,sans-serif';
     ctx.fillStyle='#fff'; ctx.textAlign='center';
     ctx.shadowColor='rgba(0,0,0,0.9)'; ctx.shadowBlur=0; /* v3.6 발열: 번짐 제거 */
-    ctx.fillText(`${boss.def.emoji} ${boss.name}`, bx+bw/2, by-4);
+    ctx.fillText(`${boss.name}`, bx+bw/2, by-4); // v3.9 이모지 제거
 
     // HP 바 배경
     ctx.fillStyle='rgba(40,20,20,0.8)';

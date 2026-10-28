@@ -107,7 +107,7 @@ Object.assign(App.prototype, {
       const evolveId = [].concat(window.MERGE_EVOLUTION?.[t._gachaId] || [])[0];
       const evolveDef = evolveId ? window.GachaTowerDefs?.[evolveId] : null;
       const synergyInfo = ''; // v28 세션E: 시너지 제거됨
-      const refund = (window.SELL_VALUE || {})[def.grade] || 40; // v28: 판매가 단일 기준
+      const refund = window.sellValue ? sellValue(def) : 40; // v3.9 히든·★ 반영
 
       // v27: 스탯 옆 (+%) 강화 표시 + 다음 강화 힌트
       const dmgPct = Math.round(((t.buffDmgMul||1) - 1) * 100);
@@ -918,7 +918,8 @@ Object.assign(App.prototype, {
       chip.textContent = t.tier;
       chip.title = `${t.label} (체력×${t.hpMul}, 보상×${t.rewardMul})`;
       chip.style.cssText = 'width:22px;height:22px;border-radius:6px;border:1.5px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.4);color:#fff;font-size:11px;cursor:pointer;padding:0;';
-      chip.addEventListener('click', () => { this._bossSummonTier = t.tier; this._updateBossSummonUI(); });
+      chip.addEventListener('click', () => { this._bossSummonTier = t.tier; this._updateBossSummonUI();
+        const w = this.engine?.currentWave || 0; if (w < (t.minWave || 1)) this.showWaveAnnounce(`${t.label}: 웨이브 ${t.minWave}부터 소환 가능`, '#ff8da1'); });
       tierRow.appendChild(chip);
     }
     bar.appendChild(tierRow);
@@ -933,11 +934,12 @@ Object.assign(App.prototype, {
     const fold = document.createElement('button');
     fold.className = 'bs-fold';
     fold.setAttribute('aria-label', '보스 소환 접기/펼치기');
-    const setFold = f => { bar.classList.toggle('folded', f); fold.innerHTML = f ? `${ICON('monster', 16)}<span>보스</span>` : ICON('close', 14); try { localStorage.setItem('pokemontd_bsfold', f ? '1' : '0'); } catch (_) {} };
+    const setFold = f => { bar.classList.toggle('folded', f); fold.innerHTML = f ? `${ICON('monster', 16)}<span>보스</span><small class="bs-cd"></small>` : ICON('close', 14); try { localStorage.setItem('pokemontd_bsfold', f ? '1' : '0'); } catch (_) {} };
     fold.addEventListener('click', () => setFold(!bar.classList.contains('folded')));
     bar.prepend(fold);
     let f0 = matchMedia('(max-width:560px)').matches; try { const v = localStorage.getItem('pokemontd_bsfold'); if (v) f0 = v === '1'; } catch (_) {}
     setFold(f0);
+    fold.addEventListener('click', () => this._updateBossSummonUI()); // 펼침/접힘 후 남은 시간 즉시 반영
 
     this._updateBossSummonUI();
   }

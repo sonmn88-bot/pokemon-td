@@ -108,11 +108,12 @@ function towerStack(t) { return (t && t.def && t.def._stack) || 1; }
 // v3.8 먹이기 확장: 같은 종이 거의 안 모여 메가 표시만 있고 못 먹이던 문제 + 먹이 없는 레전드가 버려지던 문제
 //   대상: 에픽·레전드 전부 + 메가. 재료: 같은 종 우선, 없으면 같은 타입의 에픽 이상(유니크·메가 제외)
 const FEED_GRADES = { epic: 1, legend: 1 };
-function _feedOk(t) { return t && t.def && (t.def.mega || FEED_GRADES[t.def.grade]) && towerStack(t) < STACK_MAX; }
+function _feedOk(t) { return t && t.def && (t.def.mega || t.def.hidden || FEED_GRADES[t.def.grade]) && towerStack(t) < STACK_MAX; }
 function _feedMats(app, t) {
   const sameId = t.def.mega ? t.def.megaOf : t.def.id;
   const inv = app._inventory || [];
   const same = inv.filter(d => d.id === sameId);
+  if (t.def.hidden) return same.concat(inv.filter(d => d.grade === 'legend')); // 히든: 같은 종(거의 없음) 또는 레전드 아무거나
   if (t.def.mega || (window.MEGA_OF || {})[t.def.id] || t.def.grade === 'legend') return same; // 메가 계열·레전드는 무조건 같은 종만
   const alt = inv.filter(d => d.id !== sameId && d.type === t.def.type && d.grade === 'epic' && !d.mega && !(window.MEGA_OF || {})[d.id]); // 일반 에픽만 같은 타입 에픽으로
   return same.concat(alt.sort((x, y) => (x.grade === 'epic' ? 0 : 1) - (y.grade === 'epic' ? 0 : 1))); // 에픽부터 소모
@@ -266,10 +267,10 @@ Object.assign(App.prototype, {
     if (!t || !t.def) return '';
     const st = towerStack(t), feedN = canFeed(this, t);
     const isBase = !!window.MEGA_OF[t.def.id];
-    if (!isBase && !t.def.mega && !FEED_GRADES[t.def.grade]) return '';
+    if (!isBase && !t.def.mega && !t.def.hidden && !FEED_GRADES[t.def.grade]) return '';
     let h = `<div class="mg-stack">${'★'.repeat(st)}${'☆'.repeat(STACK_MAX - st)} <small>각성 ★${st} · 공격력 +${Math.round((st - 1) * STACK_BONUS * 100)}%</small></div>`;
-    const megaLine = isBase || t.def.mega || t.def.grade === 'legend', feedName = t.def.mega ? (GachaTowerDefs[t.def.megaOf] || {}).name : t.def.name;
-    if (st < STACK_MAX) h += `<button class="tp-btn ${feedN ? 'tp-upgrade' : ''}" data-action="feed" style="grid-column:1 / -1" ${feedN ? '' : 'disabled'}>먹이기 · ${megaLine ? `보관함의 ${feedName}` : '같은 종이나 같은 타입 에픽↑'} ${feedN}마리</button>`;
+    const megaLine = (isBase || t.def.mega || t.def.grade === 'legend') && !t.def.hidden, feedName = t.def.mega ? (GachaTowerDefs[t.def.megaOf] || {}).name : t.def.name;
+    if (st < STACK_MAX) h += `<button class="tp-btn ${feedN ? 'tp-upgrade' : ''}" data-action="feed" style="grid-column:1 / -1" ${feedN ? '' : 'disabled'}>먹이기 · ${t.def.hidden ? '보관함의 레전드' : megaLine ? `보관함의 ${feedName}` : '같은 종이나 같은 타입 에픽'} ${feedN}마리</button>`;
     if (megaLine && !feedN && st < STACK_MAX) h += `<div class="mg-hint">${feedName}을(를) 뽑거나 합성하면 보관함에 쌓여요 (이 타워가 필드에 있으면 같은 등급 결과의 25%가 ${feedName})</div>`;
     if (isBase) {
       const stones = this.engine._megaStones || 0;

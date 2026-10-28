@@ -1589,3 +1589,9 @@ img.title-pkm.lead { width:88px; height:88px; }
 #wave-preview { position:absolute; left:50%; bottom:calc(var(--bar-h,82px) + 140px); transform:translateX(-50%); z-index:19; display:flex; gap:4px; align-items:center;
   background:rgba(14,16,22,.85); border:1px solid var(--border); border-radius:10px; padding:5px 10px; font-size:11px; font-weight:700; color:var(--text-mid); pointer-events:none; }
 #wave-preview span { margin-right:4px; }
+/* v3.9 보스 소환: 잠김 상태도 누를 수 있게(이유 안내), 접힌 버튼 아래 남은 시간 */
+#boss-summon-btn.locked { opacity:.55; }
+.bs-fold { flex-direction:column; gap:0; line-height:1.1; }
+#boss-summon-bar.folded .bs-fold { flex-direction:row; flex-wrap:wrap; justify-content:center; max-width:72px; }
+.bs-cd { display:block; width:100%; text-align:center; font:700 10px var(--font-px); color:var(--text-mid); }
+.bs-cd:empty { display:none; }

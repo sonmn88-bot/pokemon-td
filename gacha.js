@@ -1097,7 +1097,9 @@ window._createGachaTower=_createGachaTower;
 window.MissionDefs=MissionDefs;
 window.MissionTracker=MissionTracker;
 window.MERGE_EVOLUTION=MERGE_EVOLUTION;
-window.SELL_VALUE={ normal:40, rare:110, epic:300, legend:800, unique:2000 }; // v28: 판매가 단일 기준 (패널·엔진·합성연구소 공통)
+window.SELL_VALUE={ normal:40, rare:110, epic:600, legend:2000, unique:4000 }; // v3.9: 에픽·레전드·유니크 판매가 상향 (도박 기대 판매가 ≈520 < 2000이라 되팔기 이득 없음)
+// 판매가: 등급 기준 × 히든 2배 × 먹이로 올린 ★당 +50%
+window.sellValue = def => Math.round(((window.SELL_VALUE[def && def.grade] || 40) * (def && def.hidden ? 2 : 1)) * (1 + 0.5 * (((def && def._stack) || 1) - 1)));
 window.NEXT_GRADE=NEXT_GRADE; window.MERGE_ORDER=MERGE_ORDER; window.rollRandomMerge=rollRandomMerge; window.RECIPES=RECIPES;
 window.TypeUpgrades=TypeUpgrades;
 window.TypeUpgradeLevels=TypeUpgradeLevels;

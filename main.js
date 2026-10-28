@@ -1420,7 +1420,8 @@ class App {
     const tierDef = BOSS_TIERS.find(t => t.tier === tier);
     if (!e || !tierDef) return;
     if (e.state !== 'wave') { this.showWaveAnnounce('웨이브 진행 중에만 소환 가능', '#ff5c7a'); return; }
-    if ((e._bossSummonCooldown || 0) > 0) return;
+    if (e.currentWave < tierDef.minWave) { this.showWaveAnnounce(`${tierDef.label}은(는) 웨이브 ${tierDef.minWave}부터 소환 가능 (지금 ${e.currentWave})`, '#ff5c7a'); return; } // v3.9 열리는 웨이브 먼저 안내
+    if ((e._bossSummonCooldown || 0) > 0) { this.showWaveAnnounce(`보스 재사용 대기 ${Math.ceil(e._bossSummonCooldown)}초 남음`, '#ff5c7a'); return; }
     // v27-28: 보스 티어별 최소 웨이브 요구 (요청: 초반부터 뮤츠까지 쉽게 소환/처치되던 문제)
     if (e.currentWave < tierDef.minWave) {
       this.showWaveAnnounce(`${tierDef.label}은(는) 웨이브 ${tierDef.minWave} 이후에 소환 가능`, '#ff5c7a');
@@ -1446,15 +1447,17 @@ class App {
     const cd = this.engine._bossSummonCooldown || 0;
     const tierDef = BOSS_TIERS.find(t => t.tier === this._bossSummonTier);
     if (cd > 0) {
-      btn.disabled = true;
+      btn.disabled = false; btn.classList.add('locked'); // v3.9: 눌러도 이유를 알려주게 (비활성 대신 잠금 표시)
       btn.textContent = `재사용 대기 ${Math.ceil(cd)}초`;
     } else if (this.engine.currentWave < (tierDef.minWave || 1)) {
-      btn.disabled = true;
+      btn.disabled = false; btn.classList.add('locked');
       btn.textContent = `웨이브 ${tierDef.minWave} 이후 소환가능`;
     } else {
-      btn.disabled = false;
+      btn.disabled = false; btn.classList.remove('locked');
       btn.textContent = `${tierDef.label} 소환`;
     }
+    const fcd = bar.querySelector('.bs-cd'); // 접힌 버튼 아래 남은 시간
+    if (fcd) fcd.textContent = cd > 0 ? `${Math.ceil(cd)}초` : '';
     // v3.8 소환 가능 표시: 접힌 버튼이 빛나고, 가능해지는 순간 한 번 알림
     const ready = cd <= 0 && BOSS_TIERS.some(t => this.engine.currentWave >= (t.minWave || 1));
     bar.classList.toggle('ready', ready);

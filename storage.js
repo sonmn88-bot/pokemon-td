@@ -192,7 +192,7 @@ Object.assign(App.prototype, {
       const sameGrade = n === 3 && selected.every(m => m.def.grade === selected[0].def.grade);
       const canRandom = sameGrade && !!window.NEXT_GRADE[selected[0].def.grade];
       const evoId = n === 3 && selected.every(m => m.def.id === selected[0].def.id) ? window.MERGE_EVOLUTION[selected[0].def.id] : null;
-      const sellSum = selected.reduce((a, m) => a + (window.SELL_VALUE[m.def.grade] || 0), 0);
+      const sellSum = selected.reduce((a, m) => a + window.sellValue(m.def), 0);
       const nextG = window.NEXT_GRADE[ui.grade] ? window.GRADES[window.NEXT_GRADE[ui.grade]] : null;
 
       overlay.innerHTML = `
