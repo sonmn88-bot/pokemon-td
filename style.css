@@ -1564,3 +1564,10 @@ img.title-pkm.lead { width:88px; height:88px; }
 .lr-row b { font:700 16px var(--font-px); color:var(--text-hi); margin-right:2px; }
 .lr-mvp { display:inline-flex; align-items:center; gap:4px; color:var(--text-hi); font-weight:700; }
 .lr-mvp i { font-style:normal; font-size:9px; font-weight:800; color:var(--accent-yel); }
+/* 타워 정보창 v3.6b: 합치기 제거 후 배열 — 이름줄에 등급·역할, 계산식은 맨 아래 작게, 버튼 2열 */
+.tp-grade { display:flex; flex-wrap:wrap; align-items:center; gap:0 6px; }
+.tp-grade i { font-style:normal; font-weight:600; color:var(--text-mid); }
+.tp-grade i::before { content:'·'; margin-right:6px; color:var(--text-lo); }
+.tp-hint { padding:8px 10px; border-radius:10px; background:rgba(106,168,255,.08); }
+.tp-calc { border-top:none; padding-top:0; }
+.tp-flavor { font-style:italic; padding-top:6px; border-top:1px solid var(--border); }

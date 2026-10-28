@@ -141,7 +141,7 @@ Object.assign(App.prototype, {
           <span class="tp-thumb">${window.PKM ? PKM(def, 44) : ''}</span>
           <div class="tp-title">
             <b class="tower-panel-name">${def.name}</b>
-            <span class="tp-grade">${'★'.repeat(grade.stars)} ${def.mega ? '메가' : grade.name}</span>
+            <span class="tp-grade">${'★'.repeat(grade.stars)} ${def.mega ? '메가' : grade.name}${def.desc ? `<i>${def.desc}</i>` : ''}</span>
           </div>
         </div>
         <div class="tp-stats">
@@ -150,22 +150,13 @@ Object.assign(App.prototype, {
           <div><small>${ICON('bolt', 13)}초당 피해</small><b>${dps}</b></div>
           <div><small>${ICON('range', 13)}사거리</small><b>${Math.round(t.range)}${rangeTag}</b></div>
         </div>
-        ${def.desc ? `<div class="tp-desc">${def.desc}</div>` : ''}
         ${upgradeHint}
-        ${flavorTag}
         ${breakdown}
-        <div class="tp-merge ${canMerge ? 'ready' : ''}">
-          ${canMerge
-            ? `합치기 가능 ${sameCount}/3${evolveDef ? ' → <b>' + evolveDef.name + '</b>' : ''}`
-            : `같은 타워 ${sameCount}/3${evolveDef ? ' · 목표 <b>' + evolveDef.name + '</b>' : ''}`}
-        </div>
+        ${flavorTag}
         ${this._megaPanelHtml ? `<div class="mega-box">${this._megaPanelHtml(t)}</div>` : ''}
         <div class="tower-panel-btns">
-          ${canMerge
-            ? `<button class="tp-btn tp-upgrade" data-action="merge">${ICON('sparkle', 15)}합치기 진화</button>`
-            : `<button class="tp-btn tp-maxed" disabled>합치기 ${sameCount}/3</button>`}
           <button class="tp-btn tp-recall" data-action="recall">${ICON('bag', 15)}보관함으로</button>
-          ${window.canUseTM && window.canUseTM(t) ? `<button class="tp-btn" data-action="tm" title="태그 1개를 랜덤으로 배움 (타워당 1회)">${ICON('disc', 15)}기술머신 ${window.TM_COST}</button>` : ''}
+          ${window.canUseTM && window.canUseTM(t) ? `<button class="tp-btn" data-action="tm" style="grid-column:1 / -1" title=""태그 1개를 랜덤으로 배움 (타워당 1회)">${ICON('disc', 15)}기술머신 ${window.TM_COST}</button>` : ''}
           <button class="tp-btn tp-sell" data-action="sell">${ICON('sell', 15)}판매 +${refund}</button>
         </div>
       `;

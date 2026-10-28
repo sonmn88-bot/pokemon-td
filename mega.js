@@ -161,7 +161,7 @@ Object.assign(App.prototype, {
     e._runEmphasis = pick.map(p => p.key);
     e._runEmphasisInfo = pick;
     this._refreshMegaHud();
-    setTimeout(() => this.showWaveAnnounce(`이번 판 몬스터: ${pick.map(p => p.label).join(' · ')} 많음<br><span style="font-size:0.65em">추천 메가: ${pick.map(p => p.hint).join(' / ')}</span>`, '#6aa8ff'), 3200);
+    setTimeout(() => this.showWaveAnnounce(`이번 판 몬스터: ${pick.map(p => p.label.replace(/^\S+\s+/, '')).join(' · ')} 많음<br><span style="font-size:0.65em">추천 메가: ${pick.map(p => p.hint).join(' / ')}</span>`, '#6aa8ff'), 3200);
     // 보스 처치 → 메가스톤 / 웨이브 클리어 → 영웅 아이템
     const origDie = e._onEnemyDie.bind(e);
     e._onEnemyDie = (en) => { origDie(en); if (en._megaDrop) this._rollMegaStone(en); };
