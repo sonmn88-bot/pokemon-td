@@ -890,6 +890,16 @@ Object.assign(App.prototype, {
     summonBtn.addEventListener('click', () => this._summonBoss(this._bossSummonTier));
     bar.appendChild(summonBtn);
 
+    // v3.6: 필드를 가리지 않게 접기 (접힌 상태 기억)
+    const fold = document.createElement('button');
+    fold.className = 'bs-fold';
+    fold.setAttribute('aria-label', '보스 소환 접기/펼치기');
+    const setFold = f => { bar.classList.toggle('folded', f); fold.innerHTML = f ? `${ICON('monster', 16)}<span>보스</span>` : ICON('close', 14); try { localStorage.setItem('pokemontd_bsfold', f ? '1' : '0'); } catch (_) {} };
+    fold.addEventListener('click', () => setFold(!bar.classList.contains('folded')));
+    bar.prepend(fold);
+    let f0 = matchMedia('(max-width:560px)').matches; try { const v = localStorage.getItem('pokemontd_bsfold'); if (v) f0 = v === '1'; } catch (_) {}
+    setFold(f0);
+
     this._updateBossSummonUI();
   }
 });

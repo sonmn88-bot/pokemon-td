@@ -715,26 +715,46 @@ class GameEngine {
     }
     if (!entry.ready) return null;
     if (!entry.pattern) {
-      const sz = entry.images[0].naturalWidth || 512;
-      const cols = entry.images.length >= 2 ? 2 : 1;
-      const rows = Math.ceil(entry.images.length / cols);
-      const mc = document.createElement('canvas');
-      mc.width = sz * cols; mc.height = sz * rows;
-      const mctx = mc.getContext('2d');
-      entry.images.forEach((im, i) => {
-        const x0 = (i % cols) * sz, y0 = Math.floor(i / cols) * sz;
-        const fx = (i * 7) % 3 === 0, fy = (i * 11) % 4 === 0;
-        mctx.save();
-        mctx.translate(x0 + (fx ? sz : 0), y0 + (fy ? sz : 0));
-        mctx.scale(fx ? -1 : 1, fy ? -1 : 1);
-        mctx.drawImage(im, 0, 0, sz, sz);
-        mctx.restore();
+      // v3.6: 서로 다른 타일을 2×2로 붙이면 경계가 네모로 보였음 → 텍스처마다 거울 타일(이음매 없음) 패턴을 만들고,
+      //       기본은 첫 텍스처, 나머지는 _drawBgCached에서 부드러운 얼룩으로 섞음
+      entry.patterns = entry.images.map(im => {
+        const sz = im.naturalWidth || 512, mc = document.createElement('canvas');
+        mc.width = mc.height = sz * 2;
+        const m = mc.getContext('2d');
+        for (const [fx, fy] of [[0,0],[1,0],[0,1],[1,1]]) {
+          m.save(); m.translate(fx ? sz * 2 : 0, fy ? sz * 2 : 0); m.scale(fx ? -1 : 1, fy ? -1 : 1);
+          m.drawImage(im, 0, 0, sz, sz); m.restore();
+        }
+        const pat = ctx.createPattern(mc, 'repeat');
+        if (pat && pat.setTransform) { try { pat.setTransform(new DOMMatrix().scale(worldTileSize / sz)); } catch (e) {} }
+        return pat;
       });
-      const pat = ctx.createPattern(mc, 'repeat');
-      if (pat && pat.setTransform) { try { pat.setTransform(new DOMMatrix().scale(worldTileSize / sz)); } catch (e) {} }
-      entry.pattern = pat;
+      entry.pattern = entry.patterns[0];
     }
     return entry.pattern;
+  }
+
+  // v3.6: 다른 텍스처를 가장자리가 흐린 큰 얼룩으로 섞고, 명암 얼룩으로 단조로움 제거 (맵 이름 시드라 매번 같은 모양)
+  _blendBgPatches(bctx, pats, seedStr) {
+    let seed = 0; for (const ch of seedStr) seed = (seed * 31 + ch.charCodeAt(0)) >>> 0;
+    const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
+    const W = this.worldWidth, H = this.worldHeight;
+    const n = Math.round(W * H / 70000);
+    for (let i = 0; i < n; i++) {
+      const r = 90 + rnd() * 170, x = rnd() * W, y = rnd() * H;
+      const useTex = pats.length > 1 && rnd() < 0.7;
+      const oc = document.createElement('canvas'); oc.width = oc.height = Math.ceil(r * 2);
+      const o = oc.getContext('2d');
+      o.translate(-(x - r), -(y - r)); // 패턴 좌표를 월드 기준으로 맞춤
+      o.fillStyle = useTex ? pats[1 + Math.floor(rnd() * (pats.length - 1))] : (rnd() < 0.5 ? 'rgba(0,0,0,0.5)' : 'rgba(255,240,200,0.35)');
+      o.fillRect(x - r, y - r, r * 2, r * 2);
+      o.setTransform(1, 0, 0, 1, 0, 0);
+      o.globalCompositeOperation = 'destination-in';
+      const g = o.createRadialGradient(r, r, r * 0.15, r, r, r);
+      g.addColorStop(0, `rgba(0,0,0,${useTex ? 0.85 : 0.35})`); g.addColorStop(1, 'rgba(0,0,0,0)');
+      o.fillStyle = g; o.fillRect(0, 0, r * 2, r * 2);
+      bctx.drawImage(oc, x - r, y - r);
+    }
   }
 
   _drawBgCached(ctx) {
@@ -756,6 +776,8 @@ class GameEngine {
         const pat = this._getMosaicPattern(bctx, map.name + '_bg', map.bgTextures, map.bgTileSize || 300);
         bctx.fillStyle = pat || map.bgColor;
         bctx.fillRect(0, 0, this.worldWidth, this.worldHeight);
+        const ent = this._texCache[map.name + '_bg_' + (map.bgTileSize || 300)];
+        if (pat && ent && ent.patterns) this._blendBgPatches(bctx, ent.patterns, map.name);
         bctx.fillStyle = 'rgba(0,0,0,0.30)'; // 게임 톤(어두운)과 어우러지게
         bctx.fillRect(0, 0, this.worldWidth, this.worldHeight);
       } else if (map.bgImage) {

@@ -1478,3 +1478,44 @@ img.title-pkm.lead { width:88px; height:88px; }
 .gacha-btn .tower-btn-cost { font-family:var(--font-px); font-size:11px; }
 .gacha-btn .hotkey-badge { display:none; }
 @media (hover:hover) { .gacha-btn .hotkey-badge { display:block; } }
+
+/* --- 알림 띠 · 보스 컷인 (v3.6) --- */
+.wave-announce.band { --ac:#ffc24b; left:50%; transform:translateX(-50%); max-width:calc(100% - 32px); width:max-content;
+  padding:8px 16px 8px 14px; border-radius:12px; background:rgba(14,16,22,.9); border:1px solid rgba(255,255,255,.08);
+  box-shadow:0 8px 20px rgba(0,0,0,.35), inset 3px 0 0 var(--ac); color:var(--text-hi) !important;
+  font-family:var(--font-ui); font-size:14px; font-weight:700; line-height:1.45; letter-spacing:0; text-shadow:none;
+  word-break:keep-all; text-align:left; transition:top .2s var(--ease-out); animation:annBand 2.2s var(--ease-out) forwards; }
+@keyframes annBand { 0% { opacity:0; transform:translateX(-50%) translateY(-8px); } 10%,80% { opacity:1; transform:translateX(-50%); } 100% { opacity:0; transform:translateX(-50%) translateY(-4px); } }
+.boss-cutin { position:absolute; inset:0; z-index:110; pointer-events:none; display:flex; align-items:center; }
+.bc-band { position:relative; width:100%; display:flex; align-items:center; gap:14px; padding:14px 20px;
+  background:linear-gradient(90deg, rgba(60,8,20,.94), rgba(18,8,12,.9) 70%, rgba(18,8,12,0));
+  border-top:1px solid rgba(255,92,122,.5); border-bottom:1px solid rgba(255,92,122,.5);
+  animation:bcBand 2.8s var(--ease-out) forwards; }
+.boss-cutin.king .bc-band { animation-duration:4.5s; background:linear-gradient(90deg, rgba(10,30,70,.95), rgba(8,12,24,.9) 70%, rgba(8,12,24,0)); border-color:rgba(106,168,255,.5); }
+.bc-img { width:84px; height:84px; object-fit:contain; filter:drop-shadow(0 6px 10px rgba(0,0,0,.6)); animation:bcImg .5s var(--ease-out) both; }
+.bc-text { display:flex; flex-direction:column; gap:3px; min-width:0; }
+.bc-text small { font-size:11px; font-weight:800; letter-spacing:.12em; color:#ff8da1; }
+.boss-cutin.king .bc-text small { color:#9cc4ff; }
+.bc-text b { font-size:24px; font-weight:900; color:#fff; letter-spacing:-0.02em; }
+.bc-text i { font-size:12px; color:var(--text-mid); }
+.bc-text em { font-style:normal; font-size:11px; color:var(--text-lo); }
+.bc-weak { align-self:flex-start; margin-top:2px; font-size:11.5px; font-weight:700; color:var(--text-mid); padding:2px 8px; border-radius:6px; background:rgba(255,255,255,.08); }
+.bc-weak b { color:var(--wc); }
+@keyframes bcBand { 0% { opacity:0; transform:translateX(-24px); } 12%,82% { opacity:1; transform:none; } 100% { opacity:0; transform:translateX(12px); } }
+@keyframes bcImg { from { opacity:0; transform:translateX(-30px) scale(.95); } to { opacity:1; transform:none; } }
+@media (prefers-reduced-motion: reduce) { .bc-band, .bc-img, .wave-announce.band { animation:none; } }
+
+/* --- 필드 가리는 패널 정리 (v3.6) --- */
+#boss-summon-bar { background:rgba(14,16,22,.88) !important; border-color:rgba(255,92,122,.3) !important; border-radius:12px !important; }
+.bs-fold { align-self:flex-end; display:inline-flex; align-items:center; justify-content:center; gap:4px; min-width:28px; height:24px; padding:0 6px;
+  border:none; border-radius:8px; background:rgba(255,255,255,.06); color:var(--text-mid); font-size:11px; font-weight:700; cursor:pointer; }
+#boss-summon-bar.folded { padding:3px !important; }
+#boss-summon-bar.folded > :not(.bs-fold) { display:none !important; }
+#boss-summon-bar.folded .bs-fold { min-height:40px; padding:0 10px; color:#ff8da1; background:transparent; }
+.spell-btn { background:rgba(14,16,22,.85); border:1px solid rgba(255,255,255,.1); border-radius:10px; box-shadow:0 4px 10px rgba(0,0,0,.3); }
+@media (max-width:560px) {
+  .spell-btn { min-width:40px; min-height:40px; justify-content:center; padding:4px 6px; }
+  .spell-btn .spell-name { display:none; }
+  .spell-btn .spell-emoji .ic { width:20px; height:20px; }
+}
+.bc-text .bc-weak b { font-size:inherit; font-weight:800; letter-spacing:0; }

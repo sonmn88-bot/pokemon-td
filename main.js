@@ -1065,14 +1065,16 @@ class App {
         if (di >= 0) {
           const weakType = window.TYPE_CYCLE[(di - 1 + window.TYPE_CYCLE.length) % window.TYPE_CYCLE.length];
           const info = window.TYPES?.[weakType];
-          if (info) weakHint = `<br><span style="font-size:0.75em;color:${info.color}">💡 ${info.emoji}${info.name} 타입에 약함!</span>`;
+          if (info) weakHint = `<span class="bc-weak" style="--wc:${info.color}">약점 <b>${info.name}</b></span>`;
         }
       }
       const el = document.createElement('div');
-      el.className = 'wave-announce boss';
-      el.innerHTML = boss._isKing
-        ? `👑 ${boss.def.emoji} 바다의 신 루기아 (왕) 등장!<br><span style="font-size:0.85em;font-style:italic">"…감히 내 영역에 발을 들이다니."</span>${weakHint}<br><span style="font-size:0.65em">⚠️ 이후로는 존 이동 없이 이 자리에서 무한 강화 모드로 진입합니다</span>`
-        : `${boss.def.emoji} ${boss.name} 등장!<br><span style="font-size:0.7em">⚠️ 보스</span>${weakHint}`;
+      el.className = 'boss-cutin' + (boss._isKing ? ' king' : '');
+      const bImg = (typeof EnemySpriteImages !== 'undefined') && EnemySpriteImages[boss.typeId];
+      el.innerHTML = `<div class="bc-band">${bImg ? `<img class="bc-img" src="${bImg}" alt="">` : ''}
+        <div class="bc-text"><small>${boss._isKing ? '왕 등장' : '보스 등장'}</small><b>${boss._isKing ? '바다의 신 루기아' : boss.name}</b>
+        ${boss._isKing ? '<i>"…감히 내 영역에 발을 들이다니."</i>' : ''}${weakHint}
+        ${boss._isKing ? '<em>이후 존 이동 없이 무한 강화 모드</em>' : ''}</div></div>`;
       document.getElementById('game-screen').appendChild(el);
       setTimeout(() => el.remove(), boss._isKing ? 4500 : 2800);
       this.engine.triggerScreenShake(boss._isKing ? 16 : 10, boss._isKing ? 0.6 : 0.4);
@@ -1758,8 +1760,8 @@ class App {
       clearTimeout(old.timer);
     }
     const el = document.createElement('div');
-    el.className = 'wave-announce';
-    el.style.color = color;
+    el.className = 'wave-announce band';
+    el.style.setProperty('--ac', color || '#ffc24b');
     if (/<(br|span|b)\b/.test(text)) el.innerHTML = text; else el.textContent = text; // 내부 문구만 들어옴 (줄바꿈·작은 글씨 지원)
     document.getElementById('game-screen').appendChild(el);
     const entry = { el, timer: null };
@@ -1777,8 +1779,9 @@ class App {
   _repositionAnnounces() {
     if (!this._activeAnnounces) return;
     this._activeAnnounces.forEach((entry, i) => {
-      const offset = (i - (this._activeAnnounces.length - 1) / 2) * 46;
-      entry.el.style.top = `calc(50% + ${offset}px)`;
+      // v3.6: 화면 가운데 큰 글씨 대신 HUD 아래 얇은 띠로 쌓음 (최신이 위)
+      const n = this._activeAnnounces.length - 1 - i;
+      entry.el.style.top = `calc(var(--hud-h) + 70px + ${n * 40}px)`;
     });
   }
 
@@ -1822,7 +1825,7 @@ class App {
         const cnt = d ? this.engine.towers.filter(t => t._gachaId === k).length : 1;
         const pct = Math.round(r.dmg / total * 100);
         const col = d ? window.GRADES[d.grade].color : '#ffc24b';
-        return `<div class="rs-row"><span class="rs-rank">${i + 1}</span>${d ? PKM(d, 26) : '⚡'}<span class="rs-name" style="color:${col}">${nm}${cnt > 1 ? ` ×${cnt}` : ''}</span>
+        return `<div class="rs-row"><span class="rs-rank">${i + 1}</span>${d ? PKM(d, 26) : ICON('medal', 22)}<span class="rs-name" style="color:${col}">${nm}${cnt > 1 ? ` ×${cnt}` : ''}</span>
           <span class="rs-bar"><i style="width:${pct}%;background:${col}"></i></span><span class="rs-num">${fmt(r.dmg)} · ${pct}% · ${r.kills}킬</span></div>`;
       }).join('');
       const varietyCount = new Set(this.engine.towers.map(t => t.def?.type)).size;
