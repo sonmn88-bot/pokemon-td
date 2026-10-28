@@ -113,6 +113,7 @@ function _feedMats(app, t) {
   const sameId = t.def.mega ? t.def.megaOf : t.def.id;
   const inv = app._inventory || [];
   const same = inv.filter(d => d.id === sameId);
+  if (t.def.mega || (window.MEGA_OF || {})[t.def.id]) return same; // 메가 계열은 무조건 같은 종만
   const alt = inv.filter(d => d.id !== sameId && d.type === t.def.type && FEED_GRADES[d.grade] && !d.mega && !(window.MEGA_OF || {})[d.id]);
   return same.concat(alt.sort((x, y) => (x.grade === 'epic' ? 0 : 1) - (y.grade === 'epic' ? 0 : 1))); // 에픽부터 소모
 }
@@ -158,7 +159,7 @@ const HERO_ITEMS = {
   flareon: { item:'빛나는 비늘', icon:'fire', shine:true, desc:'크리티컬 +15% · 기본공격 광역' },
 };
 
-window.MEGA = { STACK_BONUS, STACK_MAX, MEGA_NEED_STACK, towerStack, canFeed, feedTower, canMega, megaStoneChance, RUN_EMPHASIS, HERO_ITEMS };
+window.MEGA = { STACK_BONUS, STACK_MAX, MEGA_NEED_STACK, towerStack, canFeed, feedTower, feedMats: (app, t) => (_feedOk(t) ? _feedMats(app, t) : []), canMega, megaStoneChance, RUN_EMPHASIS, HERO_ITEMS };
 
 // ================= 게임 연동 (App 확장) =================
 Object.assign(App.prototype, {
@@ -267,8 +268,9 @@ Object.assign(App.prototype, {
     const isBase = !!window.MEGA_OF[t.def.id];
     if (!isBase && !t.def.mega && !FEED_GRADES[t.def.grade]) return '';
     let h = `<div class="mg-stack">${'★'.repeat(st)}${'☆'.repeat(STACK_MAX - st)} <small>각성 ★${st} · 공격력 +${Math.round((st - 1) * STACK_BONUS * 100)}%</small></div>`;
-    if (feedN) h += `<button class="tp-btn tp-upgrade" data-action="feed" style="grid-column:1 / -1">먹이기 · 같은 종이나 같은 타입 에픽↑ (보관함 ${feedN})</button>`;
-    else if (st < STACK_MAX) h += `<div class="mg-hint">먹이: 같은 종 또는 같은 타입 에픽 이상을 보관함에 두세요</div>`;
+    const megaLine = isBase || t.def.mega, feedName = t.def.mega ? (GachaTowerDefs[t.def.megaOf] || {}).name : t.def.name;
+    if (st < STACK_MAX) h += `<button class="tp-btn ${feedN ? 'tp-upgrade' : ''}" data-action="feed" style="grid-column:1 / -1" ${feedN ? '' : 'disabled'}>먹이기 · ${megaLine ? `보관함의 ${feedName}` : '같은 종이나 같은 타입 에픽↑'} ${feedN}마리</button>`;
+    if (megaLine && !feedN && st < STACK_MAX) h += `<div class="mg-hint">${feedName}을(를) 뽑거나 합성하면 보관함에 쌓여요 (이 타워가 필드에 있으면 에픽 결과의 25%가 ${feedName})</div>`;
     if (isBase) {
       const stones = this.engine._megaStones || 0;
       for (const mid of window.MEGA_OF[t.def.id]) {

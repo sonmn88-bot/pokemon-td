@@ -512,6 +512,13 @@ const NEXT_GRADE = { normal:'rare', rare:'epic', epic:'legend' };
 const MERGE_ORDER = ['normal','rare','epic','legend','unique'];
 // 숨은 천장: 같은 계열(역할군, 없으면 타입)이 3연속 나오면 다른 계열 가중치 ×1.5 (겉보기엔 완전 랜덤)
 function _pityKey(def) { return def.role || def.type; }
+// v3.8 메가 원본 끌림: 필드에 메가 원본(★5 미만)이 있으면 그 등급 결과의 25%가 그 종으로 → 먹이(같은 종) 확보
+//   쁘사이저·프테라·캥카처럼 진화 단계가 없는 종은 같은 종을 모을 방법이 우연뿐이라 먹이 버튼이 사실상 안 떴음
+function _megaPull(grade) {
+  const e = window.app && app.engine; if (!e || !window.MEGA_OF || Math.random() >= 0.25) return null;
+  const ids = [...new Set(e.towers.filter(t => t.def && MEGA_OF[t.def.id] && t.def.grade === grade && ((t.def._stack || 1) < 5)).map(t => t.def.id))];
+  return ids.length ? ids[Math.floor(Math.random() * ids.length)] : null;
+}
 function rollRandomMerge(grade, state = {}) {
   let target = NEXT_GRADE[grade];
   if (!target) return null;
@@ -528,6 +535,7 @@ function rollRandomMerge(grade, state = {}) {
   const weights = pool.map(id => ((locked && _pityKey(GachaTowerDefs[id]) !== locked) ? pw : 1) * (tw[id] || 1));
   let r = Math.random() * weights.reduce((a, b) => a + b, 0), id = pool[pool.length - 1];
   for (let k = 0; k < pool.length; k++) { r -= weights[k]; if (r <= 0) { id = pool[k]; break; } }
+  id = _megaPull(target) || id;
   const def = GachaTowerDefs[id];
   hist.push(_pityKey(def)); if (hist.length > 6) hist.shift();
   return { ...def, _starLevel: 1 };
@@ -572,6 +580,7 @@ function rollTower(tableKey) {
   const tw = (window.DEX_TYPE_W && window.DEX_TYPE_W[grade]) || {};
   let r = Math.random() * pool.reduce((a, id) => a + (tw[id] || 1), 0), id = pool[pool.length - 1];
   for (const k of pool) { r -= (tw[k] || 1); if (r <= 0) { id = k; break; } }
+  id = _megaPull(grade) || id;
   return {...GachaTowerDefs[id], _starLevel:1};
 }
 
