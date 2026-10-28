@@ -317,9 +317,9 @@ class App {
     const overlay = document.createElement('div');
     overlay.className = 'skin-picker';
     overlay.innerHTML = `
-      <div class="skin-picker-title" id="rank-title" style="cursor:default;user-select:none;">🌍 전체 랭킹</div>
+      <div class="skin-picker-title" id="rank-title" style="cursor:default;user-select:none;">전체 랭킹</div>
       <div style="display:flex;gap:6px;margin-bottom:6px;">
-        <button id="rank-clear-btn" style="display:none;font-size:10px;padding:4px 8px;border-radius:6px;border:1px solid rgba(255,80,80,0.4);background:transparent;color:#ff5c7a;cursor:pointer;">🗑️ 전체 초기화</button>
+        <button id="rank-clear-btn" style="display:none;font-size:10px;padding:4px 8px;border-radius:6px;border:1px solid rgba(255,80,80,0.4);background:transparent;color:#ff5c7a;cursor:pointer;">전체 초기화</button>
       </div>
       <div id="rank-list-body" style="color:#888;padding:20px;">불러오는 중...</div>`;
     const closeBtn = document.createElement('button');
@@ -342,7 +342,7 @@ class App {
       body.innerHTML = rows.map((r, i) => `
         <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:rgba(255,255,255,0.05);border-radius:8px;margin-bottom:6px;">
           <span>#${i+1} ${r.name}</span>
-          <span style="color:#ffc24b">🏅${(r.score||0).toLocaleString()}</span>
+          <span style="color:#ffc24b">${fmtNum(r.score||0)}</span>
           <span style="color:#5b9dff">Wave ${r.wave}</span>
           ${isAdmin ? `<button data-rank-del="${r.id}" style="font-size:10px;padding:2px 6px;border-radius:5px;border:none;background:#ff5c7a;color:#fff;cursor:pointer;">삭제</button>` : ''}
         </div>`).join('');
@@ -381,7 +381,7 @@ class App {
       if (!confirm('전체 랭킹을 정말 초기화하시겠습니까? 되돌릴 수 없습니다.')) return;
       clearBtn.textContent = '초기화 중...';
       const res = await window.Leaderboard.clearAll();
-      clearBtn.textContent = '🗑️ 전체 초기화';
+      clearBtn.textContent = '전체 초기화';
       renderRows();
       if (res.ok) alert(`${res.count}개 기록이 삭제되었습니다.`);
     });
@@ -400,14 +400,14 @@ class App {
     const overlay = document.createElement('div');
     overlay.className = 'skin-picker';
     overlay.innerHTML = `
-      <div class="skin-picker-title">👑 왕 처치 명예의 전당</div>
+      <div class="skin-picker-title">왕 처치 명예의 전당</div>
       <div style="max-width:380px;max-height:50vh;overflow-y:auto;color:#ddd;font-size:12px;">
         ${records.length === 0 ? '<div style="text-align:center;color:#888;padding:20px">아직 왕을 처치한 기록이 없습니다</div>' :
           records.map((r, i) => `
             <div style="display:flex;justify-content:space-between;padding:8px 12px;background:rgba(255,255,255,0.05);border-radius:8px;margin-bottom:6px;">
               <span>#${i+1} · Wave ${r.wave}</span>
-              <span style="color:#ffc24b">🏅${r.score.toLocaleString()}</span>
-              <span style="color:#5b9dff">⭐${r.mvp}</span>
+              <span style="color:#ffc24b">${fmtNum(r.score)}</span>
+              <span style="color:#5b9dff">${r.mvp}</span>
               <span style="color:#888">${r.date}</span>
             </div>`).join('')}
       </div>
@@ -436,11 +436,11 @@ class App {
   // v27-18: 이번 판 한정 랜덤 시드특성 (요청G) - 영구 강화 아님, 이번 판에만 적용되는 색다른 조건
   _applyRunSeedTrait() {
     const traits = [
-      { key:'goldBoom',   name:'💰 골드 풍년',   desc:'이번 판 모든 골드 획득 +20%' },
-      { key:'swarm',      name:'👾 몬스터 창궐', desc:'몹 물량 +25%, 대신 체력 -12%' },
-      { key:'eliteEra',   name:'⚔️ 정예의 시대', desc:'엘리트 몬스터 등장 확률 2배' },
-      { key:'headStart',  name:'🚀 빠른 출발',   desc:'시작 골드 +200' },
-      { key:'luckyStart', name:'🍀 행운의 시작', desc:'행운의 동전 1개 지급 (랜덤 합성 2택)' },
+      { key:'goldBoom',   name:'골드 풍년',   desc:'이번 판 모든 골드 획득 +20%' },
+      { key:'swarm',      name:'몬스터 창궐', desc:'몹 물량 +25%, 대신 체력 -12%' },
+      { key:'eliteEra',   name:'정예의 시대', desc:'엘리트 몬스터 등장 확률 2배' },
+      { key:'headStart',  name:'빠른 출발',   desc:'시작 골드 +200' },
+      { key:'luckyStart', name:'행운의 시작', desc:'행운의 동전 1개 지급 (랜덤 합성 2택)' },
     ];
     const trait = traits[Math.floor(Math.random() * traits.length)];
     this.engine._runTrait = trait;
@@ -448,7 +448,7 @@ class App {
     if (trait.key === 'luckyStart') this.engine._luckyCoins = (this.engine._luckyCoins || 0) + 1;
     this._runTraitInfo = trait;
     const badge = document.getElementById('hud-trait');
-    if (badge) { badge.title = `${trait.name} — ${trait.desc}`; badge.textContent = trait.name.split(' ')[0]; }
+    if (badge) { badge.title = `${trait.name} — ${trait.desc}`; }
     setTimeout(() => this.showWaveAnnounce(`${trait.name} — ${trait.desc}`, '#5b9dff'), 600);
   }
 
@@ -517,6 +517,13 @@ class App {
     try {
       const val = parseInt(localStorage.getItem('pokemontd_best_wave') || '0', 10);
       label.innerHTML = `${ICON('trophy', 15)} 최고 기록 <b>${val || 0}</b> 웨이브`;
+      // v3.6 첫 화면: 최근 판 요약 카드
+      const lr = JSON.parse(localStorage.getItem('pokemontd_lastrun') || 'null'), box = document.getElementById('last-run');
+      if (lr && box) {
+        const mvp = lr.mvp && window.GachaTowerDefs?.[lr.mvp];
+        box.hidden = false;
+        box.innerHTML = `<small>최근 판</small><div class="lr-row"><span><b>${lr.wave}</b>웨이브</span><span><b>${fmtNum(lr.score)}</b>점</span><span><b>${lr.cards}</b>카드</span>${mvp ? `<span class="lr-mvp">${PKM(mvp, 26)}<i>MVP</i> ${mvp.name}</span>` : ''}</div>`;
+      }
     } catch (e) { label.textContent = '최고 기록 -'; }
   }
 
@@ -1808,6 +1815,9 @@ class App {
       window.Leaderboard && Leaderboard.log('run', { victory: !!victory, wave: e.currentWave, score: Math.round(e.score || 0), hero: this.starterHero || '',
         cards: Object.entries(e._cards || {}).map(([k, v]) => k + 'x' + v).join(','), mvp: top.join(','), towers: e.towers.length,
         stones: e._megaStones || 0, errors: e._errCount || 0, powerSave: !!e.powerSave });
+      const mvpId = top[0] && top[0].split(':')[0];
+      localStorage.setItem('pokemontd_lastrun', JSON.stringify({ wave: e.currentWave, score: Math.round(e.score || 0), hero: this.starterHero || 'pikachu',
+        mvp: mvpId && mvpId !== 'hero' ? mvpId : '', cards: e._cardCount || 0 }));
     } catch (_) {}
     const gameScreen = document.getElementById('game-screen');
 

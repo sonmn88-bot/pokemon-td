@@ -75,9 +75,11 @@ Object.assign(App.prototype, {
     for (const { def, count } of groups.slice(0, MAX)) {
       const g = window.GRADES[def.grade];
       const b = document.createElement('button');
-      b.className = 'storage-item' + (this._placingId === def.id ? ' placing' : '');
+      // v3.6: 같은 종 3개(확정 진화) = 초록 점, 필드의 메가 원본에 먹일 수 있으면 '먹이' 표시
+      const feedable = window.MEGA_OF?.[def.id] && this.engine?.towers.some(t => t.def && (t.def.id === def.id || t.def.megaOf === def.id));
+      b.className = 'storage-item' + (this._placingId === def.id ? ' placing' : '') + (count >= 3 ? ' ready' : '');
       b.style.setProperty('--gc', g.color);
-      b.innerHTML = `<span class="si-emoji">${PKM(def, 30)}</span><span class="si-stars">${'★'.repeat(g.stars)}</span>${count > 1 ? `<span class="si-count">×${count}</span>` : ''}${window.MEGA_OF?.[def.id] ? '<span class="si-mega">💎</span>' : ''}`;
+      b.innerHTML = `<span class="si-emoji">${PKM(def, 30)}</span><span class="si-stars">${'★'.repeat(g.stars)}</span>${count > 1 ? `<span class="si-count">×${count}</span>` : ''}${feedable ? '<span class="si-feed">먹이</span>' : window.MEGA_OF?.[def.id] ? `<span class="si-mega">${ICON('gem', 11)}</span>` : ''}`;
       b.title = `${def.name} (${g.name}) - 탭해서 배치`;
       b.addEventListener('click', () => this._onStorageItemTap(def.id));
       strip.appendChild(b);

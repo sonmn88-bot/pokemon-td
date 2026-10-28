@@ -548,7 +548,7 @@ Object.assign(App.prototype, {
     overlay.className = 'power-overlay mission-overlay';
     const title = document.createElement('div');
     title.className = 'skilltree-title';
-    title.textContent = '📈 종합 전력 요약';
+    title.textContent = '종합 전력 요약';
     overlay.appendChild(title);
 
     const list = document.createElement('div');
@@ -571,8 +571,8 @@ Object.assign(App.prototype, {
     const totalRow = document.createElement('div');
     totalRow.style.cssText = 'margin-top:10px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.15);font-size:12px;color:#ccc;';
     totalRow.innerHTML = `
-      <div>🏰 총 배치 타워: ${this.engine.towers.length}개</div>
-      <div>🎲 보유 종류: ${this.missionTracker?.stats?.collectedIds?.size || 0}종</div>
+      <div>총 배치 타워: ${this.engine.towers.length}개</div>
+      <div>보유 종류: ${this.missionTracker?.stats?.collectedIds?.size || 0}종</div>
     `;
     list.appendChild(totalRow);
     overlay.appendChild(list);
@@ -594,7 +594,7 @@ Object.assign(App.prototype, {
 
     const title = document.createElement('div');
     title.className = 'skilltree-title';
-    title.textContent = '🧬 합치기 레시피 & 시너지 조합표';
+    title.textContent = '합치기 레시피 & 시너지 조합표';
     overlay.appendChild(title);
 
     const list = document.createElement('div');
@@ -603,7 +603,7 @@ Object.assign(App.prototype, {
     // v27-4: 합치기 레시피 (item3 - 원래 요청하신 "조합표") - 같은 타워 3개 모으면 합쳐지는 표
     const mergeHeader = document.createElement('div');
     mergeHeader.style.cssText = 'font-size:12px;color:#ffc24b;font-weight:700;margin:4px 0 2px;';
-    mergeHeader.textContent = '🧬 합치기 (동일 타워 3개 → 상위 등급)';
+    mergeHeader.textContent = '합치기 (동일 타워 3개 → 상위 등급)';
     list.appendChild(mergeHeader);
 
     if (window.MERGE_EVOLUTION && window.GachaTowerDefs) {
@@ -626,13 +626,13 @@ Object.assign(App.prototype, {
 
     const synergyHeader = document.createElement('div');
     synergyHeader.style.cssText = 'font-size:12px;color:#5b9dff;font-weight:700;margin:14px 0 2px;';
-    synergyHeader.textContent = '🔗 배치 시너지 (150px 이내 인접 배치시 발동)';
+    synergyHeader.textContent = '배치 시너지 (150px 이내 인접 배치시 발동)';
     list.appendChild(synergyHeader);
 
     // 동일 타입
     const sameRow = document.createElement('div');
     sameRow.className = 'mission-item';
-    sameRow.innerHTML = `<div>⚡⚡ 같은 타입끼리</div><div style="color:#ffc24b">+8 데미지</div>`;
+    sameRow.innerHTML = `<div>같은 타입끼리</div><div style="color:#ffc24b">+8 데미지</div>`;
     list.appendChild(sameRow);
 
     if (window.SYNERGY_PAIRS && window.TYPES) {
@@ -669,7 +669,7 @@ Object.assign(App.prototype, {
 
     const title = document.createElement('div');
     title.className = 'skilltree-title';
-    title.textContent = '🎯 미션 보드';
+    title.textContent = '미션 보드';
     overlay.appendChild(title);
 
     // v27-6: 전체 도감 수집 진행률 표시 (요청1 - 영구보너스 대신 진행상황만)
@@ -679,7 +679,7 @@ Object.assign(App.prototype, {
       const collected = allIds.filter(id => tracker0.stats.collectedIds.has(id)).length;
       const dexBar = document.createElement('div');
       dexBar.style.cssText = 'text-align:center;color:#ffc24b;font-size:13px;margin-bottom:8px;';
-      dexBar.textContent = `📖 도감 수집: ${collected}/${allIds.length}종`;
+      dexBar.textContent = `도감 수집: ${collected}/${allIds.length}종`;
       overlay.appendChild(dexBar);
     }
 
@@ -703,12 +703,12 @@ Object.assign(App.prototype, {
       const item = document.createElement('div');
       item.className = `mission-item ${done ? 'done' : ''}`;
       item.innerHTML = `
-        <span class="mission-status">${done ? '✅' : '⬜'}</span>
+        <span class="mission-status ${done ? 'done' : ''}">${done ? '완료' : ''}</span>
         <div class="mission-info">
           <div class="mission-name">${m.name}</div>
           <div class="mission-desc">${m.desc}${progressStr}</div>
         </div>
-        <div class="mission-reward">💰${m.reward}</div>
+        <div class="mission-reward">${ICON('coin', 13)}${m.reward}</div>
       `;
       list.appendChild(item);
     }
