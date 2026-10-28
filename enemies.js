@@ -456,9 +456,13 @@ class Enemy {
 
     // v27-7: 데미지 숫자 표시 (요청1 - 지금까지 전혀 없었음). DOT 미세틱(0.x 데미지)은 스팸 방지로 제외
     if ((dmg >= 1 || armored) && this.engine?.spawnFloatingText) {
-      const size = dmg >= 30 ? 15 : dmg >= 10 ? 12 : 10;
-      const color = armored ? '#8a8f99' : dmg >= 30 ? '#ff5252' : dmg >= 10 ? '#ffc24b' : '#fff';
-      this.engine.spawnFloatingText(armored ? '🛡' : `-${Math.round(dmg)}`, this.x + (Math.random()*16-8), this.y - 14, color, { fontSize: size, life: 0.5 });
+      // v3.6 상성 체감: 약점 공격은 초록·크게·'!', 열세는 회색·작게
+      const src = this.engine._dmgSrc, eff = src && src.def && window.typeEffectiveness ? typeEffectiveness(src.def.type, this.typeTag) : 1;
+      let size = dmg >= 30 ? 15 : dmg >= 10 ? 12 : 10;
+      let color = armored ? '#8a8f99' : dmg >= 30 ? '#ff5252' : dmg >= 10 ? '#ffc24b' : '#fff';
+      if (!armored && eff > 1) { size += 3; color = '#6dffa8'; } else if (!armored && eff < 1) { size -= 1; color = '#9aa3b2'; }
+      this.engine.spawnFloatingText(armored ? '방어' : `-${fmtNum(dmg)}${eff > 1 ? '!' : ''}`, this.x + (Math.random()*16-8), this.y - 14, color, { fontSize: size, life: 0.5 });
+      if (eff > 1 && !(this._effT > performance.now())) { this._effT = performance.now() + 2500; this.engine.spawnFloatingText('효과 굉장!', this.x, this.y - 30, '#6dffa8', { fontSize: 11, life: 0.8 }); }
     }
 
     // 분노 (갸라도스)

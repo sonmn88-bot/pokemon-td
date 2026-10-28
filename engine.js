@@ -265,7 +265,8 @@ class GameEngine {
     this._errCount = (this._errCount || 0) + 1;
     const msg = `${where}: ${err && err.message}`;
     if (!this._errLog) this._errLog = [];
-    if (this._errLog.length < 8 && !this._errLog.includes(msg)) { this._errLog.push(msg); console.error('[게임 오류]', msg, err && err.stack); }
+    if (this._errLog.length < 8 && !this._errLog.includes(msg)) { this._errLog.push(msg); console.error('[게임 오류]', msg, err && err.stack);
+      window.Leaderboard && Leaderboard.log('error', { where, msg: String(err && err.message).slice(0, 200), stack: String(err && err.stack || '').slice(0, 400), wave: this.currentWave }); }
   }
 
   update() {
@@ -945,11 +946,22 @@ class GameEngine {
   }
 
   _drawRange(ctx, tower) {
+    // v3.6: 가장자리로 갈수록 진해지는 사거리 + 점선 테두리 + 현재 조준 대상 연결선·표적 링
+    const r = tower.range;
     ctx.save();
-    ctx.beginPath(); ctx.arc(tower.x, tower.y, tower.range, 0, Math.PI*2);
-    ctx.strokeStyle='rgba(255,194,75,0.65)'; ctx.lineWidth=2;
-    ctx.fillStyle='rgba(255,194,75,0.07)';
-    ctx.fill(); ctx.stroke(); ctx.restore();
+    const g = ctx.createRadialGradient(tower.x, tower.y, r * 0.55, tower.x, tower.y, r);
+    g.addColorStop(0, 'rgba(255,194,75,0.02)'); g.addColorStop(1, 'rgba(255,194,75,0.14)');
+    ctx.beginPath(); ctx.arc(tower.x, tower.y, r, 0, Math.PI*2); ctx.fillStyle = g; ctx.fill();
+    ctx.setLineDash([6, 5]); ctx.strokeStyle = 'rgba(255,194,75,0.75)'; ctx.lineWidth = 1.6; ctx.stroke(); ctx.setLineDash([]);
+    const tg = tower.target;
+    if (tg && !tg.dead && !tg.reachedEnd) {
+      ctx.strokeStyle = 'rgba(255,194,75,0.5)'; ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.moveTo(tower.x, tower.y); ctx.lineTo(tg.x, tg.y); ctx.stroke();
+      const tr = (tg.size || 14) * 0.95;
+      ctx.strokeStyle = '#ffc24b'; ctx.lineWidth = 2;
+      for (let i = 0; i < 4; i++) { const a0 = i * Math.PI / 2 + Math.PI / 4; ctx.beginPath(); ctx.arc(tg.x, tg.y, tr, a0 - 0.35, a0 + 0.35); ctx.stroke(); }
+    }
+    ctx.restore();
   }
 
   _drawPreview(ctx) {

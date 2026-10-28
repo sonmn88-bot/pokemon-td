@@ -467,29 +467,43 @@ class App {
 
   // v27-7: 신규 유저 온보딩 - 간단한 게임방법 요약 (요청3)
   _showHowToPlay() {
+    // v3.6: 긴 글 한 장 → 탭 4개 (항목마다 아이콘 + 짧은 설명)
+    const TABS = [
+      ['기본', [
+        ['target', '목표', '필드에 몬스터가 <b>200마리</b> 쌓이면 끝나요. 웨이브는 끝이 없어요 — 최대한 오래 버티세요.'],
+        ['capsule', '뽑기', '하단 캡슐 버튼. 빈 자리를 먼저 누르고 뽑으면 바로 배치, 아니면 보관함으로. <b>일반</b> 1성 · <b>프리미엄</b> 1~3성 · <b>도박</b> 2~5성 · <b>10연</b>.'],
+        ['flask', '합성', '같은 등급 아무거나 3마리 → 다음 등급 랜덤. 같은 포켓몬 3마리 → 진화 확정. <b>한 번에 전부</b>는 보관함의 그 등급을 모두 합성해요(배치된 타워는 그대로).'],
+        ['psychic', '유니크', '뮤 = 서로 다른 레전드 3마리. 뮤츠 = 뮤 + 레전드 2마리 + 2000골드. 합성 연구소 위쪽 레시피에서 만들어요.'],
+      ]],
+      ['성장', [
+        ['upgrade', '강화 · 상점', '하단 화살표 버튼. 타입 강화는 그 타입 타워 전부(등급별 고정 데미지 + 6%). 상점은 몬스터볼 같은 긴급 아이템. 열어둔 채로 플레이할 수 있어요.'],
+        ['coin', '골드', '처치 골드 + 웨이브 클리어 보너스 + <b>이자</b>(10골드당 1, 최대 30). 모아두면 이자가 붙어요.'],
+        ['card', '강화 카드', '10웨이브마다 3장 중 1장(노말·레어·에픽·레전드·신화). 고른 계열이 더 잘 나오고, 같은 카드는 레벨업, 두 계열을 모으면 조합 카드. 카드 1장마다 몬스터 체력 +4%. 상단 카드 아이콘으로 목록 확인.'],
+        ['disc', '기술머신', '에픽·레전드 타워를 누르면 1500골드에 특성 1개를 배워요(타워당 1번).'],
+      ]],
+      ['영웅', [
+        ['medal', '영웅', '맵에 놓고 길 근처로 옮겨요(하단 맨 왼쪽 버튼). 레벨이 오르면 스킬 포인트로 스킬트리를 찍어요.'],
+        ['sparkle', '영웅 변신', '15웨이브 이후 가끔(또는 20웨이브 보스) 전용 아이템이 떨어지면 변신. 피카츄→거다이맥스, 토게틱→토게키스, 이브이 계열은 금빛 각성.'],
+      ]],
+      ['보스·메가', [
+        ['monster', '보스', '왼쪽 아래 <b>보스</b> 버튼으로 직접 소환하면 큰 보상. 30웨이브마다 구역이 바뀌고 전설 보스가, 90웨이브엔 왕 루기아가 나와요.'],
+        ['gem', '메가진화', '리자몽·거북왕·이상해꽃·갸라도스 등 12종을 필드에 두고 누르면 <b>먹이기</b>로 보관함의 같은 포켓몬을 흡수해 ★이 올라요(★당 +35%). ★3 + 메가스톤이면 메가진화, ★5까지. 메가스톤은 20웨이브마다 나오는 보스에서 확률 드롭. 가능한 타워는 골드 링, 먹이기 가능하면 초록 점선 링.'],
+        ['prism', '이번 판 편성', '시작 때 많이 나오는 몬스터 특성과 추천 메가를 알려줘요. 유니크·메가는 같은 종 1마리만. 서로 다른 타입 4·5·6종이면 전체 공격력 +10·20·30%.'],
+      ]],
+    ];
     const overlay = document.createElement('div');
-    overlay.className = 'skin-picker';
-    overlay.innerHTML = `
-      <div class="skin-picker-title">❓ 게임 방법</div>
-      <div style="max-width:420px;text-align:left;color:#ddd;font-size:13px;line-height:1.9;padding:0 16px;max-height:60vh;overflow-y:auto;">
-        <b style="color:#ffc24b">목표</b> — 필드에 몬스터가 <b>200마리</b> 쌓이면 끝. 웨이브를 최대한 오래 버티세요. 웨이브는 끝이 없어요.<br><br>
-        <b style="color:#ffc24b">뽑기</b> — 하단 캡슐 버튼으로 포켓몬을 뽑아요. 빈 자리를 먼저 누르고 뽑으면 바로 배치, 아니면 보관함으로 가요. 일반(1성) · 프리미엄(1~3성) · 도박(2~5성) · 10연.<br><br>
-        <b style="color:#ffc24b">합성</b> — 플라스크 버튼. 같은 등급 아무거나 3마리 → 다음 등급 랜덤, 같은 포켓몬 3마리 → 진화가 확정. <b>⚡⚡ 한 번에 전부</b>를 누르면 보관함의 그 등급을 전부 합성해요(배치된 타워는 그대로).<br><br>
-        <b style="color:#ffc24b">유니크</b> — 뮤 = 서로 다른 레전드 3마리, 뮤츠 = 뮤 + 레전드 2마리 + 2000골드. 합성 연구소 위쪽 레시피에서 만들어요.<br><br>
-        <b style="color:#ffc24b">강화 · 상점</b> — 하단 화살표 버튼. 타입 강화는 그 타입 타워 전부(등급별 고정 데미지 + 6%), 상점은 몬스터볼·대피시키기 같은 긴급 아이템이에요. 열어둔 채로 플레이할 수 있어요.<br><br>
-        <b style="color:#ffc24b">골드</b> — 처치 골드 + 웨이브 클리어 보너스 + <b>이자</b>(10골드당 1, 최대 30). 모아두면 이자가 붙어요.<br><br>
-        <b style="color:#ffc24b">영웅</b> — 맵에 놓고 길 근처로 옮겨요. 레벨이 오르면 스킬 포인트로 스킬트리를 찍어요(영웅을 누르면 열림).<br><br>
-        <b style="color:#ffc24b">보스</b> — 왼쪽 아래에서 직접 소환하면 큰 보상. 30웨이브마다 구역이 바뀌고 전설 보스가, 90웨이브엔 왕 루기아가 나와요.<br><br>
-        <b style="color:#ffc24b">메가진화</b> — 리자몽·거북왕·이상해꽃·갸라도스·쁘사이저·독침붕·프테라·캥카·피죤투·후딘·팬텀·썬더를 필드에 두고 누르면 <b>🍖 먹이기</b>로 보관함의 같은 포켓몬을 흡수해 ★이 올라요(★당 +35%). ★3 + 메가스톤이면 메가진화, 이후 ★5까지 계속 키울 수 있어요. 메가스톤은 <b>20웨이브마다 나오는 보스</b>에서 확률로만 나와요(30%부터 점점 올라감).<br><br>
-        <b style="color:#ffc24b">이번 판 편성</b> — 시작할 때 이번 판에 많이 나오는 몬스터 특성 2가지와 추천 메가를 알려줘요. 유니크·메가는 같은 종 1마리만 배치할 수 있고, 필드에 서로 다른 타입이 4·5·6종이면 전체 공격력 +10·20·30%(상단 🌈).<br><br>
-        <b style="color:#ffc24b">강화 카드</b> — 10웨이브마다 카드 3장 중 1장을 골라요(일반·희귀·영웅·전설·신화). 이미 고른 계열이 더 잘 나와서 한 방향으로 키울 수 있고, 같은 카드는 레벨업, 두 계열을 모으면 조합 카드도 나와요. 카드 1장마다 몬스터도 체력 +4%씩 적응해요. 상단 🃏를 누르면 내 카드 목록.<br><br>
-        <b style="color:#ffc24b">영웅 변신</b> — 15웨이브 이후 가끔(또는 20웨이브 보스에서) 영웅 전용 아이템이 떨어지면 변신해요. 피카츄→거다이맥스, 토게틱→토게키스, 이브이 계열은 금빛 각성.<br><br>
-        <b style="color:#ffc24b">기술머신</b> — 에픽·레전드 타워를 누르면 1500골드에 특성 1개를 배울 수 있어요(타워당 1번).
-      </div>
-    `;
+    overlay.className = 'skin-picker howto';
+    const body = i => TABS[i][1].map(([ic, t, d]) => `<div class="ht-item"><span class="ht-ic">${ICON(ic, 22)}</span><div><b>${t}</b><p>${d}</p></div></div>`).join('');
+    overlay.innerHTML = `<div class="skin-picker-title">게임 방법</div>
+      <div class="ht-tabs">${TABS.map((t, i) => `<button data-i="${i}" class="${i ? '' : 'on'}">${t[0]}</button>`).join('')}</div>
+      <div class="ht-body">${body(0)}</div>`;
+    overlay.querySelectorAll('.ht-tabs button').forEach(btn => btn.onclick = () => {
+      overlay.querySelectorAll('.ht-tabs button').forEach(x => x.classList.toggle('on', x === btn));
+      const bd = overlay.querySelector('.ht-body'); bd.innerHTML = body(+btn.dataset.i); bd.scrollTop = 0;
+    });
     const closeBtn = document.createElement('button');
     closeBtn.className = 'skin-picker-close';
-    closeBtn.textContent = '시작하기';
+    closeBtn.textContent = '확인';
     closeBtn.addEventListener('click', () => overlay.remove());
     overlay.appendChild(closeBtn);
     document.body.appendChild(overlay);
@@ -996,7 +1010,7 @@ class App {
     this.missionTracker.onComplete = (mission) => this._onMissionComplete(mission);
 
     this.engine.onGoldChange  = g => {
-      this.els.goldVal.textContent = Math.round(g);
+      this.els.goldVal.textContent = fmtNum(g);
       this.refreshPullButtons();
       this.buildShopBar();
       // v27-5: 누적 획득 골드 트래킹 (미션용)
@@ -1019,7 +1033,7 @@ class App {
     };
     this.engine.onScoreChange = (score) => {
       const el = document.getElementById('score-val');
-      if (el) el.textContent = score.toLocaleString();
+      if (el) el.textContent = fmtNum(score);
       if (this.missionTracker) {
         this.missionTracker.stats.maxScore = Math.max(this.missionTracker.stats.maxScore || 0, score);
         this.missionTracker.check();
@@ -1132,7 +1146,7 @@ class App {
     this.engine.gold = dm.goldStart;
     this.engine.init(mapId);
 
-    this.els.goldVal.textContent = Math.round(this.engine.gold);
+    this.els.goldVal.textContent = fmtNum(this.engine.gold);
     this.els.livesVal.textContent = this.engine.lives;
     this.els.waveVal.textContent = 0;
     this.els.waveTotal.textContent = '∞';
@@ -1788,6 +1802,13 @@ class App {
 
   showEndScreen(victory, stars, best) {
     this.engine.stop();
+    try { // v3.6 판 요약 기록 (밸런스 조정용)
+      const e = this.engine, ds = e._dmgStats || {};
+      const top = Object.entries(ds).filter(([k]) => k !== 'other').sort((a, b) => b[1].dmg - a[1].dmg).slice(0, 3).map(([k, r]) => `${k}:${Math.round(r.dmg)}`);
+      window.Leaderboard && Leaderboard.log('run', { victory: !!victory, wave: e.currentWave, score: Math.round(e.score || 0), hero: this.starterHero || '',
+        cards: Object.entries(e._cards || {}).map(([k, v]) => k + 'x' + v).join(','), mvp: top.join(','), towers: e.towers.length,
+        stones: e._megaStones || 0, errors: e._errCount || 0, powerSave: !!e.powerSave });
+    } catch (_) {}
     const gameScreen = document.getElementById('game-screen');
 
     const overlay = document.createElement('div');
@@ -1989,6 +2010,22 @@ class App {
 window.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('i[data-ic]').forEach(el => { el.outerHTML = ICON(el.dataset.ic, 18); }); // v3.0 아이콘
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
+  // v3.6 새 버전 알림: 배포 후 예전 화면이 남지 않게 index.html의 버전 표시를 비교 (시작·복귀·10분마다)
+  const checkVersion = async () => {
+    try {
+      const cur = document.getElementById('app-version')?.textContent.trim();
+      const html = await (await fetch('index.html?v=' + Date.now(), { cache: 'no-store' })).text();
+      const m = html.match(/id="app-version">([^<]+)</);
+      if (!cur || !m || m[1].trim() === cur || document.getElementById('update-band')) return;
+      const b = document.createElement('button');
+      b.id = 'update-band';
+      b.innerHTML = `새 버전 <b>${m[1].trim().split(' ')[0]}</b> 이 있어요 · 눌러서 업데이트`;
+      b.onclick = () => location.reload();
+      document.body.appendChild(b);
+    } catch (_) {}
+  };
+  setTimeout(checkVersion, 4000); setInterval(checkVersion, 600000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) checkVersion(); });
   window.app = new App();
   initTitleCanvas();
 });

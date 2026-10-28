@@ -1528,3 +1528,29 @@ img.title-pkm.lead { width:88px; height:88px; }
 #game-screen #hud-top { background:rgb(13,15,21); }
 #perf-hud { position:absolute; left:8px; right:8px; top:calc(var(--hud-h) + 52px); z-index:120; pointer-events:none;
   padding:6px 10px; border-radius:8px; background:rgba(0,0,0,.78); color:#9effc4; font:600 11px/1.5 ui-monospace,Menlo,monospace; word-break:keep-all; }
+#update-band { position:fixed; left:50%; transform:translateX(-50%); bottom:calc(max(12px, env(safe-area-inset-bottom)) + var(--bar-h, 70px)); z-index:999;
+  min-height:44px; padding:10px 16px; border:none; border-radius:12px; background:var(--accent-yel); color:#1b1404; font:700 14px var(--font-ui);
+  box-shadow:0 8px 20px rgba(0,0,0,.4); white-space:nowrap; cursor:pointer; }
+
+/* --- 영웅 스킬 (v3.6): 원형 쿨타임, 준비되면 골드 테두리 --- */
+.hero-skills-group { background:rgba(14,16,22,.92); border-radius:14px; }
+.hero-skills-label { font-size:11px; font-weight:700; color:var(--text-hi); }
+.skill-btn { width:44px; height:44px; border:1.5px solid var(--accent-yel); background:rgba(255,194,75,.12); color:var(--text-hi); overflow:hidden; }
+.skill-btn.on-cooldown { border-color:rgba(255,255,255,.15); background:rgba(255,255,255,.05); }
+.skill-btn.on-cooldown::after { content:''; position:absolute; inset:0; border-radius:50%;
+  background:conic-gradient(rgba(6,8,12,.72) calc(var(--cdp, 1) * 1turn), transparent 0); }
+.skill-btn .skill-cd { position:absolute; z-index:1; font:800 13px var(--font-px); color:#fff; text-shadow:0 1px 2px #000; }
+.skill-btn.on-cooldown .skill-emoji { opacity:.55; }
+.skill-tree-btn, .hero-evo-btn { border-color:rgba(255,255,255,.18); background:rgba(255,255,255,.06); }
+
+/* --- 게임 방법 탭 (v3.6) --- */
+.howto { padding:24px 16px !important; }
+.ht-tabs { display:flex; gap:4px; width:100%; max-width:440px; padding:4px; border-radius:12px; background:rgba(255,255,255,.05); }
+.ht-tabs button { flex:1; min-height:40px; border:none; border-radius:9px; background:transparent; color:var(--text-mid); font:700 13px var(--font-ui); cursor:pointer; }
+.ht-tabs button.on { background:rgba(255,255,255,.1); color:var(--text-hi); }
+.ht-body { width:100%; max-width:440px; max-height:58vh; overflow-y:auto; display:flex; flex-direction:column; gap:14px; padding:6px 2px; }
+.ht-item { display:flex; gap:12px; align-items:flex-start; }
+.ht-ic { display:grid; place-items:center; width:40px; height:40px; flex-shrink:0; border-radius:12px; background:rgba(255,255,255,.06); color:var(--text-hi); }
+.ht-item b { font-size:14px; color:var(--text-hi); }
+.ht-item p { margin:2px 0 0; font-size:13px; line-height:1.65; color:#c3c9d6; word-break:keep-all; }
+.ht-item p b { font-size:inherit; color:var(--accent-yel); }

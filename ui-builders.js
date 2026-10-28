@@ -265,7 +265,7 @@ Object.assign(App.prototype, {
       label.className = 'hero-skills-label';
       const _ht = window.HERO_TYPE_MAP?.[hero.evolved || hero.id];
       const _ti = _ht ? window.TYPES?.[_ht] : null;
-      label.textContent = `${hero.skin.emoji} ${hero.name} Lv${hero.level} ${_ti ? _ti.emoji : ''}`;
+      label.textContent = `${hero.name} Lv${hero.level}`;
       infoCol.appendChild(label);
 
       const expOuter = document.createElement('div');
@@ -287,11 +287,11 @@ Object.assign(App.prototype, {
         btn.className = 'skill-btn';
         btn.dataset.heroId = hero.id;
         btn.dataset.skillIdx = idx;
-        btn.innerHTML = `<span class="hotkey-badge">${hotkeyMap[idx]||''}</span><span class="skill-emoji">${skill.emoji}</span><span class="skill-cd"></span>`;
+        btn.innerHTML = `<span class="hotkey-badge">${hotkeyMap[idx]||''}</span><span class="skill-emoji">${idx === 0 ? (ICON(_ht, 22) || ICON('bolt', 22)) : ICON('sparkle', 20)}</span><span class="skill-cd"></span>`;
         btn.title = `${skill.name}: ${skill.desc}${hotkeyMap[idx] ? ` (단축키: ${hotkeyMap[idx]})` : ''}`;
         btn.addEventListener('click', () => {
           if (hero.cast(idx, this.engine)) {
-            this.showWaveAnnounce(`${skill.emoji} ${skill.name}!`, '#ffc24b');
+            this.showWaveAnnounce(`${skill.name}!`, '#ffc24b');
           }
         });
         wrap.appendChild(btn);
@@ -301,7 +301,7 @@ Object.assign(App.prototype, {
       if (this.engine._heroItemPending) {
         const evoBtn = document.createElement('button');
         evoBtn.className = 'skill-btn hero-evo-btn';
-        evoBtn.innerHTML = `<span class="skill-emoji">✨</span>`;
+        evoBtn.innerHTML = `<span class="skill-emoji">${ICON('sparkle', 20)}</span>`;
         evoBtn.title = `${this.engine._heroItemPending.item}: 눌러서 변신`;
         evoBtn.addEventListener('click', () => this._playHeroTransform());
         wrap.appendChild(evoBtn);
@@ -310,7 +310,7 @@ Object.assign(App.prototype, {
       const treeBtn = document.createElement('button');
       treeBtn.className = 'skill-btn skill-tree-btn';
       treeBtn.dataset.heroId = hero.id;
-      treeBtn.innerHTML = `<span class="skill-emoji">${hero.skillPoints > 0 ? '🌟' : '📊'}</span>`;
+      treeBtn.innerHTML = `<span class="skill-emoji">${ICON(hero.skillPoints > 0 ? 'upgrade' : 'chart', 20)}</span>`;
       treeBtn.title = `스킬트리 (SP: ${hero.skillPoints})`;
       if (hero.skillPoints > 0) treeBtn.style.borderColor = '#ffc24b';
       treeBtn.addEventListener('click', () => this.openSkillTree(hero));
@@ -333,7 +333,7 @@ Object.assign(App.prototype, {
         if (lbl) {
           const _ht2 = window.HERO_TYPE_MAP?.[hero.evolved || hero.id];
           const _ti2 = _ht2 ? window.TYPES?.[_ht2] : null;
-          lbl.textContent = `${hero.skin.emoji} ${hero.name} Lv${hero.level} ${_ti2 ? _ti2.emoji : ''}`;
+          lbl.textContent = `${hero.name} Lv${hero.level}`;
         }
       }
       hero.def.skills.forEach((skill, idx) => {
@@ -344,6 +344,8 @@ Object.assign(App.prototype, {
         if (cd > 0) {
           btn.classList.add('on-cooldown');
           cdEl.textContent = Math.ceil(cd);
+          const full = hero._skillCd ? hero._skillCd(idx) : cd; // v3.6 원형 쿨타임 (남은 비율)
+          btn.style.setProperty('--cdp', Math.min(1, cd / (full || cd)).toFixed(3));
         } else {
           btn.classList.remove('on-cooldown');
           cdEl.textContent = '';

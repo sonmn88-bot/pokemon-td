@@ -96,4 +96,14 @@ function PKM(def, size = 28) {
   return p ? `<img class="pk" src="${p}" width="${size}" height="${size}" alt="" draggable="false">` : ICON(def.type, Math.round(size * 0.86));
 }
 
+// v3.6 큰 숫자 축약: 1만 미만은 그대로, 이상은 12.4K · 3.2M · 1.1B (유효숫자 3자리)
+function fmtNum(n) {
+  n = Math.round(n || 0); const a = Math.abs(n);
+  if (a < 10000) return String(n);
+  for (const [v, u] of [[1e12, 'T'], [1e9, 'B'], [1e6, 'M'], [1e3, 'K']]) {
+    if (a >= v) { const x = n / v; return String(parseFloat(x.toFixed(Math.abs(x) >= 100 ? 0 : Math.abs(x) >= 10 ? 1 : 2))) + u; }
+  }
+  return String(n);
+}
+window.fmtNum = fmtNum;
 window.ICON = ICON; window.ICON_IMG = ICON_IMG; window.PKM = PKM;

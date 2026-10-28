@@ -86,6 +86,21 @@ window.Leaderboard = (function () {
     }
   }
 
+  // v3.6 운영 기록: 오류·판 요약을 pokemontd_telemetry에 저장 (세션당 상한, 실패해도 게임 영향 없음)
+  let sent = 0;
+  const sid = Math.random().toString(36).slice(2, 10);
+  function log(kind, data) {
+    if (!enabled || sent >= 12) return;
+    sent++;
+    try {
+      db.collection('pokemontd_telemetry').add(Object.assign({
+        kind, sid, ver: (document.getElementById('app-version') || {}).textContent || '',
+        ua: navigator.userAgent.slice(0, 120), ts: firebase.firestore.FieldValue.serverTimestamp(),
+      }, data)).catch(() => {});
+    } catch (_) {}
+  }
+  window.addEventListener('error', e => log('error', { where: 'window', msg: String(e.message).slice(0, 200), src: `${(e.filename || '').split('/').pop()}:${e.lineno}` }));
+
   init();
-  return { submitScore, fetchTop, deleteEntry, clearAll, isEnabled: () => enabled };
+  return { submitScore, log, fetchTop, deleteEntry, clearAll, isEnabled: () => enabled };
 })();

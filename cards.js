@@ -3,10 +3,10 @@
 // 원칙: 등급별 체감 세기 통일 · 지금 쓸모없는 카드는 안 나옴 · 위험 카드 없음
 //       카드 1장마다 몬스터 '적응'(체력 +4%)으로 너무 쉬워지는 것 방지
 const CARD_TIERS = {
-  common:   { name:'일반', color:'#a7adba', w:55 },
-  rare:     { name:'희귀', color:'#5b9dff', w:28 },
-  epic:     { name:'영웅', color:'#b18cff', w:13 },
-  legend:   { name:'전설', color:'#ffc24b', w:3.5 },
+  common:   { name:'노말', color:'#a7adba', w:55 },
+  rare:     { name:'레어', color:'#5b9dff', w:28 },
+  epic:     { name:'에픽', color:'#b18cff', w:13 },
+  legend:   { name:'레전드', color:'#ffc24b', w:3.5 },
   myth:     { name:'신화', color:'#ff5c7a', w:0.5 },
   combo:    { name:'조합', color:'#34d399', w:0 },
 };
