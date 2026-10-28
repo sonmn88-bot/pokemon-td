@@ -478,7 +478,7 @@ class GameEngine {
     // 초반(5웨이브까지)은 기존과 동일하게 유지 - 1~2성 구간의 아슬아슬함은 그대로.
     if (!item.isKing && !item.bossTier) {
       let waveHpMul = Math.pow(1.045, Math.max(0, this.currentWave - 5));
-      if (this.currentWave > 90) waveHpMul *= Math.pow(1.07, this.currentWave - 90) / Math.pow(1.045, this.currentWave - 90);
+      if (this.currentWave > 90) waveHpMul *= Math.pow(1.06, this.currentWave - 90) / Math.pow(1.045, this.currentWave - 90); // v3.8: 1.07→1.06 (후반 갑자기 끝나는 절벽 완화)
       if (this._runTrait?.key === 'swarm') waveHpMul *= 0.88;
       enemy.maxHp = Math.round(enemy.maxHp * waveHpMul);
       enemy.hp = enemy.maxHp;

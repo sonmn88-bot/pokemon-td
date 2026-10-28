@@ -158,9 +158,18 @@ Object.assign(App.prototype, {
           <button class="tp-btn tp-recall" data-action="recall">${ICON('bag', 15)}보관함으로</button>
           ${window.canUseTM && window.canUseTM(t) ? `<button class="tp-btn" data-action="tm" style="grid-column:1 / -1" title=""태그 1개를 랜덤으로 배움 (타워당 1회)">${ICON('disc', 15)}기술머신 ${window.TM_COST}</button>` : ''}
           <button class="tp-btn tp-sell" data-action="sell">${ICON('sell', 15)}판매 +${refund}</button>
+          ${def.grade === 'epic' && !this.engine._oneTimeUsed?.rarecandy ? `<button class="tp-btn" data-action="candy" style="grid-column:1 / -1">${ICON('candy', 15)}이상한사탕 → 랜덤 레전드 ${ICON('coin', 12)}${fmtNum(window.shopItemCost(window.ShopItems.find(i => i.key === 'rarecandy'), this.engine))}</button>` : ''}
         </div>
       `;
       // v28: 필드 타워를 보관함으로 회수 (무료) - 합성 재료로 쓰거나 자리 재배치용
+      panel.querySelector('[data-action="candy"]')?.addEventListener('click', () => { // v3.8 이상한사탕 대상 선택
+        const item = window.ShopItems.find(i => i.key === 'rarecandy'), cost = window.shopItemCost(item, this.engine);
+        if (!this.engine.spendGold(cost)) { this.showWaveAnnounce('골드가 부족해요', '#ff5c7a'); return; }
+        if (!window.useRareCandy(this.engine, this.engine.towerSlots[slotIdx])) { this.engine.addGold(cost); return; }
+        if (!this.engine._oneTimeUsed) this.engine._oneTimeUsed = {};
+        this.engine._oneTimeUsed.rarecandy = true;
+        this.SFX.play('merge'); panel.remove(); this.buildShopBar();
+      });
       panel.querySelector('[data-action="recall"]')?.addEventListener('click', () => {
         this.engine.towers = this.engine.towers.filter(x => x !== t);
         const slot = this.engine.towerSlots[slotIdx];
@@ -753,32 +762,42 @@ Object.assign(App.prototype, {
       c.disabled = this.engine.gold < window.getTypeUpgradeAt(t, window.TypeUpgradeLevels?.[t] || 0).cost;
     });
     if (!this.engine._shopBuyCount) this.engine._shopBuyCount = {};
-    grid.innerHTML = '';
-    for (const item of window.ShopItems) {
+    // v3.8: 골드가 바뀔 때마다 버튼을 새로 만들면 누르는 순간 교체돼 터치가 씹혔음 → 처음 1번만 만들고 이후엔 제자리 갱신
+    const state = item => {
       const cost = window.shopItemCost(item, this.engine);
       const waveUses = (this.engine._shopWaveUses || {})[item.key] || 0;
       const pw = item.perWave ? item.perWave + (item.key === 'monsterball' ? (this.engine._cardMods?.ballExtra || 0) : 0) : 0; // v3.5 카드 '볼 주머니'
-      const used = (item.oneTime && this.engine._oneTimeUsed?.[item.key]) || (pw && waveUses >= pw);
-      const left = pw ? `${pw - waveUses}/${pw}회` : item.oneTime ? '1회' : '';
-      const btn = document.createElement('button');
-      btn.className = 'us-card shop';
-      btn.disabled = used || this.engine.gold < cost;
-      btn.innerHTML = `<b>${item.icon ? ICON(item.icon, 18) : item.emoji} ${item.name}</b><span class="us-desc">${item.desc}</span>
-        <span class="us-meta">${used ? '사용 완료' : left}</span><span class="us-cost">${ICON('coin', 12)}${cost}</span>`;
-      btn.addEventListener('click', () => {
-        if (used) return;
-        if (!this.engine.spendGold(cost)) { this.showWaveAnnounce('골드가 부족합니다', '#ff5c7a'); return; }
-        const result = item.buy(this.engine);
-        if (result === false) { this.engine.addGold(cost); return; } // 대상 없음 등 → 환불
-        if (item.scaling) this.engine._shopBuyCount[item.key] = (this.engine._shopBuyCount[item.key] || 0) + 1;
-        if (item.perWave) { if (!this.engine._shopWaveUses) this.engine._shopWaveUses = {}; this.engine._shopWaveUses[item.key] = (this.engine._shopWaveUses[item.key] || 0) + 1; }
-        if (item.oneTime) { if (!this.engine._oneTimeUsed) this.engine._oneTimeUsed = {}; this.engine._oneTimeUsed[item.key] = true; }
-        this.SFX.play('buy');
-        this.showWaveAnnounce(`${item.name} 사용!`, '#34d399');
-        this.buildShopBar();
-      });
-      grid.appendChild(btn);
+      const used = !!((item.oneTime && this.engine._oneTimeUsed?.[item.key]) || (pw && waveUses >= pw));
+      return { cost, used, left: pw ? `${pw - waveUses}/${pw}회` : item.oneTime ? '1회' : '' };
+    };
+    if (grid.children.length !== window.ShopItems.length || grid._eng !== this.engine) {
+      grid.innerHTML = ''; grid._eng = this.engine;
+      for (const item of window.ShopItems) {
+        const btn = document.createElement('button');
+        btn.className = 'us-card shop'; btn.dataset.key = item.key;
+        btn.innerHTML = `<b>${item.icon ? ICON(item.icon, 18) : ''} ${item.name}</b><span class="us-desc">${item.desc}</span><span class="us-meta"></span><span class="us-cost"></span>`;
+        btn.addEventListener('click', () => {
+          const st = state(item); // 누른 순간의 값으로 판단
+          if (st.used) return;
+          if (!this.engine.spendGold(st.cost)) { this.showWaveAnnounce('골드가 부족합니다', '#ff5c7a'); return; }
+          const result = item.buy(this.engine);
+          if (result === false) { this.engine.addGold(st.cost); this.showWaveAnnounce(`${item.name}: 지금은 쓸 대상이 없어요 (환불)`, '#9aa3b2'); return; }
+          if (item.scaling) this.engine._shopBuyCount[item.key] = (this.engine._shopBuyCount[item.key] || 0) + 1;
+          if (item.perWave) { if (!this.engine._shopWaveUses) this.engine._shopWaveUses = {}; this.engine._shopWaveUses[item.key] = (this.engine._shopWaveUses[item.key] || 0) + 1; }
+          if (item.oneTime) { if (!this.engine._oneTimeUsed) this.engine._oneTimeUsed = {}; this.engine._oneTimeUsed[item.key] = true; }
+          this.SFX.play('buy');
+          this.showWaveAnnounce(`${item.name} 사용!`, '#34d399');
+          this.buildShopBar();
+        });
+        grid.appendChild(btn);
+      }
     }
+    [...grid.children].forEach((btn, i) => {
+      const item = window.ShopItems[i], st = state(item);
+      btn.disabled = st.used || this.engine.gold < st.cost;
+      btn.querySelector('.us-meta').textContent = st.used ? '사용 완료' : st.left;
+      btn.querySelector('.us-cost').innerHTML = `${ICON('coin', 12)}${fmtNum(st.cost)}`;
+    });
   },
 
   // ===== v28 세션E: 결과 공유 카드 (1080×1350, 인스타 4:5) =====

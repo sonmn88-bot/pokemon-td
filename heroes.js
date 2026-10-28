@@ -358,7 +358,7 @@ class Hero {
     const base = (a.baseDamage + (this.level-1)*a.damagePerLevel) * (1 + this._skillVal('atkDmg', 0) + (this._multiTargetDmgBonus || 0)) * (this._evoDmgMul || 1) * burst;
     // v3.2: 적 체력이 웨이브마다 지수로 오르니 영웅도 같은 곡선으로 성장 (예전엔 레벨 비례 직선이라 후반에 무의미)
     const w = window.app?.engine?.currentWave || 0;
-    const waveScale = Math.pow(1.04, Math.max(0, w - 5));
+    const waveScale = Math.pow(1.033, Math.max(0, w - 5)); // v3.8: 1.04면 141웨이브에 ×208 → 영웅이 전체 데미지 50% 독식. 1.033(×83)으로 20~25% 목표
     return base * this._typeUpgradeDmgMul() * waveScale * (this._formMul || 1) * gmax * (window.app?.engine?._cardMods?.heroDmg || 1);
   }
 

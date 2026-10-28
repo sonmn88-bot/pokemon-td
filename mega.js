@@ -96,7 +96,7 @@ const MEGA_DEFS = [
   window.MEGA_OF = {};
   for (const m of MEGA_DEFS) {
     GachaTowerDefs[m.id] = { id: m.id, name: m.name, emoji: m.emoji, grade: 'unique', type: m.type, pokemonId: m.id,
-      damage: Math.round(base * 0.62), fireRate: m.fr, range: m.range, desc: m.desc, fire: m.fire, mega: true, megaOf: m.base, _signature: true };
+      damage: Math.round(base * 0.75) /* v3.8: 0.62→0.75 */, fireRate: m.fr, range: m.range, desc: m.desc, fire: m.fire, mega: true, megaOf: m.base, _signature: true };
     window.TowerSpriteImages[m.id] = `assets/towers/${m.id}.png`;
     (window.MEGA_OF[m.base] = window.MEGA_OF[m.base] || []).push(m.id);
   }
@@ -105,16 +105,24 @@ const MEGA_DEFS = [
 
 // ---- 스택(★)·메가 판정 ----
 function towerStack(t) { return (t && t.def && t.def._stack) || 1; }
-function canFeed(app, t) {
-  if (!t || !t.def) return 0;
-  const feedId = t.def.mega ? t.def.megaOf : t.def.id;
-  if (!t.def.mega && !window.MEGA_OF[t.def.id]) return 0;           // 메가 원본만 먹이기 가능
-  if (towerStack(t) >= STACK_MAX) return 0;
-  return (app._inventory || []).filter(d => d.id === feedId).length;
+// v3.8 먹이기 확장: 같은 종이 거의 안 모여 메가 표시만 있고 못 먹이던 문제 + 먹이 없는 레전드가 버려지던 문제
+//   대상: 에픽·레전드 전부 + 메가. 재료: 같은 종 우선, 없으면 같은 타입의 에픽 이상(유니크·메가 제외)
+const FEED_GRADES = { epic: 1, legend: 1 };
+function _feedOk(t) { return t && t.def && (t.def.mega || FEED_GRADES[t.def.grade]) && towerStack(t) < STACK_MAX; }
+function _feedMats(app, t) {
+  const sameId = t.def.mega ? t.def.megaOf : t.def.id;
+  const inv = app._inventory || [];
+  const same = inv.filter(d => d.id === sameId);
+  const alt = inv.filter(d => d.id !== sameId && d.type === t.def.type && FEED_GRADES[d.grade] && !d.mega && !(window.MEGA_OF || {})[d.id]);
+  return same.concat(alt.sort((x, y) => (x.grade === 'epic' ? 0 : 1) - (y.grade === 'epic' ? 0 : 1))); // 에픽부터 소모
 }
+function canFeed(app, t) { return _feedOk(t) ? _feedMats(app, t).length : 0; }
 function feedTower(app, t) {
-  const feedId = t.def.mega ? t.def.megaOf : t.def.id;
-  if (!app._takeFromStorageById(feedId)) return false;
+  if (!_feedOk(t)) return false;
+  const mat = _feedMats(app, t)[0];
+  if (!mat) return false;
+  const i = app._inventory.indexOf(mat); if (i < 0) return false;
+  app._inventory.splice(i, 1);
   const plus = (app.engine._cardMods && Math.random() < app.engine._cardMods.feed2) ? 2 : 1; // v3.5 카드 '포식'
   t.def = { ...t.def, _stack: Math.min(STACK_MAX, towerStack(t) + plus) };
   return true;
@@ -257,9 +265,10 @@ Object.assign(App.prototype, {
     if (!t || !t.def) return '';
     const st = towerStack(t), feedN = canFeed(this, t);
     const isBase = !!window.MEGA_OF[t.def.id];
-    if (!isBase && !t.def.mega) return '';
+    if (!isBase && !t.def.mega && !FEED_GRADES[t.def.grade]) return '';
     let h = `<div class="mg-stack">${'★'.repeat(st)}${'☆'.repeat(STACK_MAX - st)} <small>각성 ★${st} · 공격력 +${Math.round((st - 1) * STACK_BONUS * 100)}%</small></div>`;
-    if (feedN) h += `<button class="tp-btn" data-action="feed" style="background:linear-gradient(135deg,#f59e0b,#b45309)">먹이기 (보관함 ${feedN})</button>`;
+    if (feedN) h += `<button class="tp-btn tp-upgrade" data-action="feed" style="grid-column:1 / -1">먹이기 · 같은 종이나 같은 타입 에픽↑ (보관함 ${feedN})</button>`;
+    else if (st < STACK_MAX) h += `<div class="mg-hint">먹이: 같은 종 또는 같은 타입 에픽 이상을 보관함에 두세요</div>`;
     if (isBase) {
       const stones = this.engine._megaStones || 0;
       for (const mid of window.MEGA_OF[t.def.id]) {

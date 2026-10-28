@@ -99,33 +99,15 @@ const ShopItems = [
   },
   {
     key: 'rarecandy', icon:'candy', name: '이상한사탕', emoji: '🍬', cost: 2500, oneTime: true,
-    desc: '3성(에픽) 타워 1개를 랜덤 레전드로 진화 (게임당 1회) - 후반 전략용 고가 아이템',
+    desc: '고른 에픽 타워 1개를 랜덤 레전드로 진화 (게임당 1회) — 에픽 타워를 누른 뒤 정보창에서도 사용 가능',
     buy(engine) {
-      // v27 fix: 아무 등급이나 무한정 되던 걸 3성(epic) 한정 + 1회용으로 변경 (안 그러면 도배해서 다 5성 만들어버림)
-      const gachaSlots = engine.towerSlots.filter(s => s.occupied && s.tower?._gachaId && s.tower.def?.grade === 'epic');
-      if (!gachaSlots.length) {
-        engine.spawnFloatingText('3성(에픽) 타워가 없습니다', engine.camera.x, engine.camera.y - (engine.height/2 - 80)/engine.camera.zoom, '#aaa');
-        return false; // 구매 취소 (골드 안 깎임, 1회 소모 안 함)
-      }
-      const slot = gachaSlots[Math.floor(Math.random() * gachaSlots.length)];
-      const t = slot.tower;
-      // v28: 확정 진화 → 랜덤 레전드 (랜타디 감성, 특정 레전드 고정 획득 방지)
-      const legendPool = window.GRADE_POOLS?.legend || [];
-      const evoId = legendPool[Math.floor(Math.random() * legendPool.length)];
-      const evoDef = evoId ? window.GachaTowerDefs?.[evoId] : null;
-      if (evoDef) {
-        const evoTower = window._createGachaTower(evoDef, slot.x, slot.y, engine);
-        evoTower._evolveGlowTimer = 1.2;
-        engine.towers = engine.towers.filter(x => x !== t);
-        engine.towers.push(evoTower);
-        slot.tower = evoTower;
-        if (window.applyTowerSynergies) window.applyTowerSynergies(engine.towers);
-        const grade = window.GRADES?.[evoDef.grade];
-        engine.spawnFloatingText(`${evoDef.name} 진화!`, slot.x, slot.y-36, grade?.color||'#ffc24b');
-      } else {
-        engine.spawnFloatingText('이미 최고 등급!', slot.x, slot.y-20, '#ffc24b');
+      // v3.8: 랜덤 대상 → 플레이어가 고른 타워. 선택된 에픽 타워가 없으면 안내만 하고 환불
+      const t = engine.selectedTower, slot = t && engine.towerSlots.find(s => s.tower === t);
+      if (!slot || t.def?.grade !== 'epic') {
+        window.app && app.showWaveAnnounce('먼저 진화시킬 에픽 타워를 눌러 선택하세요', '#ff8fb1');
         return false;
       }
+      return useRareCandy(engine, slot);
     }
   },
 ];
@@ -196,3 +178,22 @@ window.GlobalSpells = GlobalSpells;
 window.SpellManager = SpellManager;
 window.applyShopBuffs = applyShopBuffs;
 window.shopItemCost = shopItemCost;
+
+// v3.8 이상한사탕: 선택한 에픽 → 랜덤 레전드 (타워 정보창 버튼과 상점 공용)
+function useRareCandy(engine, slot) {
+  const t = slot && slot.tower;
+  if (!t || t.def?.grade !== 'epic') return false;
+  const legendPool = window.GRADE_POOLS?.legend || [];
+  const evoDef = window.GachaTowerDefs?.[legendPool[Math.floor(Math.random() * legendPool.length)]];
+  if (!evoDef) return false;
+  const evoTower = window._createGachaTower(evoDef, slot.x, slot.y, engine);
+  evoTower._evolveGlowTimer = 1.2;
+  engine.towers = engine.towers.filter(x => x !== t);
+  engine.towers.push(evoTower);
+  slot.tower = evoTower;
+  engine.selectedTower = null;
+  if (window.applyTowerSynergies) window.applyTowerSynergies(engine.towers);
+  engine.spawnFloatingText(`${evoDef.name} 진화!`, slot.x, slot.y - 36, window.GRADES?.[evoDef.grade]?.color || '#ffc24b');
+  return true;
+}
+window.useRareCandy = useRareCandy;

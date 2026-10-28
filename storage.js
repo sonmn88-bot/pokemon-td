@@ -76,7 +76,7 @@ Object.assign(App.prototype, {
       const g = window.GRADES[def.grade];
       const b = document.createElement('button');
       // v3.6: 같은 종 3개(확정 진화) = 초록 점, 필드의 메가 원본에 먹일 수 있으면 '먹이' 표시
-      const feedable = window.MEGA_OF?.[def.id] && this.engine?.towers.some(t => t.def && (t.def.id === def.id || t.def.megaOf === def.id));
+      const feedable = window.MEGA?.canFeed && this.engine?.towers.some(t => t.def && (t.def.id === def.id || t.def.megaOf === def.id || ((def.grade === 'epic' || def.grade === 'legend') && t.def.type === def.type)) && MEGA.canFeed(this, t) > 0); // v3.8 먹이 재료 확장
       b.className = 'storage-item' + (this._placingId === def.id ? ' placing' : '') + (count >= 3 ? ' ready' : '');
       b.style.setProperty('--gc', g.color);
       b.innerHTML = `<span class="si-emoji">${PKM(def, 30)}</span><span class="si-stars">${'★'.repeat(g.stars)}</span>${count > 1 ? `<span class="si-count">×${count}</span>` : ''}${feedable ? '<span class="si-feed">먹이</span>' : window.MEGA_OF?.[def.id] ? `<span class="si-mega">${ICON('gem', 11)}</span>` : ''}`;
@@ -305,7 +305,23 @@ Object.assign(App.prototype, {
         const r = window.RECIPES.find(x => x.id === b.dataset.recipe);
         const all = this._allMaterials(true);
         const idx = r.pick(all.map(m => m.def), { miracle: this.engine._miracle });
-        if (!idx || !this.engine.spendGold(r.cost)) return;
+        if (!idx) return;
+        // v3.8: 재료 레전드를 직접 고름 (자동 선택은 아끼던 레전드가 들어가는 문제)
+        const legs = all.filter(m => m.def.grade === 'legend');
+        const need = r.id === 'mew' ? 3 : 2, distinct = r.id === 'mew';
+        if (legs.length > need && !(r.id === 'mew' && this.engine._miracle && new Set(legs.map(m => m.def.id)).size < 3)) {
+          this._pickRecipeLegends(r, legs, need, distinct, picked => {
+            if (!this.engine.spendGold(r.cost)) { this.showWaveAnnounce('골드가 부족해요', '#ff5c7a'); return; }
+            const used = r.id === 'mewtwo' ? [all.find(m => m.def.id === 'mew'), ...picked] : picked;
+            this._consumeMaterials(used);
+            const res = { ...window.GachaTowerDefs[r.id], _starLevel: 1 };
+            const birds = r.id === 'mew' && ['articuno','zapdos','moltres'].every(id => used.some(m => m.def.id === id));
+            overlay.remove();
+            this._playMergeReveal(res, { recipe: true, birds }, () => { this._addToStorage([res]); this._trackNewTower(res); this.openMergePanel(); });
+          });
+          return;
+        }
+        if (!this.engine.spendGold(r.cost)) return;
         const used = idx.map(i => all[i]);
         const birds = r.id === 'mew' && ['articuno','zapdos','moltres'].every(id => used.some(m => m.def.id === id));
         this._consumeMaterials(used);
@@ -315,6 +331,36 @@ Object.assign(App.prototype, {
       });
     };
     render();
+  },
+
+  // v3.8 레시피 재료 선택 (뮤: 서로 다른 레전드 3 / 뮤츠: 레전드 2)
+  _pickRecipeLegends(r, legs, need, distinct, done) {
+    const ov = document.createElement('div');
+    ov.className = 'merge-overlay recipe-pick';
+    const sel = new Set();
+    const draw = () => {
+      const ids = [...sel].map(k => legs.find(m => m.key === k).def.id);
+      const ok = sel.size === need && (!distinct || new Set(ids).size === need);
+      ov.innerHTML = `<div class="mg-head"><div class="mg-title">${r.name} 재료 고르기</div><button class="mg-x" data-x aria-label="닫기">${ICON('close', 18)}</button></div>
+        <div class="mg-hint">${distinct ? '서로 다른 레전드' : '레전드'} ${need}마리를 고르세요 · ${sel.size}/${need}${r.cost ? ` · ${ICON('coin', 12)}${r.cost}` : ''}</div>
+        <div class="mg-grid">${legs.map(m => `<button class="mg-card ${sel.has(m.key) ? 'sel' : ''}" data-k="${m.key}" style="--gc:${window.GRADES.legend.color}">
+          ${m.kind === 'field' ? '<span class="mg-field">필드</span>' : ''}<span class="mg-emoji">${PKM(m.def, 34)}</span><span class="mg-name">${m.def.name}${(m.def._stack || 1) > 1 ? ' ★' + m.def._stack : ''}</span></button>`).join('')}</div>
+        <div class="mg-actions"><button class="mg-btn evo" data-go ${ok ? '' : 'disabled'}>${ICON('sparkle', 15)}${r.name} 만들기</button></div>`;
+      ov.querySelectorAll('[data-k]').forEach(b => b.onclick = () => {
+        const k = b.dataset.k;
+        if (sel.has(k)) sel.delete(k);
+        else if (sel.size < need) {
+          const id = legs.find(m => m.key === k).def.id;
+          if (distinct && [...sel].some(x => legs.find(m => m.key === x).def.id === id)) { this.showWaveAnnounce('같은 종은 1마리만', '#ff5c7a'); return; }
+          sel.add(k);
+        }
+        draw();
+      });
+      ov.querySelector('[data-x]').onclick = () => ov.remove();
+      ov.querySelector('[data-go]').onclick = () => { if (!ok) return; ov.remove(); done([...sel].map(k => legs.find(m => m.key === k))); };
+    };
+    draw();
+    document.getElementById('game-screen').appendChild(ov);
   },
 
   // ---------- 행운의 동전: 후보 2개 중 선택 ----------

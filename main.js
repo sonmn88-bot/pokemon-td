@@ -488,7 +488,7 @@ class App {
       ]],
       ['보스·메가', [
         ['monster', '보스', '왼쪽 아래 <b>보스</b> 버튼으로 직접 소환하면 큰 보상. 30웨이브마다 구역이 바뀌고 전설 보스가, 90웨이브엔 왕 루기아가 나와요.'],
-        ['gem', '메가진화', '리자몽·거북왕·이상해꽃·갸라도스 등 12종을 필드에 두고 누르면 <b>먹이기</b>로 보관함의 같은 포켓몬을 흡수해 ★이 올라요(★당 +35%). ★3 + 메가스톤이면 메가진화, ★5까지. 메가스톤은 20웨이브마다 나오는 보스에서 확률 드롭. 가능한 타워는 골드 링, 먹이기 가능하면 초록 점선 링.'],
+        ['gem', '각성 · 메가진화', '에픽·레전드·메가 타워는 <b>먹이기</b>로 ★이 올라요(★당 +35%, 최대 ★5). 먹이는 같은 종, 없으면 같은 타입의 에픽 이상. 메가 원본(리자몽·거북왕 등 12종)은 ★3 + 메가스톤이면 메가진화, ★5까지. 메가스톤은 20웨이브마다 나오는 보스에서 확률 드롭. 가능한 타워는 골드 링, 먹이기 가능하면 초록 점선 링.'],
         ['prism', '이번 판 편성', '시작 때 많이 나오는 몬스터 특성과 추천 메가를 알려줘요. 유니크·메가는 같은 종 1마리만. 서로 다른 타입 4·5·6종이면 전체 공격력 +10·20·30%.'],
       ]],
     ];
@@ -1388,12 +1388,12 @@ class App {
     if (!el) {
       el = document.createElement('div');
       el.id = 'wave-preview';
-      el.style.cssText = 'position:absolute;left:50%;bottom:calc(var(--bar-h,82px) + 140px);transform:translateX(-50%);z-index:19;display:flex;gap:4px;align-items:center;background:rgba(0,0,0,0.5);border-radius:8px;padding:4px 8px;font-size:11px;color:#aaa;pointer-events:none;';
+
       document.getElementById('game-screen').appendChild(el);
     }
     const types = typeof previewWaveTypes === 'function' ? previewWaveTypes(nextWave) : [];
-    const icons = types.map(t => window.TYPES?.[t]?.emoji || '').join(' ');
-    el.innerHTML = `다음 웨이브: ${icons || '?'}`;
+    const icons = types.map(t => ICON(t, 16)).join(''); // v3.8: 이모지 → 타입 배지
+    el.innerHTML = `<span>다음 웨이브</span>${icons || '?'}`;
   }
 
   // v27: 상시노출 상점바 (기존 5웨이브마다 뜨던 팝업 대신, 게임 멈추지 않음)
@@ -1433,7 +1433,7 @@ class App {
     const tierDef = BOSS_TIERS.find(t => t.tier === this._bossSummonTier);
     if (cd > 0) {
       btn.disabled = true;
-      btn.textContent = `⏳ 재사용 대기 (${Math.ceil(cd)}s)`;
+      btn.textContent = `재사용 대기 ${Math.ceil(cd)}초`;
     } else if (this.engine.currentWave < (tierDef.minWave || 1)) {
       btn.disabled = true;
       btn.textContent = `웨이브 ${tierDef.minWave} 이후 소환가능`;
@@ -1441,6 +1441,11 @@ class App {
       btn.disabled = false;
       btn.textContent = `${tierDef.label} 소환`;
     }
+    // v3.8 소환 가능 표시: 접힌 버튼이 빛나고, 가능해지는 순간 한 번 알림
+    const ready = cd <= 0 && BOSS_TIERS.some(t => this.engine.currentWave >= (t.minWave || 1));
+    bar.classList.toggle('ready', ready);
+    if (ready && this._bossReadyPrev === false && this.engine.currentWave >= 1) this.showWaveAnnounce('보스 소환 가능 · 왼쪽 아래 보스 버튼', '#ff5c7a');
+    this._bossReadyPrev = ready;
   }
 
   checkSkinUnlocks(stars) {

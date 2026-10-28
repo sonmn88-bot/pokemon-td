@@ -1581,3 +1581,11 @@ img.title-pkm.lead { width:88px; height:88px; }
 .hero-evo.done .he-sub { animation:heTitle .7s ease-out .35s forwards; }
 .skill-btn .skill-cd:empty { display:none; }
 .hero-item-pop b, .hero-item-pop small { word-break:keep-all; }
+/* v3.8 보스 소환 가능 */
+#boss-summon-bar.ready { border-color:rgba(255,92,122,.8) !important; box-shadow:0 0 0 1px rgba(255,92,122,.5), 0 6px 16px rgba(255,92,122,.25); }
+#boss-summon-bar.ready.folded .bs-fold { background:rgba(255,92,122,.18); color:#fff; }
+#boss-summon-bar.ready.folded .bs-fold::after { content:''; position:absolute; top:4px; right:4px; width:8px; height:8px; border-radius:50%; background:#ff5c7a; }
+.bs-fold { position:relative; }
+#wave-preview { position:absolute; left:50%; bottom:calc(var(--bar-h,82px) + 140px); transform:translateX(-50%); z-index:19; display:flex; gap:4px; align-items:center;
+  background:rgba(14,16,22,.85); border:1px solid var(--border); border-radius:10px; padding:5px 10px; font-size:11px; font-weight:700; color:var(--text-mid); pointer-events:none; }
+#wave-preview span { margin-right:4px; }
