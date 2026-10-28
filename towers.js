@@ -115,6 +115,9 @@ class Projectile {
     }
     if (this.chain > 0 && this.engine) this._doChain(enemy, this.chain);
     this.engine && this.engine.spawnHitParticle(enemy.x, enemy.y, this.color);
+    const tierH = this._tier();
+    if (tierH && this.engine && this.src && ((this.src._fxN = (this.src._fxN || 0) + 1) % 2 === 0) && this.engine.particles.length < 120)
+      this.engine.particles.push(new BurstRing(enemy.x, enemy.y, tierH === 'legend' ? 26 : 34, TIER_FX[tierH].color));
     this.onHit && this.onHit(enemy);
     if (this.engine) { this.engine._dmgSrc = prevSrc; this.engine._dmgStrike = prevStrike; }
   }
@@ -136,6 +139,12 @@ class Projectile {
   }
 
   // v3.6 공격 연출: 이모지 글자 대신 타입별 미리 그린 스프라이트 + 꼬리 1획 (fillText·shadowBlur 없음 → 더 가벼움)
+  // v3.6 상위 등급 연출: 레전드(금빛 링)·유니크(무지개 링)·메가(푸른 십자 섬광) — 오라 1장 추가 + 2타마다 타격 링
+  _tier() {
+    if (this._tr !== undefined) return this._tr;
+    const d = this.src && this.src.def;
+    return (this._tr = !d ? null : d.mega ? 'mega' : d.grade === 'unique' ? 'unique' : d.grade === 'legend' ? 'legend' : null);
+  }
   _type() {
     if (this._ty) return this._ty;
     const t = this.src && this.src.def && this.src.def.type;
@@ -156,6 +165,8 @@ class Projectile {
         }
       }
       ctx.lineTo(x2, y2);
+      const tierB = this._tier();
+      if (tierB) { ctx.strokeStyle = TIER_FX[tierB].color; ctx.lineWidth = this.size * 4; ctx.globalAlpha = alpha * 0.25; ctx.stroke(); }
       ctx.strokeStyle = st.glow; ctx.lineWidth = this.size * 2.6; ctx.globalAlpha = alpha * 0.35; ctx.stroke();
       ctx.strokeStyle = st.core; ctx.lineWidth = Math.max(1.5, this.size * 0.7); ctx.globalAlpha = alpha; ctx.stroke();
       ctx.restore();
@@ -171,11 +182,13 @@ class Projectile {
         ctx.lineTo(tr[i].x + j, tr[i].y + j);
       }
       ctx.lineTo(this.x, this.y);
-      ctx.strokeStyle = st.glow; ctx.globalAlpha = st.trailA; ctx.lineWidth = this.size * st.trailW; ctx.stroke();
+      const tierT = this._tier();
+      ctx.strokeStyle = tierT ? TIER_FX[tierT].color : st.glow; ctx.globalAlpha = st.trailA + (tierT ? 0.15 : 0); ctx.lineWidth = this.size * st.trailW * (tierT ? 1.5 : 1); ctx.stroke();
       ctx.restore();
     }
-    const spr = projSprite(ty), d = this.size * 3.4;
+    const tier = this._tier(), spr = projSprite(ty), d = this.size * (tier ? 4.2 : 3.4);
     ctx.save(); ctx.translate(this.x, this.y);
+    if (tier) { const a = tierAura(tier), ad = d * 1.9; ctx.save(); ctx.rotate(performance.now() * 0.004); ctx.drawImage(a, -ad / 2, -ad / 2, ad, ad); ctx.restore(); }
     ctx.rotate(st.spin ? performance.now() * 0.014 : Math.atan2(this.vy, this.vx));
     ctx.drawImage(spr, -d / 2, -d / 2, d, d);
     ctx.restore();
@@ -191,6 +204,29 @@ const PROJ_STYLE = {
   psychic:  { core:'#ffe9ff', glow:'#c77dff', trailA:0.35, trailW:1.0 },
   normal:   { core:'#ffffff', glow:'#c3c8d2', trailA:0.3,  trailW:0.7 },
 };
+const TIER_FX = { legend:{ color:'#ffc24b' }, unique:{ color:'#ff7ab0' }, mega:{ color:'#7fd3ff' } };
+function tierAura(tier) {
+  const k = 'aura_' + tier;
+  if (_projCache[k]) return _projCache[k];
+  const c = document.createElement('canvas'); c.width = c.height = 64;
+  const x = c.getContext('2d'); x.translate(32, 32);
+  if (tier === 'unique') { // 무지개 고리
+    const g = x.createConicGradient ? x.createConicGradient(0, 0, 0) : null;
+    if (g) { ['#ff5c7a','#ffc24b','#6dffa8','#5b9dff','#c77dff','#ff5c7a'].forEach((col, i) => g.addColorStop(i / 5, col)); x.strokeStyle = g; } else x.strokeStyle = '#ff7ab0';
+    x.lineWidth = 3; x.globalAlpha = 0.9; x.beginPath(); x.arc(0, 0, 22, 0, Math.PI * 2); x.stroke();
+  } else if (tier === 'mega') { // 십자 섬광
+    for (const [w, h] of [[30, 2.2], [2.2, 30], [18, 1.4], [1.4, 18]]) {
+      const g = x.createRadialGradient(0, 0, 0, 0, 0, Math.max(w, h)); g.addColorStop(0, '#ffffff'); g.addColorStop(1, '#7fd3ff00');
+      x.save(); if (w === 18 || h === 18) x.rotate(Math.PI / 4); x.fillStyle = g; x.beginPath(); x.ellipse(0, 0, w, h, 0, 0, Math.PI * 2); x.fill(); x.restore();
+    }
+    x.strokeStyle = 'rgba(127,211,255,.7)'; x.lineWidth = 1.5; x.beginPath(); x.arc(0, 0, 20, 0, Math.PI * 2); x.stroke();
+  } else { // 레전드: 금빛 점선 고리 + 빛
+    const g = x.createRadialGradient(0, 0, 8, 0, 0, 28); g.addColorStop(0, '#ffc24b55'); g.addColorStop(1, '#ffc24b00');
+    x.fillStyle = g; x.beginPath(); x.arc(0, 0, 28, 0, Math.PI * 2); x.fill();
+    x.strokeStyle = '#ffd97a'; x.lineWidth = 2; x.setLineDash([5, 4]); x.beginPath(); x.arc(0, 0, 20, 0, Math.PI * 2); x.stroke();
+  }
+  return (_projCache[k] = c);
+}
 const _projCache = {};
 function projSprite(ty) {
   if (_projCache[ty]) return _projCache[ty];
