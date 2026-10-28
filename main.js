@@ -472,19 +472,19 @@ class App {
     overlay.innerHTML = `
       <div class="skin-picker-title">❓ 게임 방법</div>
       <div style="max-width:420px;text-align:left;color:#ddd;font-size:13px;line-height:1.9;padding:0 16px;max-height:60vh;overflow-y:auto;">
-        <b style="color:#ffc24b">🎯 목표</b> — 필드에 몬스터가 <b>200마리</b> 쌓이면 끝. 웨이브를 최대한 오래 버티세요. 웨이브는 끝이 없어요.<br><br>
-        <b style="color:#ffc24b">🎰 뽑기</b> — 하단 캡슐 버튼으로 포켓몬을 뽑아요. 빈 자리를 먼저 누르고 뽑으면 바로 배치, 아니면 보관함으로 가요. 일반(1성) · 프리미엄(1~3성) · 도박(2~5성) · 10연.<br><br>
-        <b style="color:#ffc24b">🧪 합성</b> — 플라스크 버튼. 같은 등급 아무거나 3마리 → 다음 등급 랜덤, 같은 포켓몬 3마리 → 진화가 확정. <b>⚡⚡ 한 번에 전부</b>를 누르면 보관함의 그 등급을 전부 합성해요(배치된 타워는 그대로).<br><br>
-        <b style="color:#ffc24b">💗 유니크</b> — 뮤 = 서로 다른 레전드 3마리, 뮤츠 = 뮤 + 레전드 2마리 + 2000골드. 합성 연구소 위쪽 레시피에서 만들어요.<br><br>
-        <b style="color:#ffc24b">⬆ 강화 · 상점</b> — 하단 화살표 버튼. 타입 강화는 그 타입 타워 전부(등급별 고정 데미지 + 6%), 상점은 몬스터볼·대피시키기 같은 긴급 아이템이에요. 열어둔 채로 플레이할 수 있어요.<br><br>
-        <b style="color:#ffc24b">💰 골드</b> — 처치 골드 + 웨이브 클리어 보너스 + <b>이자</b>(10골드당 1, 최대 30). 모아두면 이자가 붙어요.<br><br>
-        <b style="color:#ffc24b">⚡ 영웅</b> — 맵에 놓고 길 근처로 옮겨요. 레벨이 오르면 스킬 포인트로 스킬트리를 찍어요(영웅을 누르면 열림).<br><br>
-        <b style="color:#ffc24b">👹 보스</b> — 왼쪽 아래에서 직접 소환하면 큰 보상. 30웨이브마다 구역이 바뀌고 전설 보스가, 90웨이브엔 왕 루기아가 나와요.<br><br>
-        <b style="color:#ffc24b">💎 메가진화</b> — 리자몽·거북왕·이상해꽃·갸라도스·쁘사이저·독침붕·프테라·캥카·피죤투·후딘·팬텀·썬더를 필드에 두고 누르면 <b>🍖 먹이기</b>로 보관함의 같은 포켓몬을 흡수해 ★이 올라요(★당 +35%). ★3 + 메가스톤이면 메가진화, 이후 ★5까지 계속 키울 수 있어요. 메가스톤은 <b>20웨이브마다 나오는 보스</b>에서 확률로만 나와요(30%부터 점점 올라감).<br><br>
-        <b style="color:#ffc24b">🧭 이번 판 편성</b> — 시작할 때 이번 판에 많이 나오는 몬스터 특성 2가지와 추천 메가를 알려줘요. 유니크·메가는 같은 종 1마리만 배치할 수 있고, 필드에 서로 다른 타입이 4·5·6종이면 전체 공격력 +10·20·30%(상단 🌈).<br><br>
-        <b style="color:#ffc24b">🃏 강화 카드</b> — 10웨이브마다 카드 3장 중 1장을 골라요(일반·희귀·영웅·전설·신화). 이미 고른 계열이 더 잘 나와서 한 방향으로 키울 수 있고, 같은 카드는 레벨업, 두 계열을 모으면 조합 카드도 나와요. 카드 1장마다 몬스터도 체력 +4%씩 적응해요. 상단 🃏를 누르면 내 카드 목록.<br><br>
-        <b style="color:#ffc24b">✨ 영웅 변신</b> — 15웨이브 이후 가끔(또는 20웨이브 보스에서) 영웅 전용 아이템이 떨어지면 변신해요. 피카츄→거다이맥스, 토게틱→토게키스, 이브이 계열은 금빛 각성.<br><br>
-        <b style="color:#ffc24b">💿 기술머신</b> — 에픽·레전드 타워를 누르면 1500골드에 특성 1개를 배울 수 있어요(타워당 1번).
+        <b style="color:#ffc24b">목표</b> — 필드에 몬스터가 <b>200마리</b> 쌓이면 끝. 웨이브를 최대한 오래 버티세요. 웨이브는 끝이 없어요.<br><br>
+        <b style="color:#ffc24b">뽑기</b> — 하단 캡슐 버튼으로 포켓몬을 뽑아요. 빈 자리를 먼저 누르고 뽑으면 바로 배치, 아니면 보관함으로 가요. 일반(1성) · 프리미엄(1~3성) · 도박(2~5성) · 10연.<br><br>
+        <b style="color:#ffc24b">합성</b> — 플라스크 버튼. 같은 등급 아무거나 3마리 → 다음 등급 랜덤, 같은 포켓몬 3마리 → 진화가 확정. <b>⚡⚡ 한 번에 전부</b>를 누르면 보관함의 그 등급을 전부 합성해요(배치된 타워는 그대로).<br><br>
+        <b style="color:#ffc24b">유니크</b> — 뮤 = 서로 다른 레전드 3마리, 뮤츠 = 뮤 + 레전드 2마리 + 2000골드. 합성 연구소 위쪽 레시피에서 만들어요.<br><br>
+        <b style="color:#ffc24b">강화 · 상점</b> — 하단 화살표 버튼. 타입 강화는 그 타입 타워 전부(등급별 고정 데미지 + 6%), 상점은 몬스터볼·대피시키기 같은 긴급 아이템이에요. 열어둔 채로 플레이할 수 있어요.<br><br>
+        <b style="color:#ffc24b">골드</b> — 처치 골드 + 웨이브 클리어 보너스 + <b>이자</b>(10골드당 1, 최대 30). 모아두면 이자가 붙어요.<br><br>
+        <b style="color:#ffc24b">영웅</b> — 맵에 놓고 길 근처로 옮겨요. 레벨이 오르면 스킬 포인트로 스킬트리를 찍어요(영웅을 누르면 열림).<br><br>
+        <b style="color:#ffc24b">보스</b> — 왼쪽 아래에서 직접 소환하면 큰 보상. 30웨이브마다 구역이 바뀌고 전설 보스가, 90웨이브엔 왕 루기아가 나와요.<br><br>
+        <b style="color:#ffc24b">메가진화</b> — 리자몽·거북왕·이상해꽃·갸라도스·쁘사이저·독침붕·프테라·캥카·피죤투·후딘·팬텀·썬더를 필드에 두고 누르면 <b>🍖 먹이기</b>로 보관함의 같은 포켓몬을 흡수해 ★이 올라요(★당 +35%). ★3 + 메가스톤이면 메가진화, 이후 ★5까지 계속 키울 수 있어요. 메가스톤은 <b>20웨이브마다 나오는 보스</b>에서 확률로만 나와요(30%부터 점점 올라감).<br><br>
+        <b style="color:#ffc24b">이번 판 편성</b> — 시작할 때 이번 판에 많이 나오는 몬스터 특성 2가지와 추천 메가를 알려줘요. 유니크·메가는 같은 종 1마리만 배치할 수 있고, 필드에 서로 다른 타입이 4·5·6종이면 전체 공격력 +10·20·30%(상단 🌈).<br><br>
+        <b style="color:#ffc24b">강화 카드</b> — 10웨이브마다 카드 3장 중 1장을 골라요(일반·희귀·영웅·전설·신화). 이미 고른 계열이 더 잘 나와서 한 방향으로 키울 수 있고, 같은 카드는 레벨업, 두 계열을 모으면 조합 카드도 나와요. 카드 1장마다 몬스터도 체력 +4%씩 적응해요. 상단 🃏를 누르면 내 카드 목록.<br><br>
+        <b style="color:#ffc24b">영웅 변신</b> — 15웨이브 이후 가끔(또는 20웨이브 보스에서) 영웅 전용 아이템이 떨어지면 변신해요. 피카츄→거다이맥스, 토게틱→토게키스, 이브이 계열은 금빛 각성.<br><br>
+        <b style="color:#ffc24b">기술머신</b> — 에픽·레전드 타워를 누르면 1500골드에 특성 1개를 배울 수 있어요(타워당 1번).
       </div>
     `;
     const closeBtn = document.createElement('button');
@@ -1791,7 +1791,7 @@ class App {
 
     const title = document.createElement('div');
     title.className = 'end-title ' + (victory ? 'victory' : 'gameover');
-    title.textContent = victory ? '🏆 VICTORY!' : '💀 GAME OVER';
+    title.textContent = victory ? '승리' : '게임 오버';
     overlay.appendChild(title);
 
     if (!victory) {
@@ -1802,7 +1802,7 @@ class App {
       overlay.appendChild(info);
       const bestEl = document.createElement('div');
       bestEl.style.cssText = 'color:#ffc24b;font-size:15px;margin-bottom:8px;';
-      bestEl.textContent = `🏆 최고 기록: ${best != null ? best : reached}`;
+      bestEl.textContent = `최고 기록 ${best != null ? best : reached}`;
       overlay.appendChild(bestEl);
 
       // v27-6: 이번 판 요약 (요청4) - MVP타워/최고시너지/사용 종수
@@ -1828,9 +1828,9 @@ class App {
       const varietyCount = new Set(this.engine.towers.map(t => t.def?.type)).size;
       // v27-18: 사망 서사 (요청F)
       const dc = this.engine._deathCause;
-      const deathLine = dc ? `<div style="color:#ff5c7a;font-style:italic;margin-top:4px">💀 ${dc.name} ${dc.count}마리에게 둘러싸여 무너졌습니다</div>` : '';
+      const deathLine = dc ? `<div style="color:#ff5c7a;font-style:italic;margin-top:4px">${dc.name} ${dc.count}마리에게 둘러싸여 무너졌습니다</div>` : '';
       summary.innerHTML = `
-        <div style="color:#ffc24b;font-weight:700;margin-bottom:6px;">📊 이번 판 요약 — 데미지 순위</div>
+        <div style="color:#ffc24b;font-weight:700;margin-bottom:6px;">이번 판 요약 — 데미지 순위</div>
         ${rowHtml || '<div>기록 없음</div>'}
         <div class="rs-foot">총 데미지 ${fmt(total)} · 필드 ${this.engine.towers.length}마리 · 타입 ${varietyCount}종 · 점수 ${(this.engine.score||0).toLocaleString()}</div>
         ${deathLine}
@@ -1961,13 +1961,13 @@ class App {
       // v28 세션E: 일시정지 메뉴 (웨이브 버튼과 겹치던 '← 맵' 버튼을 여기로 옮김)
       const ov = document.createElement('div');
       ov.className = 'pause-overlay';
-      ov.innerHTML = `<div class="po-card"><div class="po-title">⏸ 일시정지</div>
-        <button class="po-btn go">▶ 계속하기</button><button class="po-btn ps">${this.engine.powerSave ? '🔋 절전 모드 켜짐 (30fps)' : '⚡ 부드럽게 (60fps)'}</button><button class="po-btn quit">🏠 타이틀로</button>${(this.engine._errLog || []).length ? `<div class="po-err">오류 기록 ${this.engine._errCount}건 (스크린샷 보내주세요)<br>${this.engine._errLog.map(m => m.replace(/</g, '&lt;')).join('<br>')}</div>` : ''}</div>`;
+      ov.innerHTML = `<div class="po-card"><div class="po-title">일시정지</div>
+        <button class="po-btn go">계속하기</button><button class="po-btn ps">${this.engine.powerSave ? '절전 모드 켜짐 · 30fps' : '부드럽게 · 60fps'}</button><button class="po-btn quit">타이틀로</button>${(this.engine._errLog || []).length ? `<div class="po-err">오류 기록 ${this.engine._errCount}건 (스크린샷 보내주세요)<br>${this.engine._errLog.map(m => m.replace(/</g, '&lt;')).join('<br>')}</div>` : ''}</div>`;
       ov.querySelector('.go').onclick = () => this.togglePause();
       ov.querySelector('.ps').onclick = (ev) => {
         this.engine.powerSave = !this.engine.powerSave;
         try { localStorage.setItem('pokemontd_powersave', this.engine.powerSave ? '1' : '0'); } catch (_) {}
-        ev.target.textContent = this.engine.powerSave ? '🔋 절전 모드 켜짐 (30fps)' : '⚡ 부드럽게 (60fps)';
+        ev.target.textContent = this.engine.powerSave ? '절전 모드 켜짐 · 30fps' : '부드럽게 · 60fps';
       };
       ov.querySelector('.quit').onclick = () => { if (confirm('타이틀로 돌아가시겠습니까? 진행 중인 게임은 저장되지 않습니다.')) { ov.remove(); this.backToMapSelect(); } };
       document.getElementById('game-screen').appendChild(ov);
