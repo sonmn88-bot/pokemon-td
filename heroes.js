@@ -656,7 +656,7 @@ class Hero {
       ctx.font = 'bold 10px Pretendard,-apple-system,sans-serif';
       ctx.textAlign = 'center';
       ctx.shadowColor = 'rgba(0,0,0,0.9)';
-      ctx.shadowBlur = 4;
+      ctx.shadowBlur=0; /* v3.6 발열: 번짐 제거 */
       ctx.fillStyle = this.skillPoints > 0 ? '#ffc24b' : '#fff';
       ctx.fillText(`Lv${this.level}${this.skillPoints>0?' ✦':''}`, this.x, this.y+34);
       ctx.restore();
@@ -696,7 +696,7 @@ class Hero {
       ctx.font = 'bold 10px Pretendard,-apple-system,sans-serif';
       ctx.textAlign = 'center';
       ctx.shadowColor = 'rgba(0,0,0,0.9)';
-      ctx.shadowBlur = 4;
+      ctx.shadowBlur=0; /* v3.6 발열: 번짐 제거 */
       ctx.fillStyle = this.skillPoints > 0 ? '#ffc24b' : '#fff';
       ctx.fillText(`Lv${this.level}${this.skillPoints>0?' ✦':''}`, this.x, this.y+34);
       ctx.restore();
@@ -711,7 +711,7 @@ class Hero {
       ctx.font = '28px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText(skin.emoji, this.x, this.y);
       ctx.font = 'bold 10px Pretendard,-apple-system,sans-serif';
-      ctx.fillStyle = '#fff'; ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 3;
+      ctx.fillStyle = '#fff'; ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur=0; /* v3.6 발열: 번짐 제거 */
       ctx.textBaseline = 'alphabetic';
       ctx.fillText(`Lv${this.level}`, this.x, this.y+34);
       ctx.restore();

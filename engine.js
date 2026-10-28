@@ -998,7 +998,7 @@ class GameEngine {
     // 이름 + 이모지
     ctx.font='bold 11px Pretendard,-apple-system,sans-serif';
     ctx.fillStyle='#fff'; ctx.textAlign='center';
-    ctx.shadowColor='rgba(0,0,0,0.9)'; ctx.shadowBlur=4;
+    ctx.shadowColor='rgba(0,0,0,0.9)'; ctx.shadowBlur=0; /* v3.6 발열: 번짐 제거 */
     ctx.fillText(`${boss.def.emoji} ${boss.name}`, bx+bw/2, by-4);
 
     // HP 바 배경
@@ -1011,7 +1011,7 @@ class GameEngine {
       ? `hsl(${10 + Math.sin(Date.now()*0.01)*10}, 90%, 55%)`
       : `hsl(${ratio * 110}, 80%, 50%)`;
     ctx.fillStyle=barColor;
-    if (isRage) { ctx.shadowColor='#ff4444'; ctx.shadowBlur=10; }
+    if (isRage) { ctx.shadowColor='#ff4444'; ctx.shadowBlur=0; /* v3.6 발열: 번짐 제거 */ }
     this._roundRect(ctx, bx, by, bw*ratio, bh, 4);
     ctx.fill();
 
@@ -1023,7 +1023,7 @@ class GameEngine {
     if (boss.shieldHp > 0 && boss.def.shieldHp) {
       const sRatio = Math.max(0, boss.shieldHp / boss.def.shieldHp);
       ctx.fillStyle='rgba(180,140,255,0.7)';
-      ctx.shadowColor='#b39ddb'; ctx.shadowBlur=6;
+      ctx.shadowColor='#b39ddb'; ctx.shadowBlur=0; /* v3.6 발열: 번짐 제거 */
       this._roundRect(ctx, bx, by-6, bw*sRatio, 5, 3);
       ctx.fill();
     }
@@ -1128,7 +1128,7 @@ class Spark {
   }
   draw(ctx) {
     ctx.save();ctx.globalAlpha=this.alpha;ctx.fillStyle=this.color;
-    ctx.shadowColor=this.color;ctx.shadowBlur=7;
+    ctx.shadowColor=this.color;ctx.shadowBlur=0; /* v3.6 발열: 번짐 제거 */
     ctx.beginPath();ctx.arc(this.x,this.y,this.r,0,Math.PI*2);ctx.fill();ctx.restore();
   }
 }
@@ -1140,7 +1140,7 @@ class BurstRing {
 
     const t=this.life/this.maxLife,r=this.maxR*t;
     ctx.save();ctx.globalAlpha=(1-t)*0.7;ctx.strokeStyle=this.color;ctx.lineWidth=3*(1-t)+1;
-    ctx.shadowColor=this.color;ctx.shadowBlur=12;
+    ctx.shadowColor=this.color;ctx.shadowBlur=0; /* v3.6 발열: 번짐 제거 */
     ctx.beginPath();ctx.arc(this.x,this.y,r,0,Math.PI*2);ctx.stroke();
     ctx.globalAlpha=(1-t)*0.14;ctx.fillStyle=this.color;ctx.fill();ctx.restore();
   }
@@ -1167,7 +1167,7 @@ class ComboFlash {
     ctx.strokeStyle='rgba(0,0,0,0.9)';ctx.lineWidth=4;
     const color=this.combo>=20?'#ff5c7a':this.combo>=10?'#ffc24b':'#34d399';
     ctx.strokeText(`${this.combo}콤보!`,0,0);
-    ctx.fillStyle=color;ctx.shadowColor=color;ctx.shadowBlur=16;
+    ctx.fillStyle=color;ctx.shadowColor=color;ctx.shadowBlur=0; /* v3.6 발열: 번짐 제거 */
     ctx.fillText(`${this.combo}콤보!`,0,0);
     ctx.restore();
   }
