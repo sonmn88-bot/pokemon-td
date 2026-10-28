@@ -2,7 +2,7 @@
 
 const WAVES_PER_ZONE = 30; // v27: 30웨이브씩 3존 순환(1~90), 90에서 왕 조우 후엔 존 전환 없이 그 자리에서 무한 강화
 const ZONE_MAPS = ['forest', 'cave', 'city']; // 1~30 태초마을 숲 / 31~60 라벤더 동굴(우주 성운 테마) / 61~90 홍련체육관 도시(화산)
-const ZONE_LABELS = ['🌲 초원 지대', '🌌 우주 동굴', '🌋 화산 도시'];
+const ZONE_LABELS = ['초원 지대', '우주 동굴', '화산 도시'];
 const KING_WAVE = 90;
 // v27-4: 90웨이브부터는 존 전환 없이 마지막 존(화산 도시)에 고정 - "왕 조우 후 무한강화" 구조 (item 9)
 function zoneIndexForWave(n) { return n >= KING_WAVE ? ZONE_MAPS.length - 1 : Math.floor((n - 1) / WAVES_PER_ZONE) % ZONE_MAPS.length; }
@@ -139,22 +139,23 @@ class App {
           const g = ctx.createGain();
           g.connect(ctx.destination);
           const o = ctx.createOscillator();
-          o.connect(g);
+          const lpf = ctx.createBiquadFilter(); lpf.type = 'lowpass'; lpf.frequency.value = 3800; // v3.8 칩튠 사각파의 거친 고음 정리
+          o.connect(lpf); lpf.connect(g);
           // 부드러운 사운드로 전면 교체: square/sawtooth(거친 지지직 소리) → sine/triangle
           const configs = {
             shoot:      { freq:[440,300],   dur:0.09, vol:0.09, type:'triangle' },
             hit:        { freq:[260,160],   dur:0.11, vol:0.10, type:'sine' },
-            wave_clear: { freq:[523,659,784],dur:0.55, vol:0.15, type:'sine' },
+            wave_clear: { freq:[784,988,1175,1568],dur:0.5, vol:0.07, type:'square' }, // v3.8 칩튠 팡파레
             king_victory: { freq:[392,523,659,784,988],dur:0.9, vol:0.18, type:'triangle' }, // v27-18: 왕 처치 전용 징글 (요청H)
-            wave_start: { freq:[330,440],   dur:0.22, vol:0.13, type:'sine' },
-            pull_normal:{ freq:[440,550],   dur:0.16, vol:0.11, type:'sine' },
-            pull_rare:  { freq:[550,700,880],dur:0.32, vol:0.14, type:'sine' },
-            pull_epic:  { freq:[440,660,880,1100],dur:0.5,vol:0.16,type:'sine' },
-            merge:      { freq:[523,659,784,1047],dur:0.6,vol:0.17,type:'sine' },
+            wave_start: { freq:[523,784],   dur:0.18, vol:0.06, type:'square' },
+            pull_normal:{ freq:[659,880],   dur:0.14, vol:0.06, type:'square' },
+            pull_rare:  { freq:[659,880,1175],dur:0.28, vol:0.07, type:'square' },
+            pull_epic:  { freq:[523,659,784,1047,1319],dur:0.6,vol:0.08,type:'square' },
+            merge:      { freq:[523,659,784,1047],dur:0.5,vol:0.08,type:'square' },
             boss:       { freq:[150,120,100],dur:0.85, vol:0.09, type:'triangle' },
-            buy:        { freq:[440,550],   dur:0.16, vol:0.11, type:'sine' },
+            buy:        { freq:[988,1319],  dur:0.16, vol:0.06, type:'square' }, // 동전 소리 (B5→E6)
             life_lost:  { freq:[260,210,170],dur:0.45, vol:0.13, type:'sine' },
-            skill:      { freq:[660,880],   dur:0.22, vol:0.13, type:'sine' },
+            skill:      { freq:[440,880,1320],dur:0.24, vol:0.07, type:'square' },
           };
           const cfg = configs[type] || configs.hit;
           o.type = cfg.type;
@@ -166,7 +167,8 @@ class App {
           o.frequency.setValueAtTime(freqs[0], t0);
           freqs.forEach((f, i) => {
             // 계단식(끊김/지지직) 대신 부드러운 선형 램프로 주파수 전환
-            o.frequency.linearRampToValueAtTime(f, t0 + i * stepDur + stepDur * 0.9);
+            if (cfg.type === 'square') o.frequency.setValueAtTime(f, t0 + i * stepDur); // 칩튠 아르페지오는 계단식
+            else o.frequency.linearRampToValueAtTime(f, t0 + i * stepDur + stepDur * 0.9);
           });
           // 어택 램프: 0에서 시작해 살짝 올라갔다 내려가는 자연스러운 엔벨로프 (클릭/팝 노이즈 방지)
           g.gain.setValueAtTime(0.0001, t0);
@@ -178,78 +180,82 @@ class App {
       }
     };
 
-    // ===== BGM 시스템 (Web Audio API 절차적 생성) =====
+    // ===== BGM v3.8: 게임보이풍 칩튠 (펄스 리드·삼각파 베이스·노이즈 드럼), 맵별 조성·코드 진행·템포 =====
+    // 예약 스케줄러(0.25초 앞까지만 예약) → 노드가 쌓이지 않음 (예전엔 루프마다 노드 배열이 계속 커졌음)
     this.BGM = {
-      ctx: null, nodes: [], playing: false,
-      _get() {
-        if (!this.ctx) this.ctx = new (window.AudioContext||window.webkitAudioContext)();
-        return this.ctx;
-      },
+      ctx: null, playing: false, timer: null,
+      _get() { if (!this.ctx) this.ctx = new (window.AudioContext||window.webkitAudioContext)(); return this.ctx; },
       stop() {
-        this.nodes.forEach(n => { try { n.stop(); } catch(e){} });
-        this.nodes = []; this.playing = false;
+        this.playing = false; clearInterval(this.timer); this.timer = null;
+        if (this.bus) { const b = this.bus, t = this.ctx.currentTime; b.gain.setTargetAtTime(0, t, 0.15); setTimeout(() => { try { b.disconnect(); } catch (_) {} }, 800); this.bus = null; }
       },
       start(mapId) {
         this.stop();
         try {
           const ctx = this._get();
-          // 맵별 음계/템포
-          const themes = {
-            forest: { notes:[261,294,330,349,392,440,494,523], tempo:0.4, vol:0.06, wave:'sine' },
-            city:   { notes:[220,247,262,294,330,370,392,440], tempo:0.3, vol:0.06, wave:'triangle' },
-            cave:   { notes:[196,220,233,261,294,311,349,392], tempo:0.5, vol:0.05, wave:'sine' },
-            // v27-7: 왕 조우 이후 무한강화 구간 전용 테마 - 더 빠르고 낮은 음역으로 긴장감 부여 (요청5)
-            infinite: { notes:[164,174,196,220,164,196,174,146], tempo:0.24, vol:0.07, wave:'sawtooth' },
+          const intense = (window.app?.engine?.currentWave || 0) >= 90 || mapId === 'infinite';
+          if (mapId === 'infinite') mapId = window.app?.currentMapId || 'city';
+          // 음 높이는 반음 단위 (0 = C4). 코드: [근음, 3도, 5도]
+          const T = {
+            forest: { bpm:118, key:0,  scale:[0,2,4,5,7,9,11], prog:[[0,4,7],[7,11,14],[9,12,16],[5,9,12]], drums:1, vol:0.05, lead:0.125 }, // 밝은 C장조 I-V-vi-IV
+            cave:   { bpm:92,  key:-3, scale:[0,2,3,5,7,8,10], prog:[[0,3,7],[8,12,15],[3,7,10],[10,14,17]], drums:0.4, vol:0.05, lead:0.25 }, // 신비한 A단조 i-VI-III-VII
+            city:   { bpm:136, key:2,  scale:[0,2,3,5,7,8,10], prog:[[0,3,7],[10,14,17],[8,12,15],[7,11,14]], drums:1.2, vol:0.05, lead:0.125 }, // 긴박한 D단조 i-VII-VI-V
           };
-          const theme = themes[mapId] || themes.forest;
-          const master = ctx.createGain();
-          master.gain.value = theme.vol;
-          // 리버브 효과
-          const conv = ctx.createConvolver();
-          const revLen = ctx.sampleRate * 1.5;
-          const revBuf = ctx.createBuffer(2, revLen, ctx.sampleRate);
-          for (let ch=0; ch<2; ch++) {
-            const d = revBuf.getChannelData(ch);
-            for (let i=0; i<revLen; i++) d[i] = (Math.random()*2-1) * Math.pow(1-i/revLen, 2);
-          }
-          conv.buffer = revBuf;
-          const revGain = ctx.createGain(); revGain.gain.value = 0.25;
-          master.connect(conv); conv.connect(revGain); revGain.connect(ctx.destination);
-          master.connect(ctx.destination);
-
-          // 멜로디 루프
-          const playMelody = () => {
-            if (!this.playing) return;
-            const notes = theme.notes;
-            const seq = [0,2,4,2,5,4,3,2,1,0,2,4,7,6,4,2];
-            seq.forEach((ni, i) => {
-              const o = ctx.createOscillator();
-              const g = ctx.createGain();
-              o.connect(g); g.connect(master);
-              o.type = theme.wave;
-              o.frequency.value = notes[ni % notes.length];
-              const t = ctx.currentTime + i * theme.tempo;
-              g.gain.setValueAtTime(0, t);
-              g.gain.linearRampToValueAtTime(0.8, t + 0.02);
-              g.gain.exponentialRampToValueAtTime(0.001, t + theme.tempo * 0.85);
-              o.start(t); o.stop(t + theme.tempo);
-              this.nodes.push(o);
-            });
-            // 루프
-            setTimeout(playMelody, seq.length * theme.tempo * 1000);
+          const th = { ...(T[mapId] || T.forest) };
+          if (intense) { th.bpm = Math.round(th.bpm * 1.12); th.drums += 0.3; }
+          const bus = ctx.createGain(); bus.gain.value = 0;
+          bus.gain.setTargetAtTime(th.vol, ctx.currentTime, 0.4); // 페이드인
+          const comp = ctx.createDynamicsCompressor(); bus.connect(comp); comp.connect(ctx.destination);
+          this.bus = bus;
+          const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 3200; lp.connect(bus); // 펄스파 거친 고음 정리
+          // 펄스파(듀티비) 만들기
+          const pulse = duty => { const n = 32, re = new Float32Array(n), im = new Float32Array(n); for (let k = 1; k < n; k++) im[k] = (2 / (k * Math.PI)) * Math.sin(k * Math.PI * duty); return ctx.createPeriodicWave(re, im); };
+          const leadWave = pulse(th.lead), harmWave = pulse(0.5);
+          const noise = ctx.createBuffer(1, ctx.sampleRate * 0.2, ctx.sampleRate); { const d = noise.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; }
+          const hz = semi => 261.63 * Math.pow(2, (semi + th.key) / 12);
+          const note = (wave, semi, t, dur, vol, dest = lp) => {
+            const o = ctx.createOscillator(), g = ctx.createGain();
+            if (typeof wave === 'string') o.type = wave; else o.setPeriodicWave(wave);
+            o.frequency.value = hz(semi); o.connect(g); g.connect(dest);
+            g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+            o.start(t); o.stop(t + dur + 0.02);
           };
-
-          // 베이스 드론
-          const bass = ctx.createOscillator();
-          const bassGain = ctx.createGain();
-          bass.connect(bassGain); bassGain.connect(master);
-          bass.type = 'sine';
-          bass.frequency.value = theme.notes[0] * 0.5;
-          bassGain.gain.value = 0.3;
-          bass.start(); this.nodes.push(bass);
-
+          const drum = (kind, t) => {
+            if (kind === 'k') { const o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.setValueAtTime(140, t); o.frequency.exponentialRampToValueAtTime(45, t + 0.12);
+              g.gain.setValueAtTime(0.9, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.15); o.connect(g); g.connect(bus); o.start(t); o.stop(t + 0.16); return; }
+            const src = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+            src.buffer = noise; f.type = kind === 'h' ? 'highpass' : 'bandpass'; f.frequency.value = kind === 'h' ? 7000 : 1800;
+            g.gain.setValueAtTime(kind === 'h' ? 0.18 : 0.4, t); g.gain.exponentialRampToValueAtTime(0.0001, t + (kind === 'h' ? 0.04 : 0.12));
+            src.connect(f); f.connect(g); g.connect(bus); src.start(t); src.stop(t + 0.15);
+          };
+          // 멜로디: 맵 이름 시드로 마디별 리듬·음을 정해 8마디 반복 (A A' B A'') → 매번 같은 곡처럼 들림
+          let seed = 0; for (const ch of mapId) seed = (seed * 31 + ch.charCodeAt(0)) >>> 0;
+          const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
+          const rhythms = [[1,0,1,0,1,0,0,1,1,0,1,0,1,0,0,0],[1,0,0,1,0,0,1,0,1,0,1,0,1,1,0,0],[1,0,1,1,0,1,0,0,1,0,0,1,0,1,0,0],[1,0,0,0,1,0,1,0,1,0,0,0,1,1,1,0]];
+          const motif = Array.from({ length: 4 }, (_, bar) => { const r = rhythms[Math.floor(rnd() * rhythms.length)]; let deg = Math.floor(rnd() * 3) * 2;
+            return r.map(on => { if (!on) return null; deg = Math.max(0, Math.min(9, deg + [-2,-1,1,1,2,0][Math.floor(rnd() * 6)])); return deg; }); });
+          const degSemi = d => th.scale[d % 7] + 12 * Math.floor(d / 7) + 12;
+          const order = [0,1,2,3, 0,1,3,2]; // 8마디 구성
+          const step = 60 / th.bpm / 4; // 16분음표
+          let pos = 0, next = ctx.currentTime + 0.1;
           this.playing = true;
-          playMelody();
+          const tick = () => {
+            if (!this.playing || this.bus !== bus) return;
+            while (next < ctx.currentTime + 0.25) {
+              const bar = Math.floor(pos / 16) % 8, s16 = pos % 16, chord = th.prog[bar % 4];
+              const m = motif[order[bar]][s16];
+              if (m !== null) note(leadWave, degSemi(m) + (bar >= 4 && order[bar] === 2 ? 2 : 0), next, step * 1.8, 0.22);
+              if (s16 % 2 === 0) note(harmWave, chord[(s16 / 2) % 3] + 12, next, step * 0.9, 0.06); // 아르페지오
+              if (s16 % 4 === 0) note('triangle', chord[0] - 12 + (s16 === 8 ? 7 : 0), next, step * 3.5, 0.5); // 베이스
+              if (th.drums > 0) {
+                if (s16 === 0 || (s16 === 10 && th.drums >= 1)) drum('k', next);
+                if (s16 === 4 || s16 === 12) drum('s', next);
+                if (th.drums >= 1 ? s16 % 2 === 0 : s16 % 4 === 2) drum('h', next);
+              }
+              pos++; next += step;
+            }
+          };
+          tick(); this.timer = setInterval(tick, 100);
         } catch(e) { console.warn('BGM failed:', e); }
       }
     };
@@ -487,7 +493,7 @@ class App {
         ['sparkle', '최종 각성', '진화 후 웨이브 50부터 전용 아이템이 떨어지고, 60까지 못 얻으면 확정. 메가스톤 2개로 바꿀 수도 있어요. 피카츄=거다이맥스 스킬, 토게틱=토게키스, 이브이 계열=갈래 특기 강화.'],
       ]],
       ['보스·메가', [
-        ['monster', '보스', '왼쪽 아래 <b>보스</b> 버튼으로 직접 소환하면 큰 보상. 30웨이브마다 구역이 바뀌고 전설 보스가, 90웨이브엔 왕 루기아가 나와요.'],
+        ['monster', '보스', '왼쪽 아래 <b>보스</b> 버튼으로 직접 소환하면 큰 보상. 15웨이브마다 배경·음악이 바뀌고, 30웨이브마다 전설 보스, 90웨이브엔 왕 루기아가 나와요.'],
         ['gem', '각성 · 메가진화', '에픽·레전드·메가 타워는 <b>먹이기</b>로 ★이 올라요(★당 +35%, 최대 ★5). 먹이는 같은 종, 없으면 같은 타입의 에픽 이상. 메가 원본(리자몽·거북왕 등 12종)은 ★3 + 메가스톤이면 메가진화, ★5까지. 메가스톤은 20웨이브마다 나오는 보스에서 확률 드롭. 가능한 타워는 골드 링, 먹이기 가능하면 초록 점선 링.'],
         ['prism', '이번 판 편성', '시작 때 많이 나오는 몬스터 특성과 추천 메가를 알려줘요. 유니크·메가는 같은 종 1마리만. 서로 다른 타입 4·5·6종이면 전체 공격력 +10·20·30%.'],
       ]],
@@ -1727,8 +1733,8 @@ class App {
     const waveIdx = e.currentWave;
     const nextWave = waveIdx + 1;
 
-    // v27: 30웨이브 경계에서 존(맵) 전환
-    const nextZone = zoneIndexForWave(nextWave);
+    // v3.8: 맵(배경·음악)은 15웨이브마다 순환, 90 이후에도 계속 (난이도용 존 계산과 분리)
+    const nextZone = Math.floor((nextWave - 1) / 15) % ZONE_MAPS.length;
     if (nextZone !== this._currentZone) {
       this._currentZone = nextZone;
       const zoneMapId = ZONE_MAPS[nextZone];
