@@ -369,7 +369,7 @@ class GameEngine {
       }
       if (hitCount > 0) {
         if (window.AoeBurst) this.particles.push(new AoeBurst(enemy.x, enemy.y, 90, '#ffc24b'));
-        this.spawnFloatingText(`✨골드 엘리트 폭발! ${hitCount}마리 추가타격`, enemy.x, enemy.y - 45, '#ffc24b');
+        this.spawnFloatingText(`골드 엘리트 폭발! ${hitCount}마리 추가타격`, enemy.x, enemy.y - 45, '#ffc24b');
       }
     }
     if (enemy._isKing) this.onKingDefeated && this.onKingDefeated();
@@ -380,7 +380,7 @@ class GameEngine {
     const bonus = Math.floor(baseReward * (effectiveGoldMul - 1));
     // v27-16: 현상금 몬스터 보너스 (요청2)
     let bountyBonus = 0;
-    if (enemy._bounty) { bountyBonus = 40 + Math.round(this.currentWave * 1.5); this.spawnFloatingText(`💰현상금 +${bountyBonus}g!`, enemy.x, enemy.y - 30, '#ffc24b'); }
+    if (enemy._bounty) { bountyBonus = 40 + Math.round(this.currentWave * 1.5); this.spawnFloatingText(`현상금 +${bountyBonus}g!`, enemy.x, enemy.y - 30, '#ffc24b'); }
     this.addGold(baseReward + bonus + bountyBonus);
     this.spawnFloatingText(`+${baseReward + bonus}g`, enemy.x, enemy.y - 10, '#ffc24b');
 
@@ -585,7 +585,7 @@ class GameEngine {
     if (interest > 0) {
       this.gold = Math.round(this.gold + interest); // 이자는 골드 배율(토게피 등) 미적용
       this.onGoldChange && this.onGoldChange(this.gold);
-      this.spawnFloatingText(`🏦 이자 +${interest}g`, this.camera.x, this.camera.y - (this.height/2 - 110)/this.camera.zoom, '#34d399');
+      this.spawnFloatingText(`이자 +${interest}g`, this.camera.x, this.camera.y - (this.height/2 - 110)/this.camera.zoom, '#34d399');
     }
     return interest;
   }

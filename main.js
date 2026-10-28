@@ -621,7 +621,7 @@ class App {
           e.preventDefault();
           if (hero.cast(skillIdx, this.engine)) {
             const skill = hero.def.skills[skillIdx];
-            this.showWaveAnnounce(`${skill.emoji} ${skill.name}!`, '#ffc24b');
+            this.showWaveAnnounce(`${skill.name}!`, '#ffc24b');
             this._flashScreenEdge(); // v27-17: 궁극기 발동 화면 테두리 플래시 (요청5)
           }
         }
@@ -776,7 +776,7 @@ class App {
       // v27-44: 슬롯 없이 뽑았으면 보관함으로 (요청2)
       this._addToStorage([towerDef]);
       const gg = window.GRADES?.[towerDef.grade];
-      this.showWaveAnnounce(`${towerDef.emoji} ${towerDef.name} 획득! → 🎒보관함`, gg?.color || '#5b9dff');
+      this.showWaveAnnounce(`${towerDef.name} 획득! → 보관함`, gg?.color || '#5b9dff');
     } else {
       this._placePulledTower(towerDef, slotIdx);
     }
@@ -794,14 +794,14 @@ class App {
           clearInterval(flickInterval);
           this.SFX.play(gradeSound[towerDef.grade] || 'pull_normal');
           const g = window.GRADES?.[towerDef.grade];
-          this.showWaveAnnounce(`${towerDef.emoji} ${g?.name||""} ${towerDef.name}`, g?.color||"#ffc24b");
+          this.showWaveAnnounce(`${g?.name||""} ${towerDef.name}`, g?.color||"#ffc24b");
         }
       }, 220);
     } else {
       this.SFX.play(gradeSound[towerDef.grade] || 'pull_normal');
       if (towerDef.grade === 'rare') {
         const g = window.GRADES?.[towerDef.grade];
-        this.showWaveAnnounce(`${towerDef.emoji} ${g?.name||""} ${towerDef.name}`, g?.color||"#ffc24b");
+        this.showWaveAnnounce(`${g?.name||""} ${towerDef.name}`, g?.color||"#ffc24b");
       }
     }
     // v27-5: 합체 힌트 (요청) - 뽑은 직후 동일 타워 보유수 체크해서 알려줌
@@ -1117,7 +1117,7 @@ class App {
       if (every > 0 && wave % every === 0) {
         const d = window.rollTower('premium');
         this._addToStorage([d]);
-        setTimeout(() => this.showWaveAnnounce(`황금알! ${d.emoji} ${d.name} 획득 → 🎒`, '#ffc24b'), 700);
+        setTimeout(() => this.showWaveAnnounce(`황금알! ${d.name} 획득 → 보관함`, '#ffc24b'), 700);
       }
       if (hudTimer) hudTimer.style.display = 'none';
       this.els.btnWave.disabled = false;

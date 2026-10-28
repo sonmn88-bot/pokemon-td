@@ -177,7 +177,7 @@ Object.assign(App.prototype, {
       panel.querySelector('[data-action="tm"]')?.addEventListener('click', () => {
         if (!this.engine.spendGold(window.TM_COST)) { this.showWaveAnnounce('골드가 부족해요', '#ff5c7a'); return; }
         const tag = window.applyTM(t);
-        this.engine.spawnFloatingText(`💿 ${window.DEX_TAGS[tag]} 습득!`, t.x, t.y - 36, '#6aa8ff');
+        this.engine.spawnFloatingText(`${window.DEX_TAGS[tag]} 습득!`, t.x, t.y - 36, '#6aa8ff');
         this.SFX && this.SFX.play && this.SFX.play('merge');
         panel.remove(); this.engine.selectedTower = null;
       });
@@ -201,7 +201,7 @@ Object.assign(App.prototype, {
         this.engine.selectedTower = evoTower;
         if (window.applyTowerSynergies) window.applyTowerSynergies(this.engine.towers);
         const evoGrade = window.GRADES[evoPick.grade];
-        this.engine.spawnFloatingText(`✨ ${evoPick.name}!`, currentSlot.x, currentSlot.y-40, evoGrade.color);
+        this.engine.spawnFloatingText(`${evoPick.name}!`, currentSlot.x, currentSlot.y-40, evoGrade.color);
         this.engine.particles.push(new BurstRing(currentSlot.x, currentSlot.y, 70, evoGrade.color));
         this.engine.triggerScreenShake(6, 0.25);
         if (this.missionTracker) { this.missionTracker.stats.mergeCount++; this.missionTracker.check(); }
@@ -747,7 +747,7 @@ Object.assign(App.prototype, {
         if (item.perWave) { if (!this.engine._shopWaveUses) this.engine._shopWaveUses = {}; this.engine._shopWaveUses[item.key] = (this.engine._shopWaveUses[item.key] || 0) + 1; }
         if (item.oneTime) { if (!this.engine._oneTimeUsed) this.engine._oneTimeUsed = {}; this.engine._oneTimeUsed[item.key] = true; }
         this.SFX.play('buy');
-        this.showWaveAnnounce(`${item.emoji} ${item.name} 사용!`, '#34d399');
+        this.showWaveAnnounce(`${item.name} 사용!`, '#34d399');
         this.buildShopBar();
       });
       grid.appendChild(btn);

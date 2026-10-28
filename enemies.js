@@ -610,12 +610,12 @@ class Enemy {
     // 타워 디버프는 2단계에서
     // v27-4 fix: 파티클을 2번 호출하면 타격음 확률도 2번 굴러서 유독 시끄럽게 들리던 문제 - 1번만 호출
     this.engine.spawnHitParticle(this.x, this.y, '#ff9800');
-    this.engine.spawnFloatingText('💥 폭발!', this.x, this.y - 20, '#ff9800');
+    this.engine.spawnFloatingText('폭발!', this.x, this.y - 20, '#ff9800');
   }
 
   doSpore() {
     // 근처 타워를 디버프 (2단계에서 구현)
-    this.engine.spawnFloatingText('🍄', this.x, this.y - 20, '#ff7043');
+    this.engine.spawnFloatingText('포자', this.x, this.y - 20, '#ff7043');
   }
 
   doTeleport() {
@@ -625,7 +625,7 @@ class Enemy {
     const jumpDist = this.totalLen * 0.06;
     this.distTraveled = Math.min(this.distTraveled + jumpDist, this.totalLen * 0.95);
     this.engine.spawnHitParticle(this.x, this.y, '#7c4dff');
-    this.engine.spawnFloatingText('✨ 순간이동!', this.x, this.y - 30, '#b39ddb');
+    this.engine.spawnFloatingText('순간이동!', this.x, this.y - 30, '#b39ddb');
   }
 
   // ===== DRAW =====

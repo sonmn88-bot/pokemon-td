@@ -308,10 +308,10 @@ function _dexFire(def, color) {
         knockback: has('knockback') ? (def.role === 'boss' ? 60 : 40) : 0,
         chain: has('chain') ? T.chainCount[g] : 0, chainRange: 150,
         onHit: (en) => {
-          if (crit) e.spawnFloatingText('💥', en.x, en.y - 18, '#ff5c7a');
+          if (crit) e.spawnFloatingText('크리!', en.x, en.y - 18, '#ff5c7a');
           if (statusTags[1] && !en.dead && Math.random() < 0.3) { const s = mkStatus(statusTags[1], dmg); en.applyStatus(s.type, s.duration, s.factor); }
           if (def.role === 'execute' && !en.dead && !en.isBoss && en.hp / en.maxHp <= T.executeHp[g]) {
-            en.hp = 0; en.die(); e.spawnFloatingText('✂️처형', en.x, en.y - 22, '#ff5252');
+            en.hp = 0; en.die(); e.spawnFloatingText('처형', en.x, en.y - 22, '#ff5252');
           }
           if (en.dead) {
             if (has('gold')) { e.addGold(T.goldOnKill[g]); e.spawnFloatingText(`+${T.goldOnKill[g]}g`, en.x, en.y - 30, '#ffc24b'); }

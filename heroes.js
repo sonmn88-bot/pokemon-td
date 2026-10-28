@@ -137,7 +137,7 @@ const HeroDefs = {
           }
           if (!recast && hero._skillVal('thunderDouble', 0)) hero._recastTimer = 0.6; // 뇌격
           engine.particles.push(new AoeBurst(hero.x, hero.y, r, '#fff176'));
-          engine.spawnFloatingText('⚡100만볼트!', hero.x, hero.y-32, '#ffeb3b');
+          engine.spawnFloatingText('100만볼트!', hero.x, hero.y-32, '#ffeb3b');
         }
       },
       {
@@ -153,7 +153,7 @@ const HeroDefs = {
             // v27-60: 고정 데미지 → 오토어택 데미지 비례 (타입강화/진화 반영)
             target.takeDamage(hero.attackDamage * 4.5, 'special');
             engine.particles.push(new ChainBolt(hero.x, hero.y, target.x, target.y));
-            engine.spawnFloatingText('💨전광석화!', target.x, target.y-22, '#ffd600');
+            engine.spawnFloatingText('전광석화!', target.x, target.y-22, '#ffd600');
           }
         }
       },
@@ -195,16 +195,16 @@ const HeroDefs = {
           if (roll === 0) {
             const dmg = hero.attackDamage * 1.6; // v27-60: 고정값 → 오토어택 비례로 통일
             for (const e of engine.enemies) { if (!e.dead&&!e.reachedEnd) e.takeDamage(dmg,'special'); }
-            engine.spawnFloatingText('🎲전체 피해!', hero.x, hero.y-32, '#ffd54f');
+            engine.spawnFloatingText('전체 피해!', hero.x, hero.y-32, '#ffd54f');
           } else if (roll === 1) {
             for (const e of engine.enemies) { if (!e.dead&&!e.reachedEnd) e.applyStatus('slow',3.5,0.38); }
-            engine.spawnFloatingText('🎲전체 슬로우!', hero.x, hero.y-32, '#5b9dff');
+            engine.spawnFloatingText('전체 슬로우!', hero.x, hero.y-32, '#5b9dff');
           } else if (roll === 2) {
             for (const e of engine.enemies) { if (!e.dead&&!e.reachedEnd) e.applyStatus('stun',1.5,0); }
-            engine.spawnFloatingText('🎲전체 스턴!', hero.x, hero.y-32, '#ba68c8');
+            engine.spawnFloatingText('전체 스턴!', hero.x, hero.y-32, '#ba68c8');
           } else {
             engine.addGold(50 + hero.level * 10);
-            engine.spawnFloatingText(`🎲골드 획득! +${50+hero.level*10}g`, hero.x, hero.y-32, '#ffc24b');
+            engine.spawnFloatingText(`골드 획득! +${50+hero.level*10}g`, hero.x, hero.y-32, '#ffc24b');
           }
           }
         }
@@ -224,7 +224,7 @@ const HeroDefs = {
             if (spd) t._tempSpeedMul = 1 + spd; // 축복
             t._pokecenterTimer = dur; // 타워 update()의 만료처리 로직 재사용
           }
-          engine.spawnFloatingText('🥚행복의알!', hero.x, hero.y-32, '#fff59d');
+          engine.spawnFloatingText('행복의알!', hero.x, hero.y-32, '#fff59d');
         }
       },
     ],
@@ -273,7 +273,7 @@ HeroDefs.eevee = {
           }
         }
         engine.particles.push(new AoeBurst(hero.x, hero.y, r, hero._evoColor || '#a1887f'));
-        engine.spawnFloatingText('🌀적응!', hero.x, hero.y-32, '#d7ccc8');
+        engine.spawnFloatingText('적응!', hero.x, hero.y-32, '#d7ccc8');
       }
     },
     {
@@ -285,7 +285,7 @@ HeroDefs.eevee = {
       cast(hero, engine) {
         hero._burstTimer = 4 + hero.level * 0.12 + hero._skillVal('burstDur', 0); // 레벨이 오를수록 지속시간도 늘어남
         engine.particles.push(new AoeBurst(hero.x, hero.y, 60, hero._evoColor || '#b18cff'));
-        engine.spawnFloatingText('🌈다재다능!', hero.x, hero.y-32, '#b18cff');
+        engine.spawnFloatingText('다재다능!', hero.x, hero.y-32, '#b18cff');
       }
     },
   ],
@@ -419,7 +419,7 @@ class Hero {
       engine.lives += node.value;
       engine.onLivesChange && engine.onLivesChange(engine.lives);
     }
-    engine && engine.spawnFloatingText(`✨ ${node.name}!`, this.x, this.y-40, '#a78bfa');
+    engine && engine.spawnFloatingText(`${node.name}!`, this.x, this.y-40, '#a78bfa');
     return true;
   }
 
@@ -458,7 +458,7 @@ class Hero {
     this._evoFireRateMul = option.fireRateMul || 1.0;
     this._evoColor = option.color;
     this._evoName = option.name; // v27 fix: 진화 후 이름이 안 바뀌던 버그
-    engine && engine.spawnFloatingText(`✨ ${option.name}(으)로 진화!`, this.x, this.y-46, option.color);
+    engine && engine.spawnFloatingText(`${option.name}(으)로 진화!`, this.x, this.y-46, option.color);
     engine && engine.particles && engine.particles.push(new AoeBurst(this.x, this.y, 70, option.color));
     engine && engine.triggerScreenShake && engine.triggerScreenShake(6, 0.3);
     engine && engine.onHeroEvolved && engine.onHeroEvolved(this);
@@ -526,7 +526,7 @@ class Hero {
       status, chain: chainAtk || 0, chainRange: 140, splash,
     });
     engine.projectiles.push(proj);
-    if (isCrit) engine.spawnFloatingText(`💥크리!`, this.attackTarget.x, this.attackTarget.y-20, '#ff5c7a');
+    if (isCrit) engine.spawnFloatingText(`크리!`, this.attackTarget.x, this.attackTarget.y-20, '#ff5c7a');
     if (this.rig) this.rig.triggerAttack();
 
     // 스킬트리: doubleShot

@@ -21,7 +21,7 @@ const ShopItems = [
       if (target) {
         target.die ? target.die() : (target.dead = true);
         engine.addGold(target.reward);
-        engine.spawnFloatingText('⚪ 포획!', target.x, target.y - 20, '#fff');
+        engine.spawnFloatingText('포획!', target.x, target.y - 20, '#fff');
       } else {
         engine.spawnFloatingText('대상 없음', engine.camera.x, engine.camera.y, '#aaa');
       }
@@ -39,7 +39,7 @@ const ShopItems = [
       const n = Math.min(10, Math.max(1, Math.round(alive.length * 0.15)));
       for (let i = 0; i < n; i++) alive[i].takeDamage(alive[i].maxHp * 10, 'special');
       if (window.AoeBurst) engine.particles.push(new AoeBurst(engine.camera.x, engine.camera.y, Math.max(engine.width, engine.height)*0.6/engine.camera.zoom, '#9575cd'));
-      engine.spawnFloatingText(`🌀 대피 완료! ${n}마리 정리`, engine.camera.x, engine.camera.y - (engine.height/2 - 80)/engine.camera.zoom, '#9575cd');
+      engine.spawnFloatingText(`대피 완료! ${n}마리 정리`, engine.camera.x, engine.camera.y - (engine.height/2 - 80)/engine.camera.zoom, '#9575cd');
     }
   },
   {
@@ -80,7 +80,7 @@ const ShopItems = [
       }
       if (best && bestMinDist > MIN_DIST) {
         engine.towerSlots.push({ x: best.x, y: best.y, occupied: false, tower: null });
-        engine.spawnFloatingText('🏗️ 새 슬롯 확보!', best.x, best.y, '#34d399');
+        engine.spawnFloatingText('새 슬롯 확보!', best.x, best.y, '#34d399');
       } else {
         engine.spawnFloatingText('공간이 부족합니다', engine.camera.x, engine.camera.y - (engine.height/2 - 80)/engine.camera.zoom, '#ff5c7a');
         return false; // v27-8 버그수정: 실패해도 return false가 없어서 골드가 환불 안 되고 그냥 나갔던 문제
@@ -94,7 +94,7 @@ const ShopItems = [
     buy(engine) {
       engine._luckyCoins = (engine._luckyCoins || 0) + 1;
       window.app?.renderStorageStrip?.();
-      engine.spawnFloatingText(`🪙 행운의 동전 ${engine._luckyCoins}개 보유`, engine.camera.x, engine.camera.y - (engine.height/2 - 80)/engine.camera.zoom, '#ffc24b');
+      engine.spawnFloatingText(`행운의 동전 ${engine._luckyCoins}개 보유`, engine.camera.x, engine.camera.y - (engine.height/2 - 80)/engine.camera.zoom, '#ffc24b');
     }
   },
   {
@@ -121,7 +121,7 @@ const ShopItems = [
         slot.tower = evoTower;
         if (window.applyTowerSynergies) window.applyTowerSynergies(engine.towers);
         const grade = window.GRADES?.[evoDef.grade];
-        engine.spawnFloatingText(`🍬 ${evoDef.name} 진화!`, slot.x, slot.y-36, grade?.color||'#ffc24b');
+        engine.spawnFloatingText(`${evoDef.name} 진화!`, slot.x, slot.y-36, grade?.color||'#ffc24b');
       } else {
         engine.spawnFloatingText('이미 최고 등급!', slot.x, slot.y-20, '#ffc24b');
         return false;
@@ -142,7 +142,7 @@ const GlobalSpells = {
         t._tempSpeedMul = 1.25;
         t._pokecenterTimer = 6; // 기존 만료처리 로직 재사용 (이름은 유지, 내용은 공용 타이머)
       }
-      engine.spawnFloatingText('🏋️ 훈련소! 전체 공속+25%', engine.camera.x, engine.camera.y - (engine.height/2 - 80)/engine.camera.zoom, '#34d399');
+      engine.spawnFloatingText('훈련소! 전체 공속+25%', engine.camera.x, engine.camera.y - (engine.height/2 - 80)/engine.camera.zoom, '#34d399');
     }
   },
   // v27-46: 마스터볼(전체 즉발피해+슬로우)은 영웅 궁극기들과 데미지 성격이 겹쳤음.
@@ -161,7 +161,7 @@ const GlobalSpells = {
       if (window.AoeBurst)
         engine.particles.push(new AoeBurst(engine.camera.x, engine.camera.y,
           Math.max(engine.width, engine.height)/engine.camera.zoom, '#7c4dff'));
-      engine.spawnFloatingText(`🕸️ 그물망 함정! ${n}마리 스턴`, engine.camera.x, engine.camera.y - (engine.height/2 - 80)/engine.camera.zoom, '#7c4dff');
+      engine.spawnFloatingText(`그물망 함정! ${n}마리 스턴`, engine.camera.x, engine.camera.y - (engine.height/2 - 80)/engine.camera.zoom, '#7c4dff');
     }
   },
 };

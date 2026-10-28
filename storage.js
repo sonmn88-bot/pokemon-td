@@ -29,7 +29,7 @@ Object.assign(App.prototype, {
     if (!def) return false;
     this._placePulledTower(def, slotIdx);
     const g = window.GRADES[def.grade];
-    this.showWaveAnnounce(`${def.emoji} ${def.name} 배치!`, g.color);
+    this.showWaveAnnounce(`${def.name} 배치!`, g.color);
     this._placingId = null;
     this.renderStorageStrip();
     return true;

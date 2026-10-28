@@ -56,7 +56,7 @@ const MEGA_DEFS = [
     desc:'체력 18% 이하 즉사(보스 제외) · 30% 크리 → 체력 많은 적',
     fire(t, e) { const [tgt] = _mgTargets(t, e, 1); if (!tgt) return; _mgBeam(t, e, tgt, '#c9a46a');
       const crit = Math.random() < 0.3; tgt.takeDamage(t.damage * (crit ? 7.5 : 3.0), 'special');
-      if (!tgt.dead && !tgt.isBoss && tgt.hp / tgt.maxHp <= 0.18) { tgt.hp = 0; tgt.die(); e.spawnFloatingText('✂️처형', tgt.x, tgt.y - 22, '#ff5252'); } } },
+      if (!tgt.dead && !tgt.isBoss && tgt.hp / tgt.maxHp <= 0.18) { tgt.hp = 0; tgt.die(); e.spawnFloatingText('처형', tgt.x, tgt.y - 22, '#ff5252'); } } },
   { id:'mega_beedrill', base:'beedrill', name:'메가독침붕', type:'grass', emoji:'🐝', fr:2.2, range:150,
     desc:'초고속 3연침 · 독 중첩 → 단일 고체력',
     fire(t, e) { const [tgt] = _mgTargets(t, e, 1); if (!tgt) return;
@@ -173,7 +173,7 @@ Object.assign(App.prototype, {
     let n = Math.random() < chance ? 1 : 0;
     if (n && w >= 100 && Math.random() < 0.25) n = 2;
     if (Math.random() < 0.2) this._dropHeroItem('보스');
-    if (!n) { e.spawnFloatingText(`💎 메가스톤 안 나옴 (${Math.round(chance * 100)}%)`, en.x, en.y - 30, '#9aa3b2'); return; }
+    if (!n) { e.spawnFloatingText(`메가스톤 안 나옴 (${Math.round(chance * 100)}%)`, en.x, en.y - 30, '#9aa3b2'); return; }
     e._megaStones = (e._megaStones || 0) + n;
     this.SFX && this.SFX.play('pull_epic');
     this.showWaveAnnounce(`메가스톤 ${n}개 획득! (보유 ${e._megaStones})`, '#b18cff');

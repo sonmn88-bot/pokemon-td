@@ -291,7 +291,7 @@ const GachaTowerDefs = {
     damage:44, range:280, fireRate:1.5, desc:'5타겟+크리티컬',
     fire(t,e){
       const targets=e.enemies.filter(en=>!en.dead&&!en.reachedEnd&&Math.hypot(en.x-t.x,en.y-t.y)<=t.range).sort((a,b)=>b.distTraveled-a.distTraveled).slice(0,5);
-      for(const tgt of targets){ let dmg=t.damage; if(Math.random()<0.35){dmg*=2.8;e.spawnFloatingText('💥크리!',tgt.x,tgt.y-18,'#f48fb1');} e.projectiles.push(new Projectile(t.x,t.y,tgt,{engine:e,color:'#b18cff',size:4,beam:true,beamLife:0.18})); tgt.takeDamage(dmg,'special'); tgt.applyStatus('slow',2.5,0.38); e.spawnHitParticle(tgt.x,tgt.y,'#ba68c8'); }
+      for(const tgt of targets){ let dmg=t.damage; if(Math.random()<0.35){dmg*=2.8;e.spawnFloatingText('크리!',tgt.x,tgt.y-18,'#f48fb1');} e.projectiles.push(new Projectile(t.x,t.y,tgt,{engine:e,color:'#b18cff',size:4,beam:true,beamLife:0.18})); tgt.takeDamage(dmg,'special'); tgt.applyStatus('slow',2.5,0.38); e.spawnHitParticle(tgt.x,tgt.y,'#ba68c8'); }
     }
   },
   gyarados: {
@@ -300,7 +300,7 @@ const GachaTowerDefs = {
     fire(t,e){
       _shot(t,e,'#1e88e5','🌊',{type:'slow',duration:2.5,factor:0.45},400,null,60);
       t._rageTimer=(t._rageTimer||0)+1/t.fireRate;
-      if(t._rageTimer>=9){ t._rageTimer=0; for(const en of e.enemies) if(!en.dead&&!en.reachedEnd&&Math.hypot(en.x-t.x,en.y-t.y)<=t.range) { en.takeDamage(t.damage*0.35,'special'); en.applyStatus('slow',2,0.55); } e.particles.push(new AoeBurst(t.x,t.y,t.range,'#5b9dff')); e.spawnFloatingText('🌊분노!',t.x,t.y-30,'#29b6f6'); }
+      if(t._rageTimer>=9){ t._rageTimer=0; for(const en of e.enemies) if(!en.dead&&!en.reachedEnd&&Math.hypot(en.x-t.x,en.y-t.y)<=t.range) { en.takeDamage(t.damage*0.35,'special'); en.applyStatus('slow',2,0.55); } e.particles.push(new AoeBurst(t.x,t.y,t.range,'#5b9dff')); e.spawnFloatingText('분노!',t.x,t.y-30,'#29b6f6'); }
     }
   },
   lapras: {
@@ -330,7 +330,7 @@ const GachaTowerDefs = {
       const sorted=e.enemies.filter(en=>!en.dead&&!en.reachedEnd&&Math.hypot(en.x-t.x,en.y-t.y)<=t.range).sort((a,b)=>b.distTraveled-a.distTraveled).slice(0,3);
       for(const tgt of sorted) e.projectiles.push(new Projectile(t.x,t.y,tgt,{engine:e,speed:460,damage:t.damage,color:'#b3e5fc',size:7,dmgType:'special',emoji:'❄️',status:{type:'freeze',duration:2.8}}));
       t._blizTimer=(t._blizTimer||0)+1/t.fireRate;
-      if(t._blizTimer>=6){ t._blizTimer=0; for(const en of e.enemies) if(!en.dead&&!en.reachedEnd&&Math.hypot(en.x-t.x,en.y-t.y)<=t.range) en.applyStatus('slow',3.5,0.3); e.particles.push(new AoeBurst(t.x,t.y,t.range,'#b3e5fc')); e.spawnFloatingText('🌨️눈보라!',t.x,t.y-36,'#80deea'); }
+      if(t._blizTimer>=6){ t._blizTimer=0; for(const en of e.enemies) if(!en.dead&&!en.reachedEnd&&Math.hypot(en.x-t.x,en.y-t.y)<=t.range) en.applyStatus('slow',3.5,0.3); e.particles.push(new AoeBurst(t.x,t.y,t.range,'#b3e5fc')); e.spawnFloatingText('눈보라!',t.x,t.y-36,'#80deea'); }
     }
   },
   zapdos: {
@@ -374,7 +374,7 @@ const GachaTowerDefs = {
     damage:100, range:320, fireRate:1.6, desc:'전지전능 6타겟+크리',
     fire(t,e){
       const all=e.enemies.filter(en=>!en.dead&&!en.reachedEnd&&Math.hypot(en.x-t.x,en.y-t.y)<=t.range).sort((a,b)=>b.distTraveled-a.distTraveled).slice(0,4);
-      for(const tgt of all){ let dmg=t.damage; if(Math.random()<0.35){dmg*=3;e.spawnFloatingText('🔮크리!',tgt.x,tgt.y-20,'#b39ddb');} e.projectiles.push(new Projectile(t.x,t.y,tgt,{engine:e,color:'#b39ddb',size:5,beam:true,beamLife:0.2})); tgt.takeDamage(dmg,'special'); tgt.applyStatus('slow',2.5,0.35); e.spawnHitParticle(tgt.x,tgt.y,'#7c4dff'); }
+      for(const tgt of all){ let dmg=t.damage; if(Math.random()<0.35){dmg*=3;e.spawnFloatingText('크리!',tgt.x,tgt.y-20,'#b39ddb');} e.projectiles.push(new Projectile(t.x,t.y,tgt,{engine:e,color:'#b39ddb',size:5,beam:true,beamLife:0.2})); tgt.takeDamage(dmg,'special'); tgt.applyStatus('slow',2.5,0.35); e.spawnHitParticle(tgt.x,tgt.y,'#7c4dff'); }
       t._psyTimer=(t._psyTimer||0)+1/t.fireRate;
       if(t._psyTimer>=4){ t._psyTimer=0; for(const en of e.enemies) if(!en.dead&&!en.reachedEnd&&Math.hypot(en.x-t.x,en.y-t.y)<=t.range) en.applyStatus('slow',1.5,0.5); e.particles.push(new AoeBurst(t.x,t.y,t.range,'#7c4dff')); }
     }
@@ -394,7 +394,7 @@ const GachaTowerDefs = {
         e._mewBuffStacks = (e._mewBuffStacks || 0) + 1;
         if (e._mewBuffStacks <= 25) {
           for(const tw of e.towers) tw.buffDmgMul=(tw.buffDmgMul||1)*1.02;
-          e.spawnFloatingText('💗전체버프!',t.x,t.y-30,'#f48fb1');
+          e.spawnFloatingText('전체버프!',t.x,t.y-30,'#f48fb1');
         }
       }
     }
@@ -928,7 +928,7 @@ function applyTypeUpgrade(type, engine) {
     if(window.AoeBurst) engine.particles.push(new AoeBurst(t.x,t.y,44,color));
     t._typeGlowColor = color; t._typeGlowTimer = 1.6; // 잠시 색깔 테두리로 강조
   }
-  engine.spawnFloatingText(`${TYPES[type].emoji} ${upg.label}!`, engine.width/2, 80, color);
+  engine.spawnFloatingText(`${upg.label}!`, engine.width/2, 80, color);
   return true;
 }
 
@@ -1028,7 +1028,7 @@ function checkMerge(towers, towerSlots, engine) {
       for(let i=1;i<3;i++){ const s=slots[i]; engine.towers=engine.towers.filter(t=>t!==s.tower); s.occupied=false; s.tower=null; }
       const evoTower=_createGachaTower(evoDef,targetSlot.x,targetSlot.y,engine);
       targetSlot.tower=evoTower; engine.towers=engine.towers.filter(t=>t!==slots[0].tower); engine.towers.push(evoTower);
-      engine.spawnFloatingText(`✨ ${evoDef.name} 진화!`,targetSlot.x,targetSlot.y-36,GRADES[evoDef.grade].color);
+      engine.spawnFloatingText(`${evoDef.name} 진화!`,targetSlot.x,targetSlot.y-36,GRADES[evoDef.grade].color);
       engine.particles.push(new BurstRing(targetSlot.x,targetSlot.y,60,GRADES[evoDef.grade].color));
       engine.triggerScreenShake(5,0.2);
       if(window.applyTowerSynergies) window.applyTowerSynergies(engine.towers);
