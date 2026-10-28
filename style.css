@@ -1571,3 +1571,13 @@ img.title-pkm.lead { width:88px; height:88px; }
 .tp-hint { padding:8px 10px; border-radius:10px; background:rgba(106,168,255,.08); }
 .tp-calc { border-top:none; padding-top:0; }
 .tp-flavor { font-style:italic; padding-top:6px; border-top:1px solid var(--border); }
+/* v3.7 거다이맥스·각성 교환 버튼 */
+.gmax-btn { border-color:#ffe14a; background:rgba(255,225,74,.16); color:#ffe14a; }
+.gmax-btn.active { background:#ffe14a; color:#1b1404; }
+.gmax-btn.active .skill-cd { color:#1b1404; text-shadow:none; }
+.stone-ex-btn { border-color:#7fd3ff; background:rgba(127,211,255,.12); color:#7fd3ff; }
+.stone-ex-btn .skill-cd { position:absolute; right:-2px; bottom:-2px; font-size:10px; background:#7fd3ff; color:#0b0d12; border-radius:6px; padding:0 3px; text-shadow:none; }
+.hero-evo .he-sub { position:absolute; left:0; right:0; bottom:calc(22% - 34px); opacity:0; text-align:center; color:#fff; font-size:14px; font-weight:700; opacity:.9; word-break:keep-all; padding:0 16px; }
+.hero-evo.done .he-sub { animation:heTitle .7s ease-out .35s forwards; }
+.skill-btn .skill-cd:empty { display:none; }
+.hero-item-pop b, .hero-item-pop small { word-break:keep-all; }

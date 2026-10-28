@@ -297,6 +297,26 @@ Object.assign(App.prototype, {
         evoBtn.addEventListener('click', () => this._playHeroTransform());
         wrap.appendChild(evoBtn);
       }
+      // v3.7 거다이맥스 (피카츄·라이츄 최종 각성 스킬)
+      if (hero._awaken && (hero.id === 'pikachu')) {
+        const gb = document.createElement('button');
+        gb.className = 'skill-btn gmax-btn';
+        gb.dataset.heroId = hero.id;
+        gb.innerHTML = `<span class="skill-emoji">${ICON('bolt', 22)}</span><span class="skill-cd"></span>`;
+        gb.title = '거다이맥스: 20초 거대화 (공격력 ×1.5 · 광역), 쿨 90초';
+        gb.addEventListener('click', () => { if (window.castGmax && castGmax(hero, this.engine)) this.showWaveAnnounce('거다이맥스!', '#ffe14a'); });
+        wrap.appendChild(gb);
+      }
+      // v3.7 메가스톤 2개 → 최종 각성 아이템 교환 (웨이브 50+, 레벨 진화 후)
+      const eng = this.engine;
+      if (!eng._heroItemGot && hero.evolved && (eng.currentWave || 0) >= 50 && (eng._megaStones || 0) >= 2 && this._dropHeroItem) {
+        const xb = document.createElement('button');
+        xb.className = 'skill-btn stone-ex-btn';
+        xb.innerHTML = `<span class="skill-emoji">${ICON('gem', 20)}</span><span class="skill-cd">2</span>`;
+        xb.title = '메가스톤 2개로 최종 각성 아이템 교환';
+        xb.addEventListener('click', () => { if ((eng._megaStones || 0) < 2) return; eng._megaStones -= 2; this._refreshMegaHud(); this._dropHeroItem('교환'); });
+        wrap.appendChild(xb);
+      }
       // 스킬트리 버튼 (SP 있을 때만 강조)
       const treeBtn = document.createElement('button');
       treeBtn.className = 'skill-btn skill-tree-btn';
@@ -326,6 +346,13 @@ Object.assign(App.prototype, {
           const _ti2 = _ht2 ? window.TYPES?.[_ht2] : null;
           lbl.textContent = `${hero.name} Lv${hero.level}`;
         }
+      }
+      const gbtn = bar.querySelector('.gmax-btn'); // 거다이맥스 쿨·지속 표시
+      if (gbtn) {
+        const on = hero._gmaxTimer > 0, cd = hero._gmaxCd || 0;
+        gbtn.classList.toggle('on-cooldown', !on && cd > 0); gbtn.classList.toggle('active', on);
+        gbtn.querySelector('.skill-cd').textContent = on ? Math.ceil(hero._gmaxTimer) : cd > 0 ? Math.ceil(cd) : '';
+        if (!on && cd > 0) gbtn.style.setProperty('--cdp', Math.min(1, cd / 90).toFixed(3));
       }
       hero.def.skills.forEach((skill, idx) => {
         const btn = bar.querySelector(`.skill-btn[data-hero-id="${hero.id}"][data-skill-idx="${idx}"]`);

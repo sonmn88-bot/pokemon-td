@@ -238,18 +238,18 @@ const HeroDefs = {
 HeroDefs.eevee = {
   id:'eevee', name:'이브이', baseColor:'#a1887f',
   role:'만능형 (진화로 특화)',
-  passive:'모든 타워 공격력 +5% · Lv8에 3갈래 진화 (같은 갈래 스킬트리 효과 ×1.5)',
+  passive:'모든 타워 공격력 +5% · Lv10에 3갈래 진화 (같은 갈래 스킬트리 효과 ×1.5)',
   attack:{
     baseRange:116, baseDamage:11, baseFireRate:1.1, // v3.3: 초반이 너무 약했음 (7·0.95 → 11·1.1)
     rangePerLevel:4, damagePerLevel:1.8,
     projColor:'#d7ccc8', projEmoji:'⭐', dmgType:'special',
   },
-  evolution:{ level:8, options:[
+  evolution:{ level:10, options:[
     // v27-60: "사거리 특화"는 DPS에 실질적 의미가 없다는 지적 반영 - 샤미드는 사거리 대신
     // 슬로우/CC 기능을 실제로 강화하는 쪽으로 재설계 (아래 '적응' 스킬에서 분기 처리)
     { id:'vaporeon', name:'샤미드',   color:'#29b6f6', dmgMul:1.10, rangeMul:1.30, fireRateMul:1.00, focus:'물(슬로우 서포터 특화)' },
-    { id:'jolteon',  name:'쥬피썬더', color:'#ffd600', dmgMul:1.10, rangeMul:1.05, fireRateMul:1.45, focus:'전기(공속 특화)' },
-    { id:'flareon',  name:'부스터',   color:'#ff5722', dmgMul:1.45, rangeMul:1.05, fireRateMul:1.00, focus:'불(데미지 특화)' },
+    { id:'jolteon',  name:'쥬피썬더', color:'#ffd600', dmgMul:1.10, rangeMul:1.05, fireRateMul:1.40, focus:'전기(공속 특화)' },
+    { id:'flareon',  name:'부스터',   color:'#ff5722', dmgMul:1.60, rangeMul:1.05, fireRateMul:1.00, focus:'불(데미지 특화)' },
   ]},
   passiveApply(engine, hero) {}, // v28: Hero._applyAura()에서 처리
   skills:[
@@ -293,6 +293,25 @@ HeroDefs.eevee = {
   ],
 };
 
+// v3.7 최종 각성 (아이템) 보너스 — 레벨 진화 후 웨이브 60 전후에 얻는 마지막 성장
+const AWAKEN_FX = {
+  togetic: { eggSpeed:0.20, metroDouble:1 },   // 토게키스: 행복의알 공속+20%, 메트로놈 2개 동시
+  togepi:  { eggSpeed:0.20, metroDouble:1 },
+  flareon: { critChance:0.15 },                // 부스터: 크리 +15% + 기본공격 광역(45)
+  jolteon: { chainAtk:2 },                     // 쥬피썬더: 연쇄 +2
+  vaporeon:{ vulnerable:0.15 },                // 샤미드: 받는 피해 증가 +15% 추가
+};
+function castGmax(hero, engine) { // 피카츄 각성 스킬: 20초 거대화, 공격력×1.5·광역, 쿨 90초
+  if (!hero._awaken || hero._gmaxCd > 0) return false;
+  hero._gmaxTimer = 20; hero._gmaxCd = 90;
+  hero._formImg = window.loadSpriteImage ? window.loadSpriteImage('assets/heroes/gmax_pikachu.png') : null;
+  engine.triggerScreenShake && engine.triggerScreenShake(8, 0.35);
+  for (let k = 0; k < 3; k++) engine.particles.push(new AoeBurst(hero.x, hero.y, 70 + k * 45, '#ffe14a'));
+  engine.spawnFloatingText('거다이맥스!', hero.x, hero.y - 44, '#ffe14a', { fontSize: 18, life: 1.2 });
+  return true;
+}
+window.castGmax = castGmax;
+
 // ===== HERO CLASS =====
 class Hero {
   constructor(heroId, x, y, skinId='default') {
@@ -335,12 +354,12 @@ class Hero {
   get attackDamage() {
     const a = this.def.attack;
     if (!a) return 0;
-    const burst = (this._burstTimer > 0) ? 1.4 : 1;
+    const burst = (this._burstTimer > 0) ? 1.4 : 1, gmax = this._gmaxTimer > 0 ? 1.5 : 1;
     const base = (a.baseDamage + (this.level-1)*a.damagePerLevel) * (1 + this._skillVal('atkDmg', 0) + (this._multiTargetDmgBonus || 0)) * (this._evoDmgMul || 1) * burst;
     // v3.2: 적 체력이 웨이브마다 지수로 오르니 영웅도 같은 곡선으로 성장 (예전엔 레벨 비례 직선이라 후반에 무의미)
     const w = window.app?.engine?.currentWave || 0;
     const waveScale = Math.pow(1.04, Math.max(0, w - 5));
-    return base * this._typeUpgradeDmgMul() * waveScale * (this._formMul || 1) * (window.app?.engine?._cardMods?.heroDmg || 1);
+    return base * this._typeUpgradeDmgMul() * waveScale * (this._formMul || 1) * gmax * (window.app?.engine?._cardMods?.heroDmg || 1);
   }
 
   // v27-8: 영웅도 해당 속성의 타입강화 영향을 받도록 추가 (기존엔 전혀 반영 안 되고 있었음)
@@ -377,6 +396,7 @@ class Hero {
       const boosted = node.evo && node.evo === this.evolved && !['thunderDouble','burstSplash','metroDouble','miracle','freePull'].includes(type);
       total += boosted ? v * 1.5 : v;
     }
+    if (this._awaken) total += (AWAKEN_FX[this.evolved || this.id] || {})[type] || 0; // v3.7 최종 각성
     return total;
   }
 
@@ -521,7 +541,7 @@ class Hero {
     if (status && status.type === 'stun') status.duration += this._skillVal('stunPlus', 0); // 마비
     const atkSlow = this._skillVal('atkSlow', 0);
     if (atkSlow > 0) status = { type:'slow', duration:1.5, factor: 1 - Math.min(0.5, atkSlow) }; // 물대포
-    const splash = (this._burstTimer > 0 && this._skillVal('burstSplash', 0)) ? 60 : 0; // 부스터 각성
+    const splash = this._gmaxTimer > 0 ? 80 : (this._burstTimer > 0 && this._skillVal('burstSplash', 0)) ? 60 : (this._awaken && this.evolved === 'flareon') ? 45 : 0; // 거다이맥스·부스터 각성
     const proj = new Projectile(this.x, this.y, this.attackTarget, {
       engine, speed:440, damage:dmg, color:a.projColor, size:6,
       dmgType:a.dmgType||'special', emoji:a.projEmoji,
@@ -556,6 +576,8 @@ class Hero {
       if (this.castFlash[i] > 0) this.castFlash[i] -= dt;
     }
     if (this._burstTimer > 0) this._burstTimer -= dt; // v27-60: 이브이 '다재다능' 스킬 지속시간
+    if (this._gmaxCd > 0) this._gmaxCd -= dt; // v3.7 거다이맥스
+    if (this._gmaxTimer > 0) { this._gmaxTimer -= dt; if (this._gmaxTimer <= 0) { this._formImg = null; engine.spawnFloatingText('거다이맥스 해제', this.x, this.y - 40, '#ffe14a'); } }
 
     // 자동 공격
     if (this.def.attack && engine.enemies) {
@@ -621,7 +643,7 @@ class Hero {
       }
       ctx.restore();
 
-      const drawSize = this._formImg ? 54 : 46;
+      const drawSize = this._gmaxTimer > 0 ? 66 : this._formImg ? 54 : 46;
       if (this._transformed) { // v3.2: 변신·각성 반짝임
         const tt = Date.now() * 0.003;
         ctx.save(); ctx.globalAlpha = 0.35 + Math.sin(tt * 2) * 0.15; ctx.strokeStyle = '#ffd86b'; ctx.lineWidth = 3;

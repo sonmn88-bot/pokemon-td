@@ -139,14 +139,15 @@ const RUN_EMPHASIS = [
 
 // ---- 영웅 변신 아이템 ----
 const HERO_ITEMS = {
-  pikachu: { item:'다이맥스 밴드', icon:'⚡', form:'gmax_pikachu', formName:'거다이맥스 피카츄' },
-  raichu:  { item:'다이맥스 밴드', icon:'⚡', form:'gmax_pikachu', formName:'거다이맥스 피카츄' },
-  togepi:  { item:'빛의돌', icon:'✨', form:'togekiss', formName:'토게키스' },
-  togetic: { item:'빛의돌', icon:'✨', form:'togekiss', formName:'토게키스' },
-  eevee:   { item:'빛나는 비늘', icon:'🌟', shine:true },
-  vaporeon:{ item:'빛나는 비늘', icon:'🌟', shine:true },
-  jolteon: { item:'빛나는 비늘', icon:'🌟', shine:true },
-  flareon: { item:'빛나는 비늘', icon:'🌟', shine:true },
+  // v3.7: 레벨 진화(웨이브 30쯤) 다음의 '최종 각성' — 웨이브 50부터 드롭, 60에 확정, 메가스톤 2개로 교환 가능
+  pikachu: { item:'다이맥스 밴드', icon:'electric', gmax:true, formName:'거다이맥스', desc:'새 스킬: 20초 거대화 (공격력 ×1.5 · 광역)' },
+  raichu:  { item:'다이맥스 밴드', icon:'electric', gmax:true, formName:'거다이맥스', desc:'새 스킬: 20초 거대화 (공격력 ×1.5 · 광역)' },
+  togepi:  { item:'빛의돌', icon:'sparkle', form:'togekiss', formName:'토게키스', desc:'행복의알 공속 +20% · 메트로놈 2개 동시' },
+  togetic: { item:'빛의돌', icon:'sparkle', form:'togekiss', formName:'토게키스', desc:'행복의알 공속 +20% · 메트로놈 2개 동시' },
+  eevee:   { item:'빛나는 비늘', icon:'sparkle', shine:true, desc:'공격력 +10%' },
+  vaporeon:{ item:'빛나는 비늘', icon:'water', shine:true, desc:'적응: 받는 피해 증가 +15% 추가' },
+  jolteon: { item:'빛나는 비늘', icon:'electric', shine:true, desc:'기본공격 연쇄 +2' },
+  flareon: { item:'빛나는 비늘', icon:'fire', shine:true, desc:'크리티컬 +15% · 기본공격 광역' },
 };
 
 window.MEGA = { STACK_BONUS, STACK_MAX, MEGA_NEED_STACK, towerStack, canFeed, feedTower, canMega, megaStoneChance, RUN_EMPHASIS, HERO_ITEMS };
@@ -172,7 +173,7 @@ Object.assign(App.prototype, {
     const chance = en._isKing ? 1 : Math.min(0.95, megaStoneChance(w) + (e._cardMods ? e._cardMods.stoneAdd : 0));
     let n = Math.random() < chance ? 1 : 0;
     if (n && w >= 100 && Math.random() < 0.25) n = 2;
-    if (Math.random() < 0.2) this._dropHeroItem('보스');
+    if (w >= 50 && Math.random() < 0.35) this._dropHeroItem('보스'); // v3.7: 최종 각성은 웨이브 50부터
     if (!n) { e.spawnFloatingText(`메가스톤 안 나옴 (${Math.round(chance * 100)}%)`, en.x, en.y - 30, '#9aa3b2'); return; }
     e._megaStones = (e._megaStones || 0) + n;
     this.SFX && this.SFX.play('pull_epic');
@@ -181,12 +182,14 @@ Object.assign(App.prototype, {
   },
 
   _megaWaveClear(wave) {
-    if (wave >= 15 && Math.random() < 0.03) this._dropHeroItem('웨이브');
+    if (wave === 50) this.buildHeroSkillBar && this.buildHeroSkillBar(); // 메가스톤 교환 버튼 노출
+    if (wave >= 60) this._dropHeroItem('천장'); // v3.7: 60까지 못 얻었으면 확정
+    else if (wave >= 50 && Math.random() < 0.05) this._dropHeroItem('웨이브');
   },
 
   _dropHeroItem(from) {
     const e = this.engine, h = e.heroes && e.heroes[0];
-    if (!h || e._heroItemGot) return;
+    if (!h || e._heroItemGot || !h.evolved) return; // 레벨 진화 먼저
     const info = HERO_ITEMS[h.evolved || h.id] || HERO_ITEMS[h.id];
     if (!info) return;
     e._heroItemGot = true;
@@ -195,7 +198,7 @@ Object.assign(App.prototype, {
     this._flashScreenEdge && this._flashScreenEdge();
     const pop = document.createElement('div');
     pop.className = 'hero-item-pop';
-    pop.innerHTML = `<div class="hip-icon">${info.icon}</div><b>${info.item} 획득!</b><small>오른쪽 아래 영웅 바의 ✨ 버튼을 눌러 ${info.formName ? info.formName + '(으)로 변신' : '각성'}하세요</small>`;
+    pop.innerHTML = `<div class="hip-icon">${ICON(info.icon, 40)}</div><b>${info.item} 획득!</b><small>${info.desc}<br>영웅 바의 반짝이는 버튼을 눌러 최종 각성하세요</small>`;
     document.getElementById('game-screen').appendChild(pop);
     setTimeout(() => pop.remove(), 4200);
     this.buildHeroSkillBar && this.buildHeroSkillBar();
@@ -206,20 +209,20 @@ Object.assign(App.prototype, {
     const e = this.engine, h = e.heroes && e.heroes[0], info = e._heroItemPending;
     if (!h || !info) return;
     e._heroItemPending = null;
-    const theme = { pikachu:['#ffe14a','#fff6b0','⚡'], raichu:['#ffb02e','#ffe9a0','⚡'], togepi:['#ff9ed8','#c9f2ff','✨'], togetic:['#ff9ed8','#c9f2ff','✨'] }[h.evolved || h.id] || ['#ffc24b','#fff3c4','🌟'];
-    const before = `assets/heroes/${h.evolved || h.id}.png`, after = info.form ? `assets/heroes/${info.form}.png` : before;
+    const theme = { pikachu:['#ffe14a','#fff6b0','✦'], raichu:['#ffb02e','#ffe9a0','✦'], togepi:['#ff9ed8','#c9f2ff','✦'], togetic:['#ff9ed8','#c9f2ff','✦'] }[h.evolved || h.id] || ['#ffc24b','#fff3c4','✦'];
+    const before = `assets/heroes/${h.evolved || h.id}.png`, after = info.form ? `assets/heroes/${info.form}.png` : info.gmax ? 'assets/heroes/gmax_pikachu.png' : before;
     const ov = document.createElement('div');
     ov.className = 'hero-evo';
     ov.style.setProperty('--c1', theme[0]); ov.style.setProperty('--c2', theme[1]);
     ov.innerHTML = `<div class="he-rays"></div><div class="he-ring"></div><img class="he-img" src="${before}" alt=""><div class="he-flash"></div>
       <div class="he-sparks">${Array.from({ length: 18 }, (_, i) => `<i style="--a:${i * 20}deg;--d:${(i % 3) * 0.15}s">${theme[2]}</i>`).join('')}</div>
-      <div class="he-title">${info.formName || h.name + ' 각성'}!</div>`;
+      <div class="he-title">${info.gmax ? '거다이맥스 해금' : (info.formName || h.name) + ' 최종 각성'}!</div><div class="he-sub">${info.desc}</div>`;
     document.getElementById('game-screen').appendChild(ov);
     this.SFX && this.SFX.play('pull_epic');
     const img = ov.querySelector('.he-img');
     setTimeout(() => { img.src = after; if (info.shine) img.classList.add('shine'); ov.classList.add('done'); this.SFX && this.SFX.play('merge'); }, 1500);
     setTimeout(() => {
-      h._transformed = info; h._formMul = 1.15;
+      h._transformed = info; h._awaken = true; h._formMul = 1.1;
       if (info.form) { h._formImg = window.loadSpriteImage ? window.loadSpriteImage(after) : null; h._formName = info.formName; }
       e.triggerScreenShake && e.triggerScreenShake(9, 0.4);
       if (window.AoeBurst) for (let k = 0; k < 3; k++) e.particles.push(new AoeBurst(h.x, h.y, 60 + k * 40, theme[0]));
@@ -246,6 +249,7 @@ Object.assign(App.prototype, {
     const n = this.engine._megaStones || 0;
     el.style.display = n > 0 ? '' : 'none';
     const v = el.querySelector('span'); if (v) v.textContent = n;
+    if ((this.engine.currentWave || 0) >= 50) this.buildHeroSkillBar && this.buildHeroSkillBar();
   },
 
   // 타워 패널에 붙일 버튼 HTML + 이벤트
