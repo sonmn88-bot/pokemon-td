@@ -291,22 +291,43 @@ class ChainBolt {
 }
 
 class AoeBurst {
+  // v3.6 특수기능 연출: 충격파(미리 그린 색별 스프라이트 1장) + 두 겹 링 + 방사 파편 + 바닥 문양. 0.6초
   constructor(x,y,radius,color){
     this.x=x;this.y=y;this.maxR=radius;this.color=color;
-    this.life=0;this.maxLife=0.4;this.dead=false;
+    this.life=0;this.maxLife=0.6;this.dead=false;
+    this.rot=Math.random()*Math.PI;
   }
   update(dt){this.life+=dt;if(this.life>=this.maxLife)this.dead=true;}
   draw(ctx){
-    const t=this.life/this.maxLife,r=this.maxR*t;
+    const t=this.life/this.maxLife, e=1-Math.pow(1-t,3), r=this.maxR*e, R=this.maxR;
     ctx.save();
-    ctx.globalAlpha=(1-t)*0.65;
-    ctx.strokeStyle=this.color;ctx.lineWidth=3*(1-t)+1;
-    ctx.beginPath();ctx.arc(this.x,this.y,r,0,Math.PI*2);ctx.stroke();
-    ctx.globalAlpha=(1-t)*0.12;
-    ctx.fillStyle=this.color;ctx.fill();
+    // 충격파 면
+    const sw=aoeWave(this.color), d=r*2.1;
+    ctx.globalAlpha=(1-t)*0.85; ctx.drawImage(sw,this.x-d/2,this.y-d/2,d,d);
+    // 바깥 링 + 늦게 따라오는 안쪽 링
+    ctx.strokeStyle=this.color; ctx.lineWidth=3.5*(1-t)+1;
+    ctx.beginPath(); ctx.arc(this.x,this.y,r,0,Math.PI*2); ctx.stroke();
+    const r2=R*Math.max(0,e-0.18);
+    if(r2>4){ ctx.globalAlpha=(1-t)*0.6; ctx.strokeStyle='#fff'; ctx.lineWidth=1.5; ctx.beginPath(); ctx.arc(this.x,this.y,r2,0,Math.PI*2); ctx.stroke(); }
+    // 방사 파편 10줄
+    ctx.globalAlpha=(1-t)*0.9; ctx.strokeStyle=this.color; ctx.lineWidth=2; ctx.lineCap='round'; ctx.beginPath();
+    for(let i=0;i<10;i++){ const a=this.rot+i*Math.PI/5, r0=r*0.72, r1=r0+R*0.16*(1-t); ctx.moveTo(this.x+Math.cos(a)*r0,this.y+Math.sin(a)*r0); ctx.lineTo(this.x+Math.cos(a)*r1,this.y+Math.sin(a)*r1); }
+    ctx.stroke();
+    // 바닥 문양 (시전 위치, 회전 점선 원)
+    if(t<0.7){ ctx.globalAlpha=(0.7-t)*0.9; ctx.setLineDash([6,5]); ctx.lineDashOffset=-t*60; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(this.x,this.y,Math.min(30,R*0.3),0,Math.PI*2); ctx.stroke(); ctx.setLineDash([]); }
     ctx.restore();
   }
 }
+const _aoeCache={};
+function aoeWave(color){ // 가운데 투명·가장자리 진한 충격파 원 (색별 1회)
+  if(_aoeCache[color]) return _aoeCache[color];
+  const raw=color; if(!/^#[0-9a-f]{6}$/i.test(color)){ const t=document.createElement('canvas').getContext('2d'); t.fillStyle=color; color=/^#[0-9a-f]{6}$/i.test(t.fillStyle)?t.fillStyle:'#ffffff'; } // 이름·rgba 색도 #rrggbb로
+  const c=document.createElement('canvas'); c.width=c.height=128; const x=c.getContext('2d');
+  const g=x.createRadialGradient(64,64,20,64,64,62); g.addColorStop(0,color+'00'); g.addColorStop(0.75,color+'40'); g.addColorStop(0.95,color+'a0'); g.addColorStop(1,color+'00');
+  x.fillStyle=g; x.beginPath(); x.arc(64,64,62,0,Math.PI*2); x.fill();
+  return (_aoeCache[raw]=c);
+}
+window.AoeBurst = AoeBurst;
 
 
 // v27-7: 죽은 코드 정리 - 여기부터 있던 TowerBase/makeTower/TowerRegistry/applyTowerSynergies(구버전)는
