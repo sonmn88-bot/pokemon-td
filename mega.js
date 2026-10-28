@@ -255,12 +255,12 @@ Object.assign(App.prototype, {
     const isBase = !!window.MEGA_OF[t.def.id];
     if (!isBase && !t.def.mega) return '';
     let h = `<div class="mg-stack">${'★'.repeat(st)}${'☆'.repeat(STACK_MAX - st)} <small>각성 ★${st} · 공격력 +${Math.round((st - 1) * STACK_BONUS * 100)}%</small></div>`;
-    if (feedN) h += `<button class="tp-btn" data-action="feed" style="background:linear-gradient(135deg,#f59e0b,#b45309)">🍖 먹이기 (보관함 ${feedN})</button>`;
+    if (feedN) h += `<button class="tp-btn" data-action="feed" style="background:linear-gradient(135deg,#f59e0b,#b45309)">먹이기 (보관함 ${feedN})</button>`;
     if (isBase) {
       const stones = this.engine._megaStones || 0;
       for (const mid of window.MEGA_OF[t.def.id]) {
         const md = GachaTowerDefs[mid], ok = canMega(this, t);
-        h += `<button class="tp-btn mega-btn" data-action="mega" data-mega="${mid}" ${ok ? '' : 'disabled'} title="${md.desc}">💎 ${md.name}${ok ? '' : st < MEGA_NEED_STACK ? ` (★${MEGA_NEED_STACK} 필요)` : ` (스톤 ${stones})`}</button>`;
+        h += `<button class="tp-btn mega-btn" data-action="mega" data-mega="${mid}" ${ok ? '' : 'disabled'} title="${md.desc}">${md.name}${ok ? '' : st < MEGA_NEED_STACK ? ` (★${MEGA_NEED_STACK} 필요)` : ` (스톤 ${stones})`}</button>`;
       }
     }
     return h;

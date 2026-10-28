@@ -1182,7 +1182,7 @@ class App {
     overlay.className = 'skin-picker'; // 기존 풀스크린 오버레이 스타일 재사용
     const title = document.createElement('div');
     title.className = 'skin-picker-title';
-    title.textContent = '🎁 시작 타워를 하나 골라주세요 (무료)';
+    title.textContent = '시작 타워를 하나 골라주세요 (무료)';
     overlay.appendChild(title);
     const grid = document.createElement('div');
     grid.style.cssText = 'display:flex;gap:16px;flex-wrap:wrap;justify-content:center;';
@@ -1435,10 +1435,10 @@ class App {
       btn.textContent = `⏳ 재사용 대기 (${Math.ceil(cd)}s)`;
     } else if (this.engine.currentWave < (tierDef.minWave || 1)) {
       btn.disabled = true;
-      btn.textContent = `🔒 웨이브 ${tierDef.minWave} 이후 소환가능`;
+      btn.textContent = `웨이브 ${tierDef.minWave} 이후 소환가능`;
     } else {
       btn.disabled = false;
-      btn.textContent = `🔮 ${tierDef.label} 소환`;
+      btn.textContent = `${tierDef.label} 소환`;
     }
   }
 
@@ -1740,9 +1740,9 @@ class App {
     const isBossWave = nextWave === KING_WAVE || nextWave % 10 === 0;
     if (!isBossWave && nextWave >= 3 && Math.random() < 0.15) {
       const events = [
-        { name:'💰 골드 러쉬', color:'#ffc24b', apply:()=>{ e._globalGoldMul = 2.2; } },
-        { name:'⚡ 스피드 웨이브', color:'#5b9dff', apply:()=>{ e._waveSpeedMul = 1.5; e._waveHpMul = 0.75; } },
-        { name:'🛡️ 정예 웨이브', color:'#ff5c7a', apply:()=>{ e._waveHpMul = 1.6; e._globalGoldMul = 1.8; } },
+        { name:'골드 러쉬', color:'#ffc24b', apply:()=>{ e._globalGoldMul = 2.2; } },
+        { name:'스피드 웨이브', color:'#5b9dff', apply:()=>{ e._waveSpeedMul = 1.5; e._waveHpMul = 0.75; } },
+        { name:'정예 웨이브', color:'#ff5c7a', apply:()=>{ e._waveHpMul = 1.6; e._globalGoldMul = 1.8; } },
       ];
       const ev = events[Math.floor(Math.random() * events.length)];
       ev.apply();
@@ -1899,7 +1899,7 @@ class App {
         // v27-20: 조용히 안 보이던 것 대신 명확한 안내 (요청6 - 등록UI가 아예 안보여서 헷갈렸음)
         const noticeEl = document.createElement('div');
         noticeEl.style.cssText = 'font-size:11px;color:#888;margin:6px 0;text-align:center;';
-        noticeEl.textContent = '🌍 랭킹 서버 미설정 (firebase-config.js에 본인 Firebase 프로젝트 값을 입력해야 등록 가능)';
+        noticeEl.textContent = '랭킹 서버 미설정 (firebase-config.js에 본인 Firebase 프로젝트 값을 입력해야 등록 가능)';
         overlay.appendChild(noticeEl);
       }
     }
@@ -1913,7 +1913,7 @@ class App {
       if (stars >= 1) {
         const unlockMsg = document.createElement('div');
         unlockMsg.className = 'end-unlock-msg';
-        unlockMsg.textContent = '🎁 새로운 영웅 스킨이 해금되었습니다!';
+        unlockMsg.textContent = '새로운 영웅 스킨이 해금되었습니다!';
         overlay.appendChild(unlockMsg);
       }
     }
@@ -1922,14 +1922,14 @@ class App {
     const shareBtn = document.createElement('button');
     shareBtn.className = 'end-btn';
     shareBtn.style.cssText = 'background:linear-gradient(135deg,#a78bfa,#6aa8ff);margin-bottom:8px;';
-    shareBtn.textContent = '📸 결과 카드 공유';
+    shareBtn.textContent = '결과 카드 공유';
     shareBtn.addEventListener('click', () => this.shareResultCard(shareBtn));
     overlay.appendChild(shareBtn);
 
     const retryBtn = document.createElement('button');
     retryBtn.className = 'end-btn';
     retryBtn.style.cssText = 'background:linear-gradient(135deg,#ff9800,#ff5722);margin-bottom:8px;';
-    retryBtn.textContent = '🔄 바로 다시 도전';
+    retryBtn.textContent = '바로 다시 도전';
     retryBtn.addEventListener('click', () => {
       overlay.remove();
       this.backToMapSelect();

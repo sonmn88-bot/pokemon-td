@@ -205,7 +205,7 @@ Object.assign(App.prototype, {
           <button class="mg-auto all" data-act="all" ${window.NEXT_GRADE[ui.grade] ? '' : 'disabled'}>한 번에 전부</button>
         </div>
         <div class="mg-grid">${cards}</div>
-        ${(this.engine._luckyCoins || 0) > 0 ? `<div class="mg-coin">🪙 행운의 동전 ${this.engine._luckyCoins}개 — 다음 랜덤 합성은 2개 중 선택</div>` : ''}
+        ${(this.engine._luckyCoins || 0) > 0 ? `<div class="mg-coin">행운의 동전 ${this.engine._luckyCoins}개 — 다음 랜덤 합성은 2개 중 선택</div>` : ''}
         <div class="mg-hint">${nextG ? `같은 등급 아무거나 3개 → <b style="color:${nextG.color}">${nextG.name}</b> 랜덤 · 같은 종 3개면 확정 진화도 가능` : '이 등급은 랜덤 합성이 없어요 (유니크는 위 레시피로)'}</div>
         <div class="mg-actions">
           <button class="mg-btn rnd" data-act="random" ${canRandom ? '' : 'disabled'}>${ICON('dice', 16)}랜덤 합성 <span class="mg-n">${n}/3</span></button>
@@ -254,7 +254,7 @@ Object.assign(App.prototype, {
         }
         const keptMega = this._allMaterials(false).filter(m => m.def.grade === grade && window.MEGA_OF?.[m.def.id]).length;
         const onField = this._allMaterials(true).filter(m => m.kind === 'field' && m.def.grade === grade).length;
-        const note = [keptMega ? `💎 메가 원본 ${keptMega}마리는 남겨뒀어요` : '', onField ? `배치된 ${onField}마리는 그대로예요` : ''].filter(Boolean).join(' · ');
+        const note = [keptMega ? `메가 원본 ${keptMega}마리는 남겨뒀어요` : '', onField ? `배치된 ${onField}마리는 그대로예요` : ''].filter(Boolean).join(' · ');
         if (!results.length) { this.showWaveAnnounce('합성할 보관함 포켓몬이 3마리 미만이에요' + (note ? `<br><span style="font-size:0.7em">${note}</span>` : ''), '#ff5c7a'); return; }
         this.SFX.play(results.some(d => d.grade === 'legend') ? 'pull_epic' : 'merge');
         overlay.remove(); this.openMergePanel();
@@ -324,7 +324,7 @@ Object.assign(App.prototype, {
     const big = defs.some(d => d.grade === 'legend' || d.grade === 'unique');
     if (big) ov.classList.add('cutin');
     ov.style.setProperty('--gc', window.GRADES[defs[0].grade].color);
-    ov.innerHTML = `<div class="mr-pick-title">🪙 행운의 동전 — 하나를 고르세요${jumped ? ' (🍀 2단 상승!)' : ''}</div>
+    ov.innerHTML = `<div class="mr-pick-title">행운의 동전 — 하나를 고르세요${jumped ? ' (2단 상승!)' : ''}</div>
       <div class="mr-pick-row">${defs.map((d, i) => {
         const G = window.GRADES[d.grade];
         return `<div class="mr-card shown" data-i="${i}" style="--gc:${G.color}"><div class="mr-emoji">${PKM(d, 72)}</div>

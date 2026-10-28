@@ -791,7 +791,7 @@ Object.assign(App.prototype, {
     g.fillStyle = '#fff'; g.font = font(250, 900); g.fillText(String(e.currentWave), W / 2, 360);
     g.fillStyle = '#6aa8ff'; g.font = font(48, 900); g.fillText('WAVE', W / 2, 510);
     g.fillStyle = 'rgba(255,255,255,0.85)'; g.font = font(40, 800);
-    g.fillText(`🏅 ${(e.score || 0).toLocaleString()}점`, W / 2, 580);
+    g.fillText(`${(e.score || 0).toLocaleString()}점`, W / 2, 580);
 
     // 영웅 + MVP 카드
     const hero = e.heroes && e.heroes[0];

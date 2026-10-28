@@ -54,7 +54,7 @@ const SkillTrees = {
       [ { id:'pk_spd',   name:'과충전', emoji:'🔌', desc:'전기 타워 공격속도 +12%', fx:{elecSpeed:0.12} },
         { id:'pk_rng',   name:'전자기장', emoji:'📡', desc:'전기 타워 사거리 +12%', fx:{elecRange:0.12} },
         { id:'pk_edmg',  name:'고전압', emoji:'🔆', desc:'전기 타워 공격력 +15%', fx:{elecDmg:0.15} },
-        { id:'pk_cap2',  name:'충전', emoji:'🔋', desc:'[캡스톤] 전기 타워 5개마다 모든 타워 공격력 +5%', fx:{chargeAll:0.05} } ],
+        { id:'pk_cap2',  name:'충전', emoji:'🔋', desc:'[캡스톤] 전기 타워 3개마다 모든 타워 공격력 +5%', fx:{chargeAll:0.05} } ],
       [ { id:'pk_stun',  name:'마비', emoji:'😵', desc:'기본공격·100만볼트 스턴 +0.3초', fx:{stunPlus:0.3} },
         { id:'pk_field', name:'감속장', emoji:'🧲', desc:'100만볼트 맞은 적 3초간 40% 감속', fx:{voltSlow:0.4} },
         { id:'pk_cd',    name:'오버로드', emoji:'⏱️', desc:'모든 스킬 쿨다운 -25%', fx:{cdReduce:0.25} },
@@ -103,14 +103,14 @@ const HeroDefs = {
   pikachu: {
     id:'pikachu', name:'피카츄', baseColor:'#ffd600',
     role:'전기 딜러',
-    passive:'전기 타워 1개당 전기 타워 공격력 +2% (최대 30%) · 라이츄: +3% (최대 45%)',
-    evolution:{ level:15, options:[
+    passive:'전기 타워 1개당 전기 타워 공격력 +5% (6개면 최대 30%) · 라이츄: +7.5% (최대 45%)',
+    evolution:{ level:10, options:[
       // v27-60: 데미지 특화로 통일(다른 강화 요소는 패시브 쪽에서 담당)
       { id:'raichu', name:'라이츄', color:'#ff9800', dmgMul:1.35, rangeMul:1.15, fireRateMul:1.0 },
     ]},
     attack:{
       baseRange:119, baseDamage:11, baseFireRate:1.1, // v3.4: 피카츄는 딜러형 → 세 영웅 중 공격력 최고
-      rangePerLevel:7, damagePerLevel:3.6,
+      rangePerLevel:4, damagePerLevel:2.2,
       projColor:'#fff176', projEmoji:'⚡', dmgType:'special',
       status:{type:'stun', duration:0.15},
     },
@@ -164,13 +164,13 @@ const HeroDefs = {
     id:'togepi', name:'토게피', baseColor:'#fff9c4',
     role:'서포터 / 행운',
     passive:'골드 획득 +10% · 이자 상한 +5 · 토게틱: 노말·레어 합성 10% 확률 2등급 상승',
-    evolution:{ level:15, options:[
+    evolution:{ level:10, options:[
       // v27-60: 서포터 역할에 맞게 한 스탯 몰빵 대신 고르게 - 대신 패시브/스킬(행복의알) 쪽이 진짜 힘
       { id:'togetic', name:'토게틱', color:'#f8bbd0', dmgMul:1.15, rangeMul:1.35, fireRateMul:1.10 },
     ]},
     attack:{
       baseRange:112, baseDamage:6, baseFireRate:1.0, // v3.4: 토게피는 경제·행운 지원형 → 공격력은 피카츄의 약 60%
-      rangePerLevel:6, damagePerLevel:2.5, // v27-46: damagePerLevel 2→4 (요청5: 성장이 너무 약했음)
+      rangePerLevel:4, damagePerLevel:1.5, // v27-46: damagePerLevel 2→4 (요청5: 성장이 너무 약했음)
       projColor:'#fff59d', projEmoji:'✨', dmgType:'special',
     },
     passiveApply(engine, hero) {
@@ -190,7 +190,8 @@ const HeroDefs = {
         desc:'랜덤 대형 효과 발동',
         cast(hero, engine) {
           // v28: 더블 메트로놈 노드면 서로 다른 효과 2개 동시 발동
-          const rolls = [0,1,2,3].sort(() => Math.random() - 0.5).slice(0, hero._skillVal('metroDouble', 0) ? 2 : 1);
+          const danger = engine.enemies.some(e => e.isBoss && !e.dead) || engine.enemies.length >= 30; // v3.7: 위기엔 전투 효과만
+          const rolls = (danger ? [0,1,2] : [0,1,2,3]).sort(() => Math.random() - 0.5).slice(0, hero._skillVal('metroDouble', 0) ? 2 : 1);
           for (const roll of rolls) {
           if (roll === 0) {
             const dmg = hero.attackDamage * 1.6; // v27-60: 고정값 → 오토어택 비례로 통일
@@ -203,22 +204,23 @@ const HeroDefs = {
             for (const e of engine.enemies) { if (!e.dead&&!e.reachedEnd) e.applyStatus('stun',1.5,0); }
             engine.spawnFloatingText('전체 스턴!', hero.x, hero.y-32, '#ba68c8');
           } else {
-            engine.addGold(50 + hero.level * 10);
-            engine.spawnFloatingText(`골드 획득! +${50+hero.level*10}g`, hero.x, hero.y-32, '#ffc24b');
+            const g = 80 + (engine.currentWave || 0) * 12; // v3.7: 웨이브 비례
+            engine.addGold(g);
+            engine.spawnFloatingText(`골드 획득! +${g}g`, hero.x, hero.y-32, '#ffc24b');
           }
           }
         }
       },
       {
         name:'행복의알', emoji:'🥚', baseCooldown:36,
-        desc:'모든 타워 공격력 +25~40% (레벨 비례, 8초)',
+        desc:'모든 타워 공격력 +25~40% (레벨 비례, 10초)',
         cast(hero, engine) {
           // v27-29 버그수정: buffDmgMul(영구필드)에 직접 곱하고 타이머 해제 로직이 아예 없어서,
           // 쿨다운 24초마다 재사용할 때마다 데미지가 영구적으로 복리 누적되고 있었음(요청 - 지속피해
           // 원인 재검토 결과 발견. 셋 중 쿨다운이 제일 짧아 가장 심각했을 가능성). 임시배율 필드로 교체.
           // v27-60: 고정 +25%는 레벨을 올려도 안 세지는 유일한 스킬이었음 - 레벨 비례로 변경(Lv1=+25%, Lv25=+40%)
           const mul = 1 + 0.25 + hero.level * 0.006 + hero._skillVal('eggPower', 0);
-          const dur = 8 + hero._skillVal('eggDur', 0), spd = hero._skillVal('eggSpeed', 0);
+          const dur = 10 + hero._skillVal('eggDur', 0), spd = hero._skillVal('eggSpeed', 0);
           for (const t of engine.towers) {
             t._tempDmgMul = mul;
             if (spd) t._tempSpeedMul = 1 + spd; // 축복
@@ -232,17 +234,17 @@ const HeroDefs = {
 };
 
 
-// ===== 이브이 (만능형, 레벨12에 3갈래 진화 선택) =====
+// ===== 이브이 (만능형, 레벨8에 3갈래 진화 선택) =====
 HeroDefs.eevee = {
   id:'eevee', name:'이브이', baseColor:'#a1887f',
   role:'만능형 (진화로 특화)',
-  passive:'모든 타워 공격력 +5% · Lv12에 3갈래 진화 (같은 갈래 스킬트리 효과 ×1.5)',
+  passive:'모든 타워 공격력 +5% · Lv8에 3갈래 진화 (같은 갈래 스킬트리 효과 ×1.5)',
   attack:{
     baseRange:116, baseDamage:11, baseFireRate:1.1, // v3.3: 초반이 너무 약했음 (7·0.95 → 11·1.1)
-    rangePerLevel:6, damagePerLevel:3,
+    rangePerLevel:4, damagePerLevel:1.8,
     projColor:'#d7ccc8', projEmoji:'⭐', dmgType:'special',
   },
-  evolution:{ level:12, options:[
+  evolution:{ level:8, options:[
     // v27-60: "사거리 특화"는 DPS에 실질적 의미가 없다는 지적 반영 - 샤미드는 사거리 대신
     // 슬로우/CC 기능을 실제로 강화하는 쪽으로 재설계 (아래 '적응' 스킬에서 분기 처리)
     { id:'vaporeon', name:'샤미드',   color:'#29b6f6', dmgMul:1.10, rangeMul:1.30, fireRateMul:1.00, focus:'물(슬로우 서포터 특화)' },
@@ -263,7 +265,7 @@ HeroDefs.eevee = {
         else if (hero.evolved === 'flareon') { dmgMul = 2.0; slowDur = 1.5; slowFactor = 0.30; }   // 불: 데미지 특화
         // 쥬피썬더는 기본값 유지 (공속 특화는 오토어택 fireRateMul로 이미 충분히 반영됨)
         const dmg = hero.attackDamage * dmgMul * (1 + hero._skillVal('adaptDmg', 0));
-        const vuln = hero._skillVal('vulnerable', 0);
+        const vuln = hero._skillVal('vulnerable', 0) + (hero.evolved === 'vaporeon' ? 0.15 : 0); // v3.7: 샤미드 기본 약화 +15%
         for (const e of engine.enemies) {
           if (e.dead||e.reachedEnd) continue;
           if (Math.hypot(e.x-hero.x,e.y-hero.y) <= r) {
@@ -299,7 +301,7 @@ class Hero {
     this.x = x; this.y = y;
     this.level = 1;
     this.exp = 0;
-    this.expToNext = 100;
+    this.expToNext = 60; // v3.7: 100·×1.3이면 웨이브40에 Lv7 → 60·×1.15 (웨이브30≈Lv10·50≈Lv15·63≈Lv20)
     this.skinId = 'default'; // v3.2: 스킨 시스템 제거 (색만 바꾸는 수준이라 의미가 없었음)
     this._bobPhase = Math.random() * Math.PI * 2; // v27-51: 아이들 모션 위상차
 
@@ -390,9 +392,9 @@ class Hero {
   _applyAura(engine) {
     const elecCount = engine.towers.filter(t => t.def?.type === 'electric').length;
     const isPika = this.id === 'pikachu';
-    const per = this.evolved ? 0.03 : 0.02, cap = this.evolved ? 0.45 : 0.30;
+    const per = this.evolved ? 0.075 : 0.05, cap = this.evolved ? 0.45 : 0.30; // v3.7: 전기 6개면 최대
     const allDmg = (this.id === 'eevee' ? 0.05 : 0) + this._skillVal('globalDmg', 0)
-                 + Math.floor(elecCount / 5) * this._skillVal('chargeAll', 0);
+                 + Math.floor(elecCount / 3) * this._skillVal('chargeAll', 0);
     const eDmg = (isPika ? Math.min(cap, elecCount * per) : 0) + this._skillVal('elecDmg', 0);
     const eSpd = this._skillVal('elecSpeed', 0), eRng = this._skillVal('elecRange', 0);
     for (const t of engine.towers) {
@@ -429,7 +431,7 @@ class Hero {
       this.exp -= this.expToNext;
       this.level++;
       this.skillPoints++;
-      this.expToNext = Math.floor(this.expToNext * 1.30);
+      this.expToNext = Math.floor(this.expToNext * 1.15);
       engine && engine.spawnFloatingText(`${this.def.name} Lv${this.level}! +SP`, this.x, this.y-42, '#ffc24b');
       engine && engine.particles && engine.particles.push(new AoeBurst(this.x, this.y, 50, '#ffc24b'));
 
