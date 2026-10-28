@@ -52,7 +52,7 @@ const MEGA_DEFS = [
     desc:'독 장판 · 재생 봉쇄 → 재생하는 적에 강함',
     fire(t, e) { const [tgt] = _mgTargets(t, e, 1); if (!tgt) return; _mgBeam(t, e, tgt, '#7cd36a', 0.25);
       _mgArea(e, tgt.x, tgt.y, 85, t.damage * 1.7, 'poison', en => { en.applyStatus('poison', 4, t.damage * 0.25); en._noRegen = 5; }); } },
-  { id:'mega_pinsir', base:'pinsir', name:'메가쁘사이저', type:'grass', emoji:'🪲', fr:0.9, range:150,
+  { id:'mega_pinsir', base:'pinsir', name:'메가쁘사이저', type:'grass', emoji:'🪲', fr:0.9, range:150, dmgMul:1.3,
     desc:'체력 18% 이하 즉사(보스 제외) · 30% 크리 → 체력 많은 적',
     fire(t, e) { const [tgt] = _mgTargets(t, e, 1); if (!tgt) return; _mgBeam(t, e, tgt, '#c9a46a');
       const crit = Math.random() < 0.3; tgt.takeDamage(t.damage * (crit ? 7.5 : 3.0), 'special');
@@ -62,7 +62,7 @@ const MEGA_DEFS = [
     fire(t, e) { const [tgt] = _mgTargets(t, e, 1); if (!tgt) return;
       for (let i = 0; i < 3; i++) e.projectiles.push(new Projectile(t.x, t.y, tgt, { engine: e, speed: 700, damage: t.damage * 0.55, color: '#e8d24a', size: 3, dmgType: 'special',
         status: { type: 'poison', duration: 3, factor: t.damage * 0.08 } })); } },
-  { id:'mega_aerodactyl', base:'aerodactyl', name:'메가프테라', type:'grass', emoji:'🦖', fr:1.0, range:180,
+  { id:'mega_aerodactyl', base:'aerodactyl', name:'메가프테라', type:'grass', emoji:'🦖', fr:1.0, range:180, dmgMul:1.3,
     desc:'2마리 공격 · 비행 ×2.5 · 넉백 → 비행에 강함',
     fire(t, e) { for (const tgt of _mgTargets(t, e, 2)) { _mgBeam(t, e, tgt, '#b9a3d6');
       tgt.takeDamage(t.damage * 1.9 * (_isFly(tgt) ? 2.5 : 1), 'special'); if (Math.random() < 0.3) tgt.distTraveled = Math.max(0, tgt.distTraveled - 40); } } },
@@ -96,7 +96,7 @@ const MEGA_DEFS = [
   window.MEGA_OF = {};
   for (const m of MEGA_DEFS) {
     GachaTowerDefs[m.id] = { id: m.id, name: m.name, emoji: m.emoji, grade: 'unique', type: m.type, pokemonId: m.id,
-      damage: Math.round(base * 0.75) /* v3.8: 0.62→0.75 */, fireRate: m.fr, range: m.range, desc: m.desc, fire: m.fire, mega: true, megaOf: m.base, _signature: true };
+      damage: Math.round(base * 0.75 * (m.dmgMul || 1)) /* v3.8: 0.62→0.75, 희귀 메가(쁘사이저·프테라) ×1.3 */, fireRate: m.fr, range: m.range, desc: m.desc, fire: m.fire, mega: true, megaOf: m.base, _signature: true };
     window.TowerSpriteImages[m.id] = `assets/towers/${m.id}.png`;
     (window.MEGA_OF[m.base] = window.MEGA_OF[m.base] || []).push(m.id);
   }

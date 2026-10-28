@@ -126,7 +126,7 @@ for (const item of w.ShopItems || []) {
 
 // ---- 9. v28 세션D: 151 도감 ----
 {
-  const defs = Object.values(w.GachaTowerDefs);
+  const defs = Object.values(w.GachaTowerDefs).filter(d => !d.mega && !d.hidden); // 메가·히든(도박 전용)은 도감 151 밖
   check('도감: 정확히 151마리', defs.length === 151, `실제 ${defs.length}`);
   check('도감: 번호 1~151 빠짐없음', new Set(defs.map(d => d.no)).size === 151 && defs.every(d => d.no >= 1 && d.no <= 151));
   const cnt = {}; defs.forEach(d => cnt[d.grade] = (cnt[d.grade] || 0) + 1);

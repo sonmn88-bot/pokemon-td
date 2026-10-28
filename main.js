@@ -778,7 +778,12 @@ class App {
     }
 
     // 단일 뽑기
-    const towerDef = window.rollTower(pullKey);
+    let towerDef = window.rollTower(pullKey);
+    if (pullKey === 'gamble' && Math.random() < 0.01 && window.GachaTowerDefs.shiny_gyarados) { // v3.8 히든: 도박 1%
+      towerDef = { ...window.GachaTowerDefs.shiny_gyarados, _starLevel: 1 };
+      this.engine.triggerScreenShake && this.engine.triggerScreenShake(12, 0.6);
+      setTimeout(() => this.showWaveAnnounce('히든 포켓몬! 붉은 갸라도스', '#ff4d5e'), 900);
+    }
     if (noSlotSelected) {
       // v27-44: 슬롯 없이 뽑았으면 보관함으로 (요청2)
       this._addToStorage([towerDef]);

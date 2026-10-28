@@ -379,6 +379,23 @@ const GachaTowerDefs = {
       if(t._psyTimer>=4){ t._psyTimer=0; for(const en of e.enemies) if(!en.dead&&!en.reachedEnd&&Math.hypot(en.x-t.x,en.y-t.y)<=t.range) en.applyStatus('slow',1.5,0.5); e.particles.push(new AoeBurst(t.x,t.y,t.range,'#7c4dff')); }
     }
   },
+  // v3.8 히든: 도박 뽑기(2000)에서만 1% — 붉은 갸라도스 (등급 풀에 없음, 레시피·합성으로 못 얻음)
+  shiny_gyarados: {
+    id:'shiny_gyarados', name:'붉은 갸라도스', emoji:'', grade:'unique', type:'water', pokemonId:'gyarados', hidden:true,
+    damage:115, range:280, fireRate:1.1, desc:'히든 · 파괴광선(일직선 관통) + 6초마다 역린(범위 2배 피해·감속)',
+    fire(t,e){
+      const tgt=e.enemies.filter(en=>!en.dead&&!en.reachedEnd&&Math.hypot(en.x-t.x,en.y-t.y)<=t.range).sort((a,b)=>b.distTraveled-a.distTraveled)[0];
+      if(tgt){
+        const dx=tgt.x-t.x, dy=tgt.y-t.y, L=Math.hypot(dx,dy)||1, ux=dx/L, uy=dy/L, ex=t.x+ux*t.range, ey=t.y+uy*t.range;
+        e.projectiles.push(new Projectile(t.x,t.y,{x:ex,y:ey},{engine:e,color:'#ff4d5e',size:7,beam:true,beamLife:0.22}));
+        for(const en of e.enemies){ if(en.dead||en.reachedEnd) continue; const px=en.x-t.x, py=en.y-t.y, along=px*ux+py*uy; if(along<0||along>t.range) continue;
+          if(Math.abs(px*uy-py*ux)<=26){ en.takeDamage(t.damage,'special'); e.spawnHitParticle(en.x,en.y,'#ff4d5e'); } }
+      }
+      t._rageT=(t._rageT||0)+1/t.fireRate;
+      if(t._rageT>=6){ t._rageT=0; for(const en of e.enemies) if(!en.dead&&!en.reachedEnd&&Math.hypot(en.x-t.x,en.y-t.y)<=t.range*0.7){ en.takeDamage(t.damage*2,'special'); en.applyStatus('slow',2,0.5); }
+        e.particles.push(new AoeBurst(t.x,t.y,t.range*0.7,'#ff4d5e')); e.spawnFloatingText('역린!',t.x,t.y-34,'#ff4d5e'); }
+    }
+  },
   mew: {
     id:'mew', name:'뮤', emoji:'💗', grade:'unique', type:'psychic', pokemonId:'mew',
     damage:80, range:330, fireRate:1.4, desc:'전체버프+변신',
@@ -1008,6 +1025,30 @@ window.TowerSpriteImages = {
 window.GRADES=GRADES; window.TYPES=TYPES;
 window.GachaTowerDefs=GachaTowerDefs;
 window.GRADE_POOLS=GRADE_POOLS;
+// v3.8 붉은 갸라도스 스프라이트: 갸라도스의 파란 몸통만 빨갛게 (픽셀 색상 변환, 1회)
+(function makeShinyGyarados(){
+  if (typeof document === 'undefined') return;
+  window.TowerSpriteImages = window.TowerSpriteImages || {};
+  window.TowerSpriteImages.shiny_gyarados = 'assets/towers/gyarados.png'; // 변환 전 임시
+  const im = new Image();
+  im.onload = () => { try {
+    const c = document.createElement('canvas'); c.width = im.naturalWidth; c.height = im.naturalHeight;
+    const x = c.getContext('2d'); x.drawImage(im, 0, 0);
+    const d = x.getImageData(0, 0, c.width, c.height), p = d.data;
+    for (let i = 0; i < p.length; i += 4) {
+      const r = p[i] / 255, g = p[i+1] / 255, b = p[i+2] / 255, mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2, dd = mx - mn;
+      if (p[i+3] < 10 || dd < 0.12) continue;
+      let h = mx === r ? ((g - b) / dd) % 6 : mx === g ? (b - r) / dd + 2 : (r - g) / dd + 4; h *= 60; if (h < 0) h += 360;
+      if (h < 170 || h > 260) continue; // 파란 계열만
+      const sat = dd / (1 - Math.abs(2 * l - 1)), nh = (h + 150) % 360 / 60, C = (1 - Math.abs(2 * l - 1)) * Math.min(1, sat * 1.1), X = C * (1 - Math.abs(nh % 2 - 1)), m = l - C / 2;
+      const [rr, gg, bb] = nh < 1 ? [C, X, 0] : nh < 2 ? [X, C, 0] : nh < 3 ? [0, C, X] : nh < 4 ? [0, X, C] : nh < 5 ? [X, 0, C] : [C, 0, X];
+      p[i] = (rr + m) * 255; p[i+1] = (gg + m) * 255; p[i+2] = (bb + m) * 255;
+    }
+    x.putImageData(d, 0, 0);
+    window.TowerSpriteImages.shiny_gyarados = c.toDataURL();
+  } catch (_) {} };
+  im.src = 'assets/towers/gyarados.png';
+})();
 window.PULL_COSTS=PULL_COSTS;
 window.PULL_TABLES=PULL_TABLES;
 window.rollTower=rollTower;
