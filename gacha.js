@@ -659,7 +659,7 @@ function _createGachaTower(def, x, y, engine) {
     _tempDmgMul:1, _pokecenterTimer:0, _auraDmgMul:1, // v27-29: 임시버프+오라 전용 필드 (영구곱연산 버그 수정)
     get range(){ return (def.range+(this.synergyBonus*2))*Math.min(this.buffRangeMul, BUFF_CAPS.range)*(this._heroRangeMul||1)*(this._cardRng||1); },
     get damage(){
-      const base = (def.damage+this.synergyBonus+(this.flatDmg||0))*Math.min(this.buffDmgMul, BUFF_CAPS.damage)*this.masteryMul*(this._tempDmgMul||1)*(this._auraDmgMul||1)*(this._heroDmgMul||1)*(this._divMul||1)*(1+0.35*(((this.def&&this.def._stack)||1)-1))*(this._cardDmg||1); // v3.2: 타입 다양성 · 각성 ★ · v3.5 카드
+      const base = (def.damage+this.synergyBonus+(this.flatDmg||0))*Math.min(this.buffDmgMul, BUFF_CAPS.damage)*this.masteryMul*(this._tempDmgMul||1)*(this._auraDmgMul||1)*(this._heroDmgMul||1)*(this._divMul||1)*(1+((this.def&&this.def.hidden)?0.8:0.35)*(((this.def&&this.def._stack)||1)-1))*(this._cardDmg||1); // v3.2: 타입 다양성 · 각성 ★ · v3.5 카드
       const mul = window.typeEffectiveness ? window.typeEffectiveness(def.type, this.target && this.target.typeTag) : 1;
       return base * mul;
     },
@@ -1097,9 +1097,9 @@ window._createGachaTower=_createGachaTower;
 window.MissionDefs=MissionDefs;
 window.MissionTracker=MissionTracker;
 window.MERGE_EVOLUTION=MERGE_EVOLUTION;
-window.SELL_VALUE={ normal:40, rare:110, epic:600, legend:2000, unique:4000 }; // v3.9: 에픽·레전드·유니크 판매가 상향 (도박 기대 판매가 ≈520 < 2000이라 되팔기 이득 없음)
-// 판매가: 등급 기준 × 히든 2배 × 먹이로 올린 ★당 +50%
-window.sellValue = def => Math.round(((window.SELL_VALUE[def && def.grade] || 40) * (def && def.hidden ? 2 : 1)) * (1 + 0.5 * (((def && def._stack) || 1) - 1)));
+window.SELL_VALUE={ normal:40, rare:110, epic:600, legend:2000, unique:10000 }; // v3.9: 에픽·레전드·유니크 판매가 상향 (도박 기대 판매가 ≈520 < 2000이라 되팔기 이득 없음)
+// 판매가: 등급 기준 × 히든 3배 × 먹이로 올린 ★당 +50%
+window.sellValue = def => Math.round(((window.SELL_VALUE[def && def.grade] || 40) * (def && def.hidden ? 3 : 1)) * (1 + 0.5 * (((def && def._stack) || 1) - 1)));
 window.NEXT_GRADE=NEXT_GRADE; window.MERGE_ORDER=MERGE_ORDER; window.rollRandomMerge=rollRandomMerge; window.RECIPES=RECIPES;
 window.TypeUpgrades=TypeUpgrades;
 window.TypeUpgradeLevels=TypeUpgradeLevels;
