@@ -1,12 +1,12 @@
 // ===== MEGA.JS - v3.2 메가진화 · 각성 스택 · 메가스톤 · 영웅 변신 · 몬스터 편성 · 타입 다양성 =====
 // 로드 순서: storage.js 다음 (App.prototype 확장 + GachaTowerDefs 등록)
 //
-// 흐름: 에픽(원본) 필드 배치 → 같은 종을 '먹이기'로 ★ 올리기(★당 +35%) → ★3 + 메가스톤 → 메가진화 → ★5까지 계속 먹이기
+// 흐름: 에픽(원본) 필드 배치 → 같은 종을 '먹이기'로 ★ 올리기(★당 +35%) → ★5 + 메가스톤 → 메가진화(★5 그대로, 이후 먹이 없음) [v3.10]
 // 메가스톤: 20웨이브 보스에서만 확률 드롭 (30% → 20웨이브마다 +10%p, 최대 90%, 100웨이브부터 25% 확률로 2개)
 
 const STACK_BONUS = 0.35;   // ★ 하나당 공격력 +35%
 const STACK_MAX = 5;
-const MEGA_NEED_STACK = 3;
+const MEGA_NEED_STACK = 5; // v3.10: 원본을 같은 종 먹이로 ★5까지 키워야 메가진화 (메가는 ★5를 그대로 이어받고 더는 먹이 없음)
 
 // ---- 공용 헬퍼 ----
 function _mgTargets(t, e, n, range) {
@@ -108,7 +108,7 @@ function towerStack(t) { return (t && t.def && t.def._stack) || 1; }
 // v3.8 먹이기 확장: 같은 종이 거의 안 모여 메가 표시만 있고 못 먹이던 문제 + 먹이 없는 레전드가 버려지던 문제
 //   대상: 에픽·레전드 전부 + 메가. 재료: 같은 종 우선, 없으면 같은 타입의 에픽 이상(유니크·메가 제외)
 const FEED_GRADES = { epic: 1, legend: 1 };
-function _feedOk(t) { return t && t.def && (t.def.mega || t.def.hidden || FEED_GRADES[t.def.grade]) && towerStack(t) < STACK_MAX; }
+function _feedOk(t) { return t && t.def && !t.def.mega && (t.def.hidden || FEED_GRADES[t.def.grade]) && towerStack(t) < STACK_MAX; } // 메가는 먹이 불가
 function _feedMats(app, t) {
   const sameId = t.def.mega ? t.def.megaOf : t.def.id;
   const inv = app._inventory || [];
@@ -269,8 +269,9 @@ Object.assign(App.prototype, {
     if (!isBase && !t.def.mega && !t.def.hidden && !FEED_GRADES[t.def.grade]) return '';
     let h = `<div class="mg-stack">${'★'.repeat(st)}${'☆'.repeat(STACK_MAX - st)} <small>각성 ★${st} · 공격력 +${Math.round((st - 1) * (t.def.hidden ? 0.8 : STACK_BONUS) * 100)}%${t.def.hidden ? ' (히든 ★당 +80%)' : ''}</small></div>`;
     const megaLine = isBase || t.def.mega || t.def.grade === 'legend' || t.def.hidden, feedName = t.def.mega ? (GachaTowerDefs[t.def.megaOf] || {}).name : t.def.name;
-    if (st < STACK_MAX) h += `<button class="tp-btn ${feedN ? 'tp-upgrade' : ''}" data-action="feed" style="grid-column:1 / -1" ${feedN ? '' : 'disabled'}>먹이기 · ${t.def.hidden || megaLine ? `보관함의 ${feedName}` : '같은 종이나 같은 타입 에픽'} ${feedN}마리</button>`;
-    if (megaLine && !feedN && st < STACK_MAX) h += `<div class="mg-hint">${feedName}을(를) 뽑거나 합성하면 보관함에 쌓여요 (이 타워가 필드에 있으면 같은 등급 결과의 25%가 ${feedName})</div>`;
+    if (t.def.mega) h += `<div class="mg-hint">메가는 원본 ★5를 이어받은 완성형이라 먹이를 더 줄 수 없어요</div>`;
+    else if (st < STACK_MAX) h += `<button class="tp-btn ${feedN ? 'tp-upgrade' : ''}" data-action="feed" style="grid-column:1 / -1" ${feedN ? '' : 'disabled'}>먹이기 · ${t.def.hidden || megaLine ? `보관함의 ${feedName}` : '같은 종이나 같은 타입 에픽'} ${feedN}마리</button>`;
+    if (megaLine && !t.def.mega && !feedN && st < STACK_MAX) h += `<div class="mg-hint">${feedName}을(를) 뽑거나 합성하면 보관함에 쌓여요 (이 타워가 필드에 있으면 같은 등급 결과의 25%가 ${feedName})</div>`;
     if (isBase) {
       const stones = this.engine._megaStones || 0;
       for (const mid of window.MEGA_OF[t.def.id]) {

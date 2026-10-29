@@ -239,7 +239,8 @@ Object.assign(App.prototype, {
         const results = [];
         // v3.10: 메가 원본은 '필드의 같은 종(원본·메가)을 ★5까지 먹일 만큼'만 남기고 나머지는 합성에 포함
         //   (메가는 종마다 1마리라 메가를 만든 뒤 남는 원본은 먹이 말고 쓸 데가 없음). 필드에 그 종이 없으면 전부 보관
-        const megaNeed = id => { const ts = this.engine.towers.filter(t => t.def && (t.def.id === id || t.def.megaOf === id));
+        const megaNeed = id => { if (this.engine.towers.some(t => t.def && t.def.megaOf === id)) return 0; // 메가가 이미 있으면 원본은 전부 여분
+          const ts = this.engine.towers.filter(t => t.def && t.def.id === id);
           return ts.length ? ts.reduce((a, t) => a + Math.max(0, 5 - ((t.def._stack) || 1)), 0) : Infinity; };
         for (;;) {
           const all = this._allMaterials(false).filter(m => m.def.grade === grade), taken = {};
