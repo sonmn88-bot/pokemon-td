@@ -1,12 +1,12 @@
 // ===== MEGA.JS - v3.2 메가진화 · 각성 스택 · 메가스톤 · 영웅 변신 · 몬스터 편성 · 타입 다양성 =====
 // 로드 순서: storage.js 다음 (App.prototype 확장 + GachaTowerDefs 등록)
 //
-// 흐름: 에픽(원본) 필드 배치 → 같은 종을 '먹이기'로 ★ 올리기(★당 +35%) → ★5 + 메가스톤 → 메가진화(★5 그대로, 이후 먹이 없음) [v3.10]
+// 흐름 [v3.10]: 원본을 같은 종 먹이로 ★5 → ★5 + 메가스톤 → 메가 ★1 → '★5 원본'을 먹여 메가 ★5까지 (★당 +35%)
 // 메가스톤: 20웨이브 보스에서만 확률 드롭 (30% → 20웨이브마다 +10%p, 최대 90%, 100웨이브부터 25% 확률로 2개)
 
 const STACK_BONUS = 0.35;   // ★ 하나당 공격력 +35%
 const STACK_MAX = 5;
-const MEGA_NEED_STACK = 5; // v3.10: 원본을 같은 종 먹이로 ★5까지 키워야 메가진화 (메가는 ★5를 그대로 이어받고 더는 먹이 없음)
+const MEGA_NEED_STACK = 5; // v3.10: 원본 ★5 + 메가스톤 → 메가 ★1. 메가는 '★5 원본'을 먹이로 먹어 ★5까지 성장
 
 // ---- 공용 헬퍼 ----
 function _mgTargets(t, e, n, range) {
@@ -78,11 +78,11 @@ const MEGA_DEFS = [
     desc:'5마리 동시 공격 · 30% 스턴 → 빠른 적에 강함',
     fire(t, e) { for (const tgt of _mgTargets(t, e, 5)) { _mgBeam(t, e, tgt, '#e7c46a');
       tgt.takeDamage(t.damage * 0.95, 'special'); if (Math.random() < 0.3) tgt.applyStatus('stun', 0.5); } } },
-  { id:'mega_gengar', base:'gengar', name:'메가팬텀', type:'psychic', emoji:'👻', fr:0.9, range:190, needGrade:'legend',
+  { id:'mega_gengar', base:'gengar', name:'메가팬텀', type:'psychic', emoji:'👻', fr:0.9, range:190, needGrade:'legend', dmgMul:2.3,
     desc:'방어 완전 무시 · 2마리 · 그림자 속박(20% 1초 정지) → 장갑·유령에 강함',
     fire(t, e) { for (const tgt of _mgTargets(t, e, 2)) { _mgBeam(t, e, tgt, '#7a4dd6', 0.22);
       tgt.takeDamage(t.damage * 2.3, 'true'); if (Math.random() < 0.2) tgt.applyStatus('stun', 1.0); } } },
-  { id:'awakened_zapdos', base:'zapdos', name:'각성 썬더', type:'electric', emoji:'⚡', fr:0.9, range:210, needGrade:'legend',
+  { id:'awakened_zapdos', base:'zapdos', name:'각성 썬더', type:'electric', emoji:'⚡', fr:0.9, range:210, needGrade:'legend', dmgMul:2.3,
     desc:'8번 연쇄 번개 · 감전 → 물량에 강함',
     fire(t, e) { const [tgt] = _mgTargets(t, e, 1); if (!tgt) return;
       e.projectiles.push(new Projectile(t.x, t.y, tgt, { engine: e, speed: 900, damage: t.damage * 1.6, color: '#ffe066', size: 6, dmgType: 'special',
@@ -108,10 +108,15 @@ function towerStack(t) { return (t && t.def && t.def._stack) || 1; }
 // v3.8 먹이기 확장: 같은 종이 거의 안 모여 메가 표시만 있고 못 먹이던 문제 + 먹이 없는 레전드가 버려지던 문제
 //   대상: 에픽·레전드 전부 + 메가. 재료: 같은 종 우선, 없으면 같은 타입의 에픽 이상(유니크·메가 제외)
 const FEED_GRADES = { epic: 1, legend: 1 };
-function _feedOk(t) { return t && t.def && !t.def.mega && (t.def.hidden || FEED_GRADES[t.def.grade]) && towerStack(t) < STACK_MAX; } // 메가는 먹이 불가
+function _feedOk(t) { return t && t.def && (t.def.mega || t.def.hidden || FEED_GRADES[t.def.grade]) && towerStack(t) < STACK_MAX; }
 function _feedMats(app, t) {
   const sameId = t.def.mega ? t.def.megaOf : t.def.id;
   const inv = app._inventory || [];
+  if (t.def.mega) { // 메가 먹이 = ★5 원본 (보관함 우선, 그다음 필드)
+    const five = d => d.id === sameId && ((d._stack || 1) >= STACK_MAX);
+    const field = app.engine.towers.filter(x => x !== t && x.def && five(x.def)).map(x => ({ __field: x, id: x.def.id }));
+    return inv.filter(five).concat(field);
+  }
   const same = inv.filter(d => d.id === sameId);
   if (t.def.mega || (window.MEGA_OF || {})[t.def.id] || t.def.grade === 'legend') return same; // 메가 계열·레전드는 무조건 같은 종만
   const alt = inv.filter(d => d.id !== sameId && d.type === t.def.type && d.grade === 'epic' && !d.mega && !(window.MEGA_OF || {})[d.id]); // 일반 에픽만 같은 타입 에픽으로
@@ -122,8 +127,10 @@ function feedTower(app, t) {
   if (!_feedOk(t)) return false;
   const mat = _feedMats(app, t)[0];
   if (!mat) return false;
-  const i = app._inventory.indexOf(mat); if (i < 0) return false;
-  app._inventory.splice(i, 1);
+  if (mat.__field) { // 필드의 ★5 원본을 먹이로
+    const slot = app.engine.towerSlots.find(s => s.tower === mat.__field); if (!slot) return false;
+    app.engine.towers = app.engine.towers.filter(x => x !== mat.__field); slot.occupied = false; slot.tower = null;
+  } else { const i = app._inventory.indexOf(mat); if (i < 0) return false; app._inventory.splice(i, 1); }
   const plus = (app.engine._cardMods && Math.random() < app.engine._cardMods.feed2) ? 2 : 1; // v3.5 카드 '포식'
   t.def = { ...t.def, _stack: Math.min(STACK_MAX, towerStack(t) + plus) };
   return true;
@@ -269,9 +276,9 @@ Object.assign(App.prototype, {
     if (!isBase && !t.def.mega && !t.def.hidden && !FEED_GRADES[t.def.grade]) return '';
     let h = `<div class="mg-stack">${'★'.repeat(st)}${'☆'.repeat(STACK_MAX - st)} <small>각성 ★${st} · 공격력 +${Math.round((st - 1) * (t.def.hidden ? 0.8 : STACK_BONUS) * 100)}%${t.def.hidden ? ' (히든 ★당 +80%)' : ''}</small></div>`;
     const megaLine = isBase || t.def.mega || t.def.grade === 'legend' || t.def.hidden, feedName = t.def.mega ? (GachaTowerDefs[t.def.megaOf] || {}).name : t.def.name;
-    if (t.def.mega) h += `<div class="mg-hint">메가는 원본 ★5를 이어받은 완성형이라 먹이를 더 줄 수 없어요</div>`;
-    else if (st < STACK_MAX) h += `<button class="tp-btn ${feedN ? 'tp-upgrade' : ''}" data-action="feed" style="grid-column:1 / -1" ${feedN ? '' : 'disabled'}>먹이기 · ${t.def.hidden || megaLine ? `보관함의 ${feedName}` : '같은 종이나 같은 타입 에픽'} ${feedN}마리</button>`;
-    if (megaLine && !t.def.mega && !feedN && st < STACK_MAX) h += `<div class="mg-hint">${feedName}을(를) 뽑거나 합성하면 보관함에 쌓여요 (이 타워가 필드에 있으면 같은 등급 결과의 25%가 ${feedName})</div>`;
+    if (st < STACK_MAX) h += `<button class="tp-btn ${feedN ? 'tp-upgrade' : ''}" data-action="feed" style="grid-column:1 / -1" ${feedN ? '' : 'disabled'}>먹이기 · ${t.def.mega ? `★5 ${feedName}` : t.def.hidden || megaLine ? `보관함의 ${feedName}` : '같은 종이나 같은 타입 에픽'} ${feedN}마리</button>`;
+    if (t.def.mega && !feedN && st < STACK_MAX) h += `<div class="mg-hint">${feedName}을(를) 한 마리 더 ★5로 키우면 메가의 먹이가 돼요 (필드·보관함 모두 가능)</div>`;
+    else if (megaLine && !feedN && st < STACK_MAX) h += `<div class="mg-hint">${feedName}을(를) 뽑거나 합성하면 보관함에 쌓여요 (이 타워가 필드에 있으면 같은 등급 결과의 25%가 ${feedName})</div>`;
     if (isBase) {
       const stones = this.engine._megaStones || 0;
       for (const mid of window.MEGA_OF[t.def.id]) {
@@ -295,7 +302,7 @@ Object.assign(App.prototype, {
       if (this.engine.towers.some(x => x._gachaId === mid)) { this.showWaveAnnounce('같은 메가는 필드에 1마리만', '#ff5c7a'); return; }
       this.engine._megaStones--;
       const slot = this.engine.towerSlots[slotIdx];
-      const nd = { ...GachaTowerDefs[mid], _stack: towerStack(t), _tmTag: t.def._tmTag };
+      const nd = { ...GachaTowerDefs[mid], _stack: 1, _tmTag: t.def._tmTag }; // 메가는 ★1부터 다시 성장
       const nt = window._createGachaTower(nd, slot.x, slot.y, this.engine);
       nt._evolveGlowTimer = 1.2; // (2로 넣었던 게 화면 깨짐 원인 - 반지름이 음수가 됐음)
       this.engine.towers = this.engine.towers.filter(x => x !== t); this.engine.towers.push(nt);

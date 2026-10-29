@@ -563,7 +563,9 @@ function _pityKey(def) { return def.role || def.type; }
 //   쁘사이저·프테라·캥카처럼 진화 단계가 없는 종은 같은 종을 모을 방법이 우연뿐이라 먹이 버튼이 사실상 안 떴음
 function _megaPull(grade) {
   const e = window.app && app.engine; if (!e || !window.MEGA_OF || Math.random() >= 0.25) return null;
-  const ids = [...new Set(e.towers.filter(t => t.def && (MEGA_OF[t.def.id] || t.def.grade === 'legend') && t.def.grade === grade && ((t.def._stack || 1) < 5)).map(t => t.def.id))]; // 메가 원본·레전드
+  const ids = [...new Set(e.towers.filter(t => t.def && ((t.def._stack || 1) < 5)).map(t => // 메가 원본·레전드, 그리고 ★5 미만 메가는 그 원본 종
+    t.def.mega ? t.def.megaOf : (MEGA_OF[t.def.id] || t.def.grade === 'legend') ? t.def.id : null)
+    .filter(id => id && GachaTowerDefs[id] && GachaTowerDefs[id].grade === grade))];
   return ids.length ? ids[Math.floor(Math.random() * ids.length)] : null;
 }
 function rollRandomMerge(grade, state = {}) {
