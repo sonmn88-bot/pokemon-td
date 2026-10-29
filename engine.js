@@ -292,7 +292,7 @@ class GameEngine {
     if (this.w3) { // 3D: 타워 자리 전체가 HUD~하단 바 사이에 들어오는 시점
       const box = this.canvas.getBoundingClientRect(), hud = document.getElementById('hud-top'), bar = document.getElementById('tower-bar');
       const top = hud ? hud.getBoundingClientRect().bottom - box.top + 6 : 60, bot = bar ? bar.getBoundingClientRect().top - box.top - 6 : this.height - 90;
-      if (this.towerSlots.length) { this._fit = this.w3.fit(this.towerSlots, top, bot); this.minZoom = this._fit.zoom; this.maxZoom = Math.max(2.2, this._fit.zoom * 3); Object.assign(this.camera, this._fit); }
+      if (this.towerSlots.length) { this._fit = this.w3.fit(this.towerSlots, top, bot, this.paths[0]); this.minZoom = this._fit.zoom; this.maxZoom = Math.max(2.2, this._fit.zoom * 3); Object.assign(this.camera, this._fit); }
       return;
     }
     this._tiltFit();

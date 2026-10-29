@@ -15,7 +15,7 @@ let camPos = new THREE.Vector3();
 let occluders = [];                       // 화면상 나무 영역 (유닛 가림 판정)
 
 // 카메라: 오른쪽 위로 멀어지는 대각 시점
-const VIEW = { fov: 50, el: 44 * Math.PI / 180, yaw: 17 * Math.PI / 180 };
+const VIEW = { fov: 50, el: 44 * Math.PI / 180, yaw: 9 * Math.PI / 180 };
 W3.groundK = Math.sin(VIEW.el);           // 바닥 세로 압축률(세워 그리는 스프라이트 보정용)
 
 const THEMES = {
@@ -344,10 +344,13 @@ W3.occluded = function (x, y, P) {
   return false;
 };
 // 화면에 맵 전체(타워 자리)가 들어오는 줌·중심 계산 (top~bottom = HUD 아래~하단 바 위)
-W3.fit = function (slots, top, bottom) {
+W3.fit = function (slots, top, bottom, path) {
   let cx = 0, cy = 0; for (const s of slots) { cx += s.x; cy += s.y; } cx /= slots.length; cy /= slots.length;
   let zoom = 0.6, x = cx, y = cy;
-  const box = () => { let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9; for (const s of slots) { const p = W3.project(s.x, s.y); x0 = Math.min(x0, p.x - 22 * p.s); x1 = Math.max(x1, p.x + 22 * p.s); y0 = Math.min(y0, p.y - 58 * p.s); y1 = Math.max(y1, p.y + 18 * p.s); } return { x0, x1, y0, y1 }; };
+  const box = () => { let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9; for (const s of slots) { const p = W3.project(s.x, s.y); x0 = Math.min(x0, p.x - 22 * p.s); x1 = Math.max(x1, p.x + 22 * p.s); y0 = Math.min(y0, p.y - 58 * p.s); y1 = Math.max(y1, p.y + 18 * p.s); }
+    // 길 전체(왼쪽 복귀 세로길 포함)도 화면 안에 — 몹이 지나는 곳이 잘리지 않게
+    if (path) for (let i = 0; i < path.length; i += 4) { const p = W3.project(path[i].x, path[i].y); x0 = Math.min(x0, p.x - 18 * p.s); x1 = Math.max(x1, p.x + 18 * p.s); y0 = Math.min(y0, p.y - 40 * p.s); y1 = Math.max(y1, p.y + 14 * p.s); }
+    return { x0, x1, y0, y1 }; };
   for (let it = 0; it < 18; it++) {
     dirty = true; W3.setView(x, y, zoom);
     const b = box(), sh = (bottom - top) / (b.y1 - b.y0), sw = Wpx / (b.x1 - b.x0);
