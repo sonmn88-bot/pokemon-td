@@ -554,13 +554,14 @@ class App {
     if (!el) {
       el = document.createElement('div');
       el.id = 'field-warning-banner';
-      el.style.cssText = 'position:absolute;top:8px;left:50%;transform:translateX(-50%);z-index:150;padding:6px 14px;border-radius:10px;font-weight:bold;font-size:12px;pointer-events:none;transition:opacity 0.3s;white-space:nowrap;';
+      el.style.cssText = 'position:absolute;top:calc(var(--hud-h) + 62px);left:50%;transform:translateX(-50%);z-index:150;padding:7px 14px;border-radius:10px;font-weight:800;font-size:13px;pointer-events:none;transition:opacity 0.3s;white-space:nowrap;';
       document.getElementById('game-screen').appendChild(el);
     }
     const colors = { 140: ['#3a2f00','#ffc24b'], 160: ['#3a1f00','#ff9800'], 180: ['#3a0000','#ff3b3b'] };
     const [bg, fg] = colors[level] || colors[140];
     el.style.background = bg; el.style.color = fg; el.style.border = `1px solid ${fg}`;
-    el.textContent = `⚠️ 필드에 몬스터 ${count}마리 (200마리에서 게임오버!)`;
+    const tw = this.engine?.towers.length || 0; // v3.10: 타워가 적으면 원인도 같이 알려줌
+    el.textContent = `필드 몬스터 ${count}/200` + (tw < 8 ? ` · 배치된 타워 ${tw}개뿐이에요` : ' · 200이 되면 게임 오버');
     el.style.opacity = '1';
     clearTimeout(this._fieldWarnHideTimer);
     this._fieldWarnHideTimer = setTimeout(() => { if (el) el.style.opacity = '0'; }, 4000);
@@ -1142,7 +1143,7 @@ class App {
       if (!timedOut) {
         // v27-17: 웨이브 클리어 문구 다양화 (요청2) - 필드에 남은 적이 없으면 "완벽 클리어"
         const remaining = this.engine.enemies.length;
-        const clearMsg = remaining === 0 ? `✨ 완벽한 클리어! Wave ${wave} +${bonus}g` : `Wave ${wave} 완료! +${bonus}g`;
+        const clearMsg = remaining === 0 ? `완벽한 클리어! 웨이브 ${wave} +${bonus}g` : `웨이브 ${wave} 완료 +${bonus}g`;
         this.showWaveAnnounce(clearMsg, '#ffc24b');
       }
       if (this.missionTracker && this.difficulty === 'hard' && !timedOut) {

@@ -130,6 +130,8 @@ Object.assign(App.prototype, {
         }
       }
     }
+    const fieldUsed = entries.filter(m => m.kind !== 'store').length;
+    if (fieldUsed) this.showWaveAnnounce(`필드 타워 ${fieldUsed}마리를 재료로 썼어요 — 빈 자리를 채워주세요`, '#ff8da1');
     if (window.applyTowerSynergies) window.applyTowerSynergies(this.engine.towers);
   },
 
@@ -149,7 +151,7 @@ Object.assign(App.prototype, {
   openMergePanel() {
     if (!this.engine) return;
     document.querySelector('.merge-overlay')?.remove();
-    if (!this._mergeUi) this._mergeUi = { grade: 'normal', field: true, sel: new Set() };
+    if (!this._mergeUi) this._mergeUi = { grade: 'normal', field: false, sel: new Set() }; // v3.10: 기본 OFF — 켜져 있으면 합성할 때 필드 타워가 빠져 수비가 무너졌음
     const ui = this._mergeUi;
     ui.sel = new Set();
 
