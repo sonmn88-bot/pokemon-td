@@ -51,8 +51,8 @@ const NaturalLayout = {
     const key = Math.round(w) + 'x' + Math.round(h);
     if (this._cache && this._cache.key === key) return this._cache;
     const rnd = _mapRng(20261025);
-    const ROWS = 6;                              // 구불구불한 가로 줄 수 (짝수 → 마지막 줄이 왼쪽에서 끝남)
-    const top = h * 0.12, bot = h * 0.88, gap = (bot - top) / (ROWS - 1);
+    const ROWS = 4;                              // v3.13: 6→4줄 (한 바퀴가 너무 길어 늦게 돌아오던 문제). 짝수 → 마지막 줄이 왼쪽에서 끝남
+    const top = h * 0.15, bot = h * 0.82, gap = (bot - top) / (ROWS - 1); // 위 HUD·아래 바에 안 가리게
     const corridorX = w * 0.055;                 // 왼쪽 복귀로
     const leftTurn = w * 0.19, rightTurn = w * 0.90;
     const ys = [];
@@ -94,14 +94,14 @@ const NaturalLayout = {
       return out.sort((p, q) => p - q);
     };
     const place = (sp) => {
-      const res = [], x0 = w * 0.23, x1 = w * 0.85;
+      const res = [], x0 = w * 0.12, x1 = w * 0.92; // v3.13: 맵이 좁아진 만큼 가로 범위 확대
       const n = Math.max(2, Math.round((x1 - x0) / sp) + 1);
       for (let k = 0; k < n; k++) for (const half of [0, 1]) {
         const x = x0 + (x1 - x0) * (k + half * 0.5) / (n - 0.5);
         const ys = crossings(x);
         const cand = [];
-        if (ys.length && ys[0] - 72 > 45 && half === 0) cand.push(ys[0] - 72);                       // 맨 위 길 바깥
-        if (ys.length && ys[ys.length - 1] + 72 < h - 45 && half === 0) cand.push(ys[ys.length - 1] + 72); // 맨 아래 길 바깥
+        if (ys.length && ys[0] - 72 > h * 0.12 && half === 0) cand.push(ys[0] - 72);                       // 맨 위 길 바깥 (HUD 아래만)
+        if (ys.length && ys[ys.length - 1] + 72 < h * 0.86 && half === 0) cand.push(ys[ys.length - 1] + 72); // 맨 아래 길 바깥 (하단 바 위만)
         for (let j = 0; j < ys.length - 1; j++) {
           const g = ys[j + 1] - ys[j];
           if (g < 92) continue;                                                                   // 커브 안쪽 좁은 틈은 제외
@@ -111,13 +111,13 @@ const NaturalLayout = {
         for (const y of cand) {
           const d = _distToPath(x, y, path);
           if (d < 44 || d > 120) continue;
-          if (res.every(s => (s.x - x) ** 2 + (s.y - y) ** 2 >= 60 * 60)) res.push({ x: Math.round(x), y: Math.round(y) });
+          if (res.every(s => (s.x - x) ** 2 + (s.y - y) ** 2 >= 56 * 56)) res.push({ x: Math.round(x), y: Math.round(y) });
         }
       }
       return res;
     };
     let slots = place(70);                          // 가로 간격을 바꿔가며 목표 개수에 가장 가까운 배치 선택
-    for (let sp = 60; sp <= 400; sp += 4) { const r = place(sp); if (Math.abs(r.length - target) < Math.abs(slots.length - target)) slots = r; }
+    for (let sp = 40; sp <= 400; sp += 2) { const r = place(sp); if (Math.abs(r.length - target) < Math.abs(slots.length - target)) slots = r; }
     slots.sort((a, b) => a.y - b.y || a.x - b.x);  // 위→아래 순서 (인덱스 안정)
 
     this._cache = { key, path, slots, ys, gap };

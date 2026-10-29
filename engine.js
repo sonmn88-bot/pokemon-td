@@ -141,14 +141,15 @@ class GameEngine {
     this.height = this._logicalHeight;
     // v27-47: 월드는 뷰포트보다 넓게 (요청A: 카메라로 팬/줌해서 보는 넓은 맵)
     // v3.4: 정수로 반올림 - 소수(예: 1434.8)면 캔버스(1434)와 크기가 영영 안 맞아서 배경을 매 프레임 다시 그리고 있었음 (발열 주범)
-    this.worldWidth = Math.round(this.width * 1.7);
-    this.worldHeight = Math.round(this.height * 1.7);
+    // v3.13: 1.7배면 최소 줌 0.8에서도 맵의 73%만 보여 위·아래 슬롯이 잘렸음 → 1.25배(=1/0.8)로 줄여 0.8배에서 맵 전체가 화면에 들어오게
+    this.worldWidth = Math.round(this.width * 1.25);
+    this.worldHeight = Math.round(this.height * 1.25);
     if (!this._cameraInited) {
       this._cameraInited = true;
       this.camera.x = this.worldWidth / 2;
       this.camera.y = this.worldHeight / 2;
       this.camera.zoom = Math.max(this.minZoom, Math.min(this.maxZoom,
-        Math.min(this.width / this.worldWidth, this.height / this.worldHeight) * 1.15));
+        Math.min(this.width / this.worldWidth, this.height / this.worldHeight)));
     }
     this._bgDirty = true;
   }
@@ -159,7 +160,7 @@ class GameEngine {
     this.camera.x = this.worldWidth / 2;
     this.camera.y = this.worldHeight / 2;
     this.camera.zoom = Math.max(this.minZoom, Math.min(this.maxZoom,
-      Math.min(this.width / this.worldWidth, this.height / this.worldHeight) * 1.15));
+      Math.min(this.width / this.worldWidth, this.height / this.worldHeight)));
     this.clampCamera();
   }
   clampCamera() {
