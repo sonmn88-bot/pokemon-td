@@ -352,10 +352,16 @@ const GachaTowerDefs = {
   },
   dragonite: {
     id:'dragonite', name:'망나뇽', emoji:'🐉', grade:'legend', type:'water', pokemonId:'dragonite',
-    damage:80, range:300, fireRate:1.8, desc:'용의분노+광역폭발',
+    damage:80, range:300, fireRate:1.8, desc:'보스 사냥꾼: 사거리 안 보스를 자동 조준 · 보스에게 2배 · 크리 25%(2.5배) · 넉백 + 광역폭발',
     fire(t,e){
-      e.projectiles.push(new Projectile(t.x,t.y,t.target,{engine:e,speed:560,damage:t.damage,color:'#fb8c00',size:7,dmgType:'special',emoji:'🐉',
-        onHit:(en)=>{ e.particles.push(new AoeBurst(en.x,en.y,70,'#fb8c00')); for(const e2 of e.enemies) if(e2!==en&&!e2.dead&&!e2.reachedEnd&&Math.hypot(e2.x-en.x,e2.y-en.y)<70) e2.takeDamage(t.damage*0.35,'special'); }}));
+      // v3.11: 보스가 사거리 안에 있으면 무조건 보스를 노림 (어그로), 보스·엘리트에게 2배, 크리 25%, 일반 적 넉백 30%
+      const r2=t.range*t.range, boss=e.enemies.find(en=>en.isBoss&&!en.dead&&!en.reachedEnd&&(en.x-t.x)**2+(en.y-t.y)**2<=r2);
+      const tgt=boss||t.target; if(!tgt) return;
+      const crit=Math.random()<0.25, bossMul=(tgt.isBoss||tgt._elite)?2:1, dmg=t.damage*bossMul*(crit?2.5:1);
+      if(crit) e.spawnFloatingText('크리!',tgt.x,tgt.y-24,'#fb8c00');
+      e.projectiles.push(new Projectile(t.x,t.y,tgt,{engine:e,speed:560,damage:dmg,color:'#fb8c00',size:crit?9:7,dmgType:'special',
+        onHit:(en)=>{ e.particles.push(new AoeBurst(en.x,en.y,70,'#fb8c00')); if(!en.isBoss&&!en.dead&&Math.random()<0.3) en.distTraveled=Math.max(0,en.distTraveled-35);
+          for(const e2 of e.enemies) if(e2!==en&&!e2.dead&&!e2.reachedEnd&&Math.hypot(e2.x-en.x,e2.y-en.y)<70) e2.takeDamage(t.damage*0.35,'special'); }}));
     }
   },
   gengar: {
@@ -363,7 +369,7 @@ const GachaTowerDefs = {
     id:'gengar', name:'팬텀', emoji:'👻', grade:'legend', type:'psychic', pokemonId:'haunter',
     damage:62, range:250, fireRate:1.6, desc:'완전 방어무시 + 광역 슬로우',
     fire(t,e){
-      e.projectiles.push(new Projectile(t.x,t.y,t.target,{engine:e,speed:420,damage:t.damage*2,color:'#4a148c',size:9,dmgType:'special',emoji:'👻',
+      e.projectiles.push(new Projectile(t.x,t.y,t.target,{engine:e,speed:420,damage:t.damage*2,color:'#4a148c',size:9,dmgType:'true',/* v3.11: 설명대로 방어 완전 무시 */
         onHit:(en)=>{ e.particles.push(new AoeBurst(en.x,en.y,90,'#4a148c')); for(const e2 of e.enemies) if(!e2.dead&&!e2.reachedEnd&&Math.hypot(e2.x-en.x,e2.y-en.y)<90) e2.applyStatus('slow',2.5,0.45); }}));
     }
   },
