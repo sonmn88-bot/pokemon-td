@@ -1598,7 +1598,7 @@ img.title-pkm.lead { width:88px; height:88px; }
 
 /* v3.13 3D 기울기: 게임 판을 살짝 눕혀 깊이감 (engine.js TILT 값과 같게 유지) */
 #game-screen { background:#1f3a14; perspective-origin:50% 60%; }
-#game-canvas { transform:perspective(1100px) rotateX(16deg) scale(1.12); transform-origin:50% 60%; }
+#game-canvas { transform:perspective(1000px) rotateX(28deg) scale(1.35); transform-origin:50% 60%; }
 /* 먼 쪽(위) 안개로 원근감 */
-#game-screen::before { content:''; position:absolute; left:0; right:0; top:0; height:30%; z-index:1; pointer-events:none;
-  background:linear-gradient(180deg, rgba(12,18,10,.55), rgba(12,18,10,0)); }
+#game-screen::before { content:''; position:absolute; left:0; right:0; top:0; height:34%; z-index:1; pointer-events:none;
+  background:linear-gradient(180deg, rgba(150,180,200,.28) 0%, rgba(40,60,70,.18) 35%, rgba(12,18,10,0) 100%); } /* 먼 쪽 대기 원근(옅은 하늘빛 안개) */

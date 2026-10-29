@@ -150,17 +150,32 @@ class GameEngine {
       this.camera.y = this.worldHeight / 2;
       this.camera.zoom = Math.max(this.minZoom, Math.min(this.maxZoom,
         (this.height / this.worldHeight)));
+      setTimeout(() => this.resetCamera(), 0); // HUD 배치 후 기울기 맞춤
     }
     this._bgDirty = true;
   }
 
   // v27-47: 카메라가 월드 밖으로 안 나가게 고정 (요청A)
   // v27-63: 카메라 원위치 (요청 - 화면이 확대/이동된 채 돌아오지 못하는 경우의 복구 수단)
+  // v3.13 기울기 맞춤: HUD 아래~하단 바 위 화면 구간이 캔버스의 어느 세로 구간인지 역변환으로 구해서
+  //   맵 전체가 그 구간에 들어오는 줌을 최소 줌으로 씀 (기울기 확대 덕분에 화면 가운데 실제 크기는 예전 0.8과 비슷)
+  _tiltFit() {
+    try {
+      const hud = document.getElementById('hud-top'), bar = document.getElementById('tower-bar');
+      if (!hud || !bar || !window.untiltPoint) return;
+      const y1 = hud.getBoundingClientRect().bottom + 4, y2 = bar.getBoundingClientRect().top - 4;
+      if (!(y2 > y1)) return;
+      const c1 = window.untiltPoint(this.canvas, 0, y1).y, c2 = window.untiltPoint(this.canvas, 0, y2).y;
+      const fit = (c2 - c1) / this.worldHeight;
+      this.minZoom = Math.min(0.8, fit);
+      this._bandOffset = (c1 + c2) / 2 - this.height / 2; // 맵 중심을 화면 보이는 구간 중심에 맞추기 위한 캔버스 y 보정
+    } catch (_) {}
+  }
   resetCamera() {
+    this._tiltFit();
     this.camera.x = this.worldWidth / 2;
     this.camera.y = this.worldHeight / 2;
-    this.camera.zoom = Math.max(this.minZoom, Math.min(this.maxZoom,
-      (this.height / this.worldHeight)));
+    this.camera.zoom = this.minZoom; // 기울기 맞춤 줌 = 맵 세로 전체가 보이는 줌
     this.clampCamera();
   }
   clampCamera() {
@@ -168,7 +183,7 @@ class GameEngine {
     const halfW = viewW / 2, halfH = viewH / 2;
     if (viewW >= this.worldWidth) this.camera.x = this.worldWidth / 2;
     else this.camera.x = Math.max(halfW, Math.min(this.worldWidth - halfW, this.camera.x));
-    if (viewH >= this.worldHeight) this.camera.y = this.worldHeight / 2;
+    if (viewH >= this.worldHeight) this.camera.y = this.worldHeight / 2 - (this._bandOffset || 0) / this.camera.zoom;
     else this.camera.y = Math.max(halfH, Math.min(this.worldHeight - halfH, this.camera.y));
   }
 
@@ -696,7 +711,9 @@ class GameEngine {
     const inView = (o) => Math.abs(o.x - cx) <= viewHalfW && Math.abs(o.y - cy) <= viewHalfH;
 
     const safe = (o) => { ctx.save(); try { o.draw(ctx); } catch (err) { this._logError('draw ' + (o._gachaId || o.typeId || o.constructor.name), err); this._ctxDirty = true; } ctx.restore(); };
-    for (const t of this.towers) if (inView(t)) safe(t);
+    // v3.13 세워 그린 포켓몬이 앞뒤로 겹치니 위(먼 쪽)→아래(가까운 쪽) 순으로
+    const _tw = this._towerDrawOrder || (this._towerDrawOrder = []); _tw.length = 0; for (const t of this.towers) if (inView(t)) _tw.push(t);
+    _tw.sort((a, b) => a.y - b.y); for (const t of _tw) safe(t);
     for (const h of this.heroes) safe(h);
 
     // Y순 정렬 (제자리 정렬 - 매 프레임 배열 복사 제거)
@@ -844,18 +861,35 @@ class GameEngine {
       const map = this.currentMap;
       const pw = map.pathWidth || 34;
 
-      // v3.13 길: CC0 돌바닥 텍스처 + 부드러운 바닥 그림자 + 가장자리 음영(살짝 파인 느낌). 배경 캐시에 1회만 그림
-      const trace = (dy = 0) => { ctx.beginPath(); ctx.moveTo(path[0].x, path[0].y + dy); for (let i = 1; i < path.length; i++) ctx.lineTo(path[i].x, path[i].y + dy); };
-      ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-      for (const [extra, a] of [[22, 0.08], [14, 0.12], [8, 0.18]]) { ctx.strokeStyle = `rgba(0,0,0,${a})`; ctx.lineWidth = pw + extra; trace(4); ctx.stroke(); } // 바닥 그림자(번짐 단계)
+      // v3.13 자연스러운 길: 길을 4px 간격으로 따라가며 폭이 천천히 변하는 원을 찍어(stamp) 모양을 만들고,
+      //   ① 넓게 번지는 흙 자국 ② 바닥 그림자 ③ 가장자리가 부드럽게 사라지는 돌바닥 텍스처 순으로 겹침. 배경 캐시에 1회.
+      const W0 = this.worldWidth, H0 = this.worldHeight, samples = [];
+      { let acc = 0, t = 0;
+        for (let i = 1; i < path.length; i++) {
+          const a0 = path[i - 1], a1 = path[i], L = Math.hypot(a1.x - a0.x, a1.y - a0.y);
+          while (acc <= L) { const u = acc / L; samples.push({ x: a0.x + (a1.x - a0.x) * u, y: a0.y + (a1.y - a0.y) * u,
+            r: pw / 2 * (1 + 0.16 * Math.sin(t * 0.011) + 0.08 * Math.sin(t * 0.043 + 1.7)) }); acc += 4; t += 4; }
+          acc -= L;
+        } }
+      const layer = (fn) => { const c = document.createElement('canvas'); c.width = W0; c.height = H0; const g = c.getContext('2d'); fn(g); return c; };
+      const stampAll = (g, extra, dy = 0) => { g.beginPath(); for (const p of samples) { g.moveTo(p.x + p.r + extra, p.y + dy); g.arc(p.x, p.y + dy, p.r + extra, 0, Math.PI * 2); } g.fill(); };
+      // ① 흙 자국: 길 바깥으로 넓게, 아주 옅게 여러 겹 → 풀이 닳아 흙이 드러난 느낌
+      ctx.drawImage(layer(g => { for (const [e, al] of [[18, 0.05], [12, 0.07], [7, 0.10]]) { g.fillStyle = map.soilColor ? map.soilColor(al) : `rgba(86,62,34,${al})`; stampAll(g, e); } }), 0, 0);
+      // ② 바닥 그림자(살짝 아래로)
+      ctx.drawImage(layer(g => { for (const [e, al] of [[6, 0.10], [3, 0.14]]) { g.fillStyle = `rgba(0,0,0,${al})`; stampAll(g, e, 3); } }), 0, 0);
+      // ③ 돌바닥: 마스크(가장자리 페더) 안에만 텍스처
       let pathFill = map.pathColor;
       if (map.pathTextures) { const ppat = this._getMosaicPattern(ctx, map.name + '_path', map.pathTextures, map.pathTileSize || 40); if (ppat) pathFill = ppat; }
-      ctx.strokeStyle = pathFill; ctx.lineWidth = pw; trace(); ctx.stroke();                          // 돌바닥
-      ctx.strokeStyle = 'rgba(0,0,0,0.30)'; ctx.lineWidth = pw; trace(); ctx.stroke();               // 가장자리 음영: 전체를 어둡게 한 뒤
-      ctx.strokeStyle = pathFill; ctx.lineWidth = pw - 6; trace(); ctx.stroke();                      // 안쪽만 다시 밝게 → 테두리 3px 음영
-      ctx.strokeStyle = 'rgba(255,245,220,0.08)'; ctx.lineWidth = pw - 14; trace(-1); ctx.stroke();   // 가운데 살짝 밝게(볼록)
-      if (map.pathTint) { ctx.strokeStyle = map.pathTint; ctx.lineWidth = pw; trace(); ctx.stroke(); } // 맵 분위기에 맞춘 톤
-      ctx.restore();
+      const stone = layer(g => {
+        g.fillStyle = 'rgba(0,0,0,0.35)'; stampAll(g, 2); g.fillStyle = 'rgba(0,0,0,0.7)'; stampAll(g, 0); g.fillStyle = '#000'; stampAll(g, -3); // 페더 마스크
+        g.globalCompositeOperation = 'source-in'; g.fillStyle = pathFill; g.fillRect(0, 0, W0, H0);
+        g.globalCompositeOperation = 'source-atop';                                            // 가장자리 음영 → 가운데로 갈수록 밝게
+        g.fillStyle = 'rgba(0,0,0,0.20)'; g.fillRect(0, 0, W0, H0);
+        g.globalCompositeOperation = 'source-atop'; g.fillStyle = 'rgba(255,248,230,0.10)';
+        g.beginPath(); for (const p of samples) { const r = p.r * 0.55; g.moveTo(p.x + r, p.y - 1); g.arc(p.x, p.y - 1, r, 0, Math.PI * 2); } g.fill();
+        if (map.pathTint) { g.fillStyle = map.pathTint; g.fillRect(0, 0, W0, H0); }
+      });
+      ctx.drawImage(stone, 0, 0);
       // v3.13: 방향 화살표 제거 (돌바닥 위 화살표가 지저분해 보였음 — 몬스터 이동으로 방향이 보임)
     }
   }
@@ -1084,7 +1118,8 @@ class GameEngine {
 // ===== v3.13 3D 기울기 (CSS perspective + rotateX) =====
 // 캔버스만 CSS로 눕히고(GPU 합성이라 그리기 비용 0), 입력은 아래 역변환으로 원래 캔버스 좌표로 되돌림.
 // style.css의 #game-canvas transform 값과 반드시 같게 유지할 것.
-const TILT = { p: 1100, deg: 16, k: 1.12, ox: 0.5, oy: 0.6 };
+const TILT = { p: 1000, deg: 28, k: 1.35, ox: 0.5, oy: 0.6 };
+window.STAND_K = 1 / Math.cos(TILT.deg * Math.PI / 180); // 캐릭터를 세울 때 세로로 늘리는 배율(기울기로 눌린 만큼 되돌림)
 window.TILT = TILT;
 window.untiltPoint = function (canvas, clientX, clientY) {
   const box = (canvas.parentElement || canvas).getBoundingClientRect(); // 변형 전 레이아웃 박스(캔버스는 부모를 꽉 채움)

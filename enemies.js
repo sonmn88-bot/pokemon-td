@@ -697,12 +697,15 @@ class Enemy {
       const drawSize = s * 1.7;
       // v27-10: 이미지 여백 자동크롭 적용
       const b = window.SpriteBoundsCache?.[imgPath];
-      const dx = this.x - drawSize / 2, dy = drawY - drawSize / 2;
-      if (b) ctx.drawImage(img, b.x, b.y, b.w, b.h, dx, dy, drawSize, drawSize);
-      else ctx.drawImage(img, dx, dy, drawSize, drawSize);
+      // v3.13 세워 그리기: 발끝 기준으로 세로 STAND_K배 + 발밑 그림자 (기울어진 판에서도 서 있어 보이게)
+      const SK = window.STAND_K || 1, dhS = drawSize * SK, dx = this.x - drawSize / 2, dy = drawY + drawSize / 2 - dhS;
+      ctx.save(); ctx.globalAlpha *= 0.35; ctx.fillStyle = '#000'; ctx.beginPath(); ctx.ellipse(this.x, drawY + drawSize * 0.42, drawSize * 0.3, drawSize * 0.09, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+      this._standLift = dhS - drawSize; // HP바를 머리 위로 올릴 만큼
+      if (b) ctx.drawImage(img, b.x, b.y, b.w, b.h, dx, dy, drawSize, dhS);
+      else ctx.drawImage(img, dx, dy, drawSize, dhS);
       // v3.6: 메인 캔버스에 source-atop을 쓰면 배경까지 칠해져 네모 박스가 보였음 → 오프스크린 실루엣을 덧그림
       const tint = this.flashTimer > 0 ? 'rgba(255,255,255,0.75)' : isDarkElite ? 'rgba(60,0,90,0.55)' : null;
-      if (tint) ctx.drawImage(tintedSprite(img, imgPath, b, tint), dx, dy, drawSize, drawSize);
+      if (tint) ctx.drawImage(tintedSprite(img, imgPath, b, tint), dx, dy, drawSize, dhS);
     } else {
       // 폴백: 도형 + 이모지
       ctx.beginPath();
@@ -721,8 +724,8 @@ class Enemy {
 
     ctx.restore();
 
-    // HP바
-    this.drawHpBar(ctx, drawY);
+    // HP바 (세워 그린 만큼 위로)
+    this.drawHpBar(ctx, drawY - (this._standLift || 0));
 
     // 상태이상 아이콘
     this.drawStatusIcons(ctx, drawY);

@@ -52,7 +52,7 @@ const NaturalLayout = {
     if (this._cache && this._cache.key === key) return this._cache;
     const rnd = _mapRng(20261025);
     const ROWS = 4;                              // v3.13: 6→4줄 (한 바퀴가 너무 길어 늦게 돌아오던 문제). 짝수 → 마지막 줄이 왼쪽에서 끝남
-    const top = h * 0.15, bot = h * 0.82, gap = (bot - top) / (ROWS - 1); // 위 HUD·아래 바에 안 가리게
+    const top = h * 0.10, bot = h * 0.88, gap = (bot - top) / (ROWS - 1); // 기울기 맞춤 줌이 HUD~하단 바 사이에 맵을 맞추므로 세로 전체 사용
     const corridorX = w * 0.055;                 // 왼쪽 복귀로
     const leftTurn = w * 0.19, rightTurn = w * 0.90;
     const ys = [];
@@ -101,8 +101,8 @@ const NaturalLayout = {
         const x = x0 + (x1 - x0) * (k + half * 0.5) / (n - 0.5);
         const ys = crossings(x);
         const cand = [];
-        if (ys.length && ys[0] - 72 > h * 0.15 && half === 0) cand.push(ys[0] - 72);                       // 맨 위 길 바깥 (HUD 아래만)
-        if (ys.length && ys[ys.length - 1] + 72 < h * 0.86 && half === 0) cand.push(ys[ys.length - 1] + 72); // 맨 아래 길 바깥 (하단 바 위만)
+        if (ys.length && ys[0] - 72 > h * 0.03 && half === 0) cand.push(ys[0] - 72);                       // 맨 위 길 바깥 (HUD 아래만)
+        if (ys.length && ys[ys.length - 1] + 72 < h * 0.97 && half === 0) cand.push(ys[ys.length - 1] + 72); // 맨 아래 길 바깥 (하단 바 위만)
         for (let j = 0; j < ys.length - 1; j++) {
           const g = ys[j + 1] - ys[j];
           if (g < 92) continue;                                                                   // 커브 안쪽 좁은 틈은 제외
@@ -179,7 +179,7 @@ function drawNaturalTerrain(ctx, w, h, map) {
   if (!tree.complete || !tree.naturalWidth) { tree.onload = () => { if (window.app && app.engine) app.engine._bgDirty = true; }; return; }
   const count = Math.round((w * h) / 26000);
   for (let n = 0, tries = 0; n < count && tries < count * 10; tries++) {
-    const x = rnd() * w, y = rnd() * h, sz = 70 + rnd() * 50;
+    const x = rnd() * w, y = rnd() * h, sz = 56 + rnd() * 34; // 원본 192px라 너무 크게 그리면 흐려짐
     if (_distToPath(x, y, pathS) < sz * 0.45 + 18) continue;
     if (slots.some(s => (s.x - x)**2 + (s.y - y)**2 < (sz * 0.45 + 26) ** 2)) continue;
     ctx.save(); ctx.translate(x, y); ctx.rotate(rnd() * 6.283); ctx.globalAlpha = 0.95;
@@ -215,7 +215,7 @@ const MapDefs = {
     bgTextures:['assets/textures/lava_01.jpg','assets/textures/lava_02.jpg'],
     bgTileSize:420,
     pathTextures:['assets/terrain/rock.jpg'],
-    pathTileSize:90, pathTint:'rgba(40,12,0,0.30)', bgDim:0.5,
+    pathTileSize:90, pathTint:'rgba(40,12,0,0.30)', bgDim:0.5, soilColor:a=>`rgba(24,10,6,${a*1.6})`,
     pathColor:'#6b4428', pathColorDark:'#2a1206',
     pathArrow:'rgba(255,160,90,0.22)', pathWidth:30, rim:'#3a2618', rimLight:'#7a5232', cliffTop:'rgba(40,18,8,0.9)', cliffLight:'rgba(255,140,60,0.35)', rockDark:'#2e1d16', rockLight:'#6e4a36',
     deco:{ big:['rock','spire'], small:['ember','pebble','crack'], theme:'volcano' },
@@ -230,7 +230,7 @@ const MapDefs = {
     bgColor:'#050210',
     bgImage:'assets/textures/cave_bg.jpg',
     pathTextures:['assets/terrain/slate.jpg'],
-    pathTileSize:110, pathTint:'rgba(28,18,60,0.50)',
+    pathTileSize:110, pathTint:'rgba(28,18,60,0.50)', soilColor:a=>`rgba(14,8,30,${a*1.6})`,
     pathColor:'#3e2860', pathColorDark:'#160b26',
     pathArrow:'rgba(190,160,255,0.20)', pathWidth:30, rim:'#2b2040', rimLight:'#5e4a86', cliffTop:'rgba(20,10,40,0.9)', cliffLight:'rgba(190,160,255,0.35)', rockDark:'#26203a', rockLight:'#5a4f7a',
     ghostBonus:0.30,

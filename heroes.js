@@ -664,8 +664,11 @@ class Hero {
         }
         spriteImg = this._shineCache.c;
       }
-      if (_b) ctx.drawImage(spriteImg, _b.x, _b.y, _b.w, _b.h, this.x - drawSize/2, this.y - drawSize/2 + bob, drawSize, drawSize);
-      else ctx.drawImage(spriteImg, this.x - drawSize/2, this.y - drawSize/2 + bob, drawSize, drawSize);
+      // v3.13 세워 그리기: 기울어진 판에서 눌린 만큼 세로로 늘리고 발끝(아래)을 기준으로 + 발밑 그림자
+      const SK = window.STAND_K || 1, dh = drawSize * SK, top = this.y + drawSize / 2 - dh + bob;
+      ctx.fillStyle = 'rgba(0,0,0,0.32)'; ctx.beginPath(); ctx.ellipse(this.x, this.y + drawSize * 0.44, drawSize * 0.32, drawSize * 0.1, 0, 0, Math.PI * 2); ctx.fill();
+      if (_b) ctx.drawImage(spriteImg, _b.x, _b.y, _b.w, _b.h, this.x - drawSize/2, top, drawSize, dh);
+      else ctx.drawImage(spriteImg, this.x - drawSize/2, top, drawSize, dh);
       ctx.restore();
 
       if (skin.badge) {

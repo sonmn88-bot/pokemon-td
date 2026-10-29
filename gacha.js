@@ -818,11 +818,14 @@ function _createGachaTower(def, x, y, engine) {
         // v27-58: 정적인 이미지가 밋밋해 보여서, 살짝 위아래로 숨쉬듯 흔들리는 아이들 애니메이션 추가
         // (타워별로 위상차를 둬서 전부 같은 박자로 안 움직이게 함)
         const bobY = Math.sin(this._rotAngle*2.2 + this._bobPhase) * 2.2;
-        if (b) ctx.drawImage(img, b.x, b.y, b.w, b.h, this.x-dw/2, this.y-dh/2+bobY, dw, dh);
-        else ctx.drawImage(img,this.x-dw/2,this.y-dh/2+bobY,dw,dh);
+        // v3.13 세워 그리기: 받침은 땅에, 포켓몬은 받침 위에 발을 딛고 서 있게 (세로 STAND_K배, 발끝 기준)
+        const SK = window.STAND_K || 1, sh = dh * SK, feet = this.y + dh * 0.3, sy = feet - sh + bobY;
+        ctx.fillStyle = 'rgba(0,0,0,0.30)'; ctx.beginPath(); ctx.ellipse(this.x, feet - 1, dw * 0.34, 4, 0, 0, Math.PI * 2); ctx.fill();
+        if (b) ctx.drawImage(img, b.x, b.y, b.w, b.h, this.x-dw/2, sy, dw, sh);
+        else ctx.drawImage(img,this.x-dw/2,sy,dw,sh);
         if (this._evolveGlowTimer > 0.6 && window.tintedSprite) { // 진화 직후 0.6초: 흰 실루엣이 걷히며 새 모습 등장
           ctx.globalAlpha = Math.min(1, (this._evolveGlowTimer - 0.6) / 0.6);
-          ctx.drawImage(tintedSprite(img, imgPath, b, '#ffffff'), this.x-dw/2, this.y-dh/2+bobY, dw, dh);
+          ctx.drawImage(tintedSprite(img, imgPath, b, '#ffffff'), this.x-dw/2, sy, dw, sh);
           ctx.globalAlpha = 1;
         }
       } else {
