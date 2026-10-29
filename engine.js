@@ -123,7 +123,119 @@ class GameEngine {
     this.buildPaths();
     this.buildTowerSlots();
     this._bgDirty = true;
+    this._setup3D();
     this.start();
+  }
+
+  // ===== v3.14 진짜 3D 월드 (world3d.js) =====
+  // 지형·길·나무·조명은 WebGL 캔버스(뒤), 이 2D 캔버스는 투명한 위층으로 포켓몬·적·이펙트만 그림.
+  // WebGL이 안 되면 기존 2D(+CSS 기울기) 그대로.
+  _setup3D() {
+    if (this._w3tried) { this._rebuild3D(); return; }
+    this._w3tried = true;
+    const W3 = window.World3D;
+    if (!W3 || !W3.init(this.canvas.parentElement, this.canvas)) return;
+    this.w3 = W3; window.__3d = true;
+    TILT.pitch = 0; TILT.turn = 0; TILT.k = 1;                       // CSS 기울기 끔 (입력 역변환도 항등)
+    this.canvas.style.transform = 'none';
+    window.STAND_K = 1 / W3.groundK;                                   // 바닥 압축만큼 세로로 늘려 세움
+    this._dpr3 = Math.min(2, window.devicePixelRatio || 1);            // 위층도 기기 해상도로 (예전엔 1배라 폰에서 흐렸음)
+    this.canvas.width = Math.round(this.width * this._dpr3); this.canvas.height = Math.round(this.height * this._dpr3);
+    W3.resize(this.width, this.height);
+    this._rebuild3D();
+  }
+  _rebuild3D() {
+    if (!this.w3 || !this.paths[0]) return;
+    const map = this.currentMap, theme = (map.deco && map.deco.theme) || 'forest';
+    this.w3.build({ W: this.worldWidth, H: this.worldHeight, path: this.paths[0], slots: this.towerSlots, pw: map.pathWidth || 30, theme })
+      .then(() => this.w3.markDirty());
+    const host = this.canvas.parentElement; if (host) host.style.background = '#000';
+    setTimeout(() => this.resetCamera(), 0);
+  }
+  // 엔티티 하나를 3D 위치에 세워 그리기: 화면 수직(빌보드), 바닥 압축 groundK
+  _xfBill(ctx, x, y, P) {
+    const W3 = this.w3, p = W3.project(x, y, undefined, P), d = this._dpr3, s = p.s, k = W3.groundK, sh = this._shk;
+    ctx.setTransform(d * s, 0, 0, d * s * k, d * (p.x - s * x + sh.x), d * (p.y - s * k * y + sh.y));
+    return p;
+  }
+  // 바닥에 붙는 것(링·사거리·충격파): 그 지점의 실제 바닥 기울기(야코비안)로 붙임
+  _xfGround(ctx, x, y) {
+    const W3 = this.w3, P0 = W3.project(x, y), P1 = W3.project(x + 1, y), P2 = W3.project(x, y + 1), d = this._dpr3, sh = this._shk;
+    const a = P1.x - P0.x, b = P1.y - P0.y, c = P2.x - P0.x, e = P2.y - P0.y;
+    ctx.setTransform(d * a, d * b, d * c, d * e, d * (P0.x - a * x - c * y + sh.x), d * (P0.y - b * x - e * y + sh.y));
+  }
+  // 두 점을 잇는 것(번개·빔): 양 끝이 정확히 맞는 아핀
+  _xfSeg(ctx, x1, y1, x2, y2) {
+    const W3 = this.w3, ux = x2 - x1, uy = y2 - y1, L = Math.hypot(ux, uy) || 1, vx = -uy / L * 20, vy = ux / L * 20;
+    const S1 = W3.project(x1, y1), S2 = W3.project(x2, y2), S3 = W3.project(x1 + vx, y1 + vy), d = this._dpr3, sh = this._shk;
+    const Ux = S2.x - S1.x, Uy = S2.y - S1.y, Vx = S3.x - S1.x, Vy = S3.y - S1.y, det = ux * vy - uy * vx || 1e-6;
+    const a = (Ux * vy - Vx * uy) / det, c = (Vx * ux - Ux * vx) / det, b = (Uy * vy - Vy * uy) / det, e = (Vy * ux - Uy * vx) / det;
+    ctx.setTransform(d * a, d * b, d * c, d * e, d * (S1.x - a * x1 - c * y1 + sh.x), d * (S1.y - b * x1 - e * y1 + sh.y));
+  }
+  _draw3D() {
+    const ctx = this.ctx, W3 = this.w3, cam = this.camera, d = this._dpr3;
+    W3.setView(cam.x, cam.y, cam.zoom); W3.render();
+    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    const s = this.shakeTimer > 0 ? (this.shakeTimer / 0.35) * this.shakeAmt : 0;
+    this._shk = { x: (Math.random() - 0.5) * s, y: (Math.random() - 0.5) * s };
+    const onScr = (p) => p.x > -90 && p.x < this.width + 90 && p.y > -140 && p.y < this.height + 140;
+    const err = (o, e) => { this._logError('draw ' + (o._gachaId || o.typeId || o.constructor.name), e); this._ctxDirty = true; };
+    // 빈 자리 강조(배치 모드·선택·호버)만 위층에 — 돌판 자체는 3D
+    const isHL = this.selectedTowerType !== null;
+    for (let i = 0; i < this.towerSlots.length; i++) {
+      const sl = this.towerSlots[i]; if (sl.occupied) continue;
+      const hov = this.selectedSlotIdx === i, mh = this.hoveredSlotIdx === i && !hov;
+      if (!hov && !mh && !isHL) continue;
+      ctx.save(); this._xfGround(ctx, sl.x, sl.y);
+      ctx.beginPath(); ctx.arc(sl.x, sl.y, 20, 0, Math.PI * 2);
+      ctx.fillStyle = hov ? 'rgba(106,168,255,0.35)' : 'rgba(255,255,255,0.12)'; ctx.fill();
+      ctx.strokeStyle = hov ? '#6aa8ff' : 'rgba(255,255,255,0.75)'; ctx.lineWidth = hov ? 2.5 : 1.5; ctx.stroke();
+      ctx.restore();
+    }
+    // 타워·영웅·적: 먼 것부터(깊이 큰 것부터)
+    const L = this._drawList || (this._drawList = []); L.length = 0;
+    const put = (o) => { const p = W3.project(o.x, o.y); if (!onScr(p)) return; o._dk = p.d; L.push(o); };
+    for (const t of this.towers) put(t);
+    for (const h of this.heroes) put(h);
+    for (const e of this.enemies) put(e);
+    L.sort((a, b) => b._dk - a._dk);
+    const P = { x: 0, y: 0, s: 1, d: 1 };
+    for (const o of L) {
+      ctx.save();
+      try {
+        if (o._gachaId !== undefined && o.def) { this._xfGround(ctx, o.x, o.y); ctx.drawImage(towerBaseSprite(o.def.grade), o.x - 30, o.y - 30, 60, 60); } // 받침 링은 바닥에
+        const p = this._xfBill(ctx, o.x, o.y, P);
+        if (W3.occluded(o.x, o.y, p)) ctx.globalAlpha = 0.38;           // 나무·언덕 뒤 = 반투명
+        o.draw(ctx);
+      } catch (e) { err(o, e); }
+      ctx.restore();
+    }
+    for (const o of this.projectiles) {
+      ctx.save();
+      try {
+        if (o.beam) this._xfSeg(ctx, o.bx1, o.by1, o.bx2, o.by2);
+        else if (!onScr(this._xfBill(ctx, o.x, o.y, P))) { ctx.restore(); continue; }
+        o.draw(ctx);
+      } catch (e) { err(o, e); }
+      ctx.restore();
+    }
+    for (const o of this.particles) {
+      if (o instanceof RedFlash) continue;
+      ctx.save();
+      try {
+        if (o.x1 !== undefined && o.x2 !== undefined) this._xfSeg(ctx, o.x1, o.y1, o.x2, o.y2);
+        else if (o.x === undefined) ctx.setTransform(d, 0, 0, d, 0, 0);
+        else if (o instanceof BurstRing || (window.AoeBurst && o instanceof AoeBurst)) this._xfGround(ctx, o.x, o.y);
+        else this._xfBill(ctx, o.x, o.y, P);
+        o.draw(ctx);
+      } catch (e) { err(o, e); }
+      ctx.restore();
+    }
+    if (this.selectedTower) { ctx.save(); this._xfGround(ctx, this.selectedTower.x, this.selectedTower.y); this._drawRange(ctx, this.selectedTower); ctx.restore(); }
+    if (this.selectedSlotIdx !== null && this.selectedTowerType) { const sl = this.towerSlots[this.selectedSlotIdx]; ctx.save(); this._xfGround(ctx, sl.x, sl.y); this._drawPreview(ctx); ctx.restore(); }
+    ctx.setTransform(d, 0, 0, d, 0, 0);
+    for (const p of this.particles) if (p instanceof RedFlash) p.draw(ctx);
+    if (this.activeBoss) this._drawBossBar(ctx);
   }
 
   resize() {
@@ -177,6 +289,12 @@ class GameEngine {
     } catch (_) {}
   }
   resetCamera() {
+    if (this.w3) { // 3D: 타워 자리 전체가 HUD~하단 바 사이에 들어오는 시점
+      const box = this.canvas.getBoundingClientRect(), hud = document.getElementById('hud-top'), bar = document.getElementById('tower-bar');
+      const top = hud ? hud.getBoundingClientRect().bottom - box.top + 6 : 60, bot = bar ? bar.getBoundingClientRect().top - box.top - 6 : this.height - 90;
+      if (this.towerSlots.length) { this._fit = this.w3.fit(this.towerSlots, top, bot); this.minZoom = this._fit.zoom; this.maxZoom = Math.max(2.2, this._fit.zoom * 3); Object.assign(this.camera, this._fit); }
+      return;
+    }
     this._tiltFit();
     this.camera.x = this.worldWidth / 2;
     this.camera.y = this.worldHeight / 2;
@@ -184,6 +302,13 @@ class GameEngine {
     this.clampCamera();
   }
   clampCamera() {
+    if (this.w3) {
+      const c = this.camera, f = this._fit || { x: this.worldWidth / 2, y: this.worldHeight / 2, zoom: c.zoom };
+      c.zoom = Math.max(this.minZoom, Math.min(this.maxZoom, c.zoom));
+      const t = 1 - this.minZoom / c.zoom, rx = this.worldWidth * 0.5 * t + this.worldWidth * 0.1, ry = this.worldHeight * 0.5 * t + 20;
+      c.x = Math.max(f.x - rx, Math.min(f.x + rx, c.x)); c.y = Math.max(f.y - ry, Math.min(f.y + ry, c.y));
+      return;
+    }
     // v3.13: 화면에 실제로 보이는 창(_vis)이 맵 밖으로 나가지 않게 (원근으로 보이는 구간이 캔버스 가운데가 아님)
     const z = this.camera.zoom, v = this._vis || { x1: 0, x2: this.width, y1: 0, y2: this.height };
     const vw = (v.x2 - v.x1) / z, vh = (v.y2 - v.y1) / z;
@@ -197,6 +322,7 @@ class GameEngine {
 
   // v27-47: 화면 좌표 → 월드 좌표 변환 (입력처리에서 사용)
   screenToWorld(sx, sy) {
+    if (this.w3) return this.w3.pick(sx, sy);
     const g = -(window.CAM_YAW || 0), dx = sx - this.width / 2, dy = sy - this.height / 2; // 카메라 회전 역변환
     return {
       x: this.camera.x + (dx * Math.cos(g) - dy * Math.sin(g)) / this.camera.zoom,
@@ -205,6 +331,7 @@ class GameEngine {
   }
   // 화면에서 드래그한 만큼 카메라 이동 (회전 반영)
   panBy(dx, dy) {
+    if (this.w3) { const a = this.w3.pick(this.width / 2, this.height / 2), b = this.w3.pick(this.width / 2 - dx, this.height / 2 - dy); this.camera.x += b.x - a.x; this.camera.y += b.y - a.y; return; }
     const g = -(window.CAM_YAW || 0);
     this.camera.x -= (dx * Math.cos(g) - dy * Math.sin(g)) / this.camera.zoom;
     this.camera.y -= (dx * Math.sin(g) + dy * Math.cos(g)) / this.camera.zoom;
@@ -661,6 +788,7 @@ class GameEngine {
     this.buildPaths();
     this.buildTowerSlots();
     this._bgDirty = true;
+    this._rebuild3D();
     this.onZoneChange && this.onZoneChange(zoneIdx, mapId);
   }
   triggerVictory() {
@@ -704,6 +832,7 @@ class GameEngine {
 
   // ===== DRAW =====
   draw() {
+    if (this.w3) return this._draw3D();
     const ctx = this.ctx;
     // v3.3: 지난 프레임에 그리기 오류가 있었으면 캔버스 상태(저장 스택·투명도·변환)를 완전히 초기화
     if (this._ctxDirty) { this._ctxDirty = false; this.canvas.width = this.canvas.width; }

@@ -801,7 +801,7 @@ function _createGachaTower(def, x, y, engine) {
       }
       // 베이스 패드 (v3.6: 등급별로 1회 그려둔 메달 받침 - 그림자·입체 테두리·하이라이트)
       ctx.save();
-      ctx.drawImage(towerBaseSprite(def.grade), this.x-30, this.y-30, 60, 60);
+      if (!window.__3d) ctx.drawImage(towerBaseSprite(def.grade), this.x-30, this.y-30, 60, 60); // 3D: 엔진이 바닥에 붙여 그림
       // 포켓몬 이미지: 진화단계 전용(id) 이미지 우선, 없으면 라인 공통(pokemonId) 이미지로 폴백
       // v27 fix: towers 폴더에 이미지가 없으면 같은 이름의 enemies 폴더 이미지로 자동 폴백 (파일 중복 업로드 불필요)
       const imgPath=window.TowerSpriteImages?.[def.id] || window.TowerSpriteImages?.[def.pokemonId]
