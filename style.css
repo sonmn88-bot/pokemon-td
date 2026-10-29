@@ -1595,3 +1595,10 @@ img.title-pkm.lead { width:88px; height:88px; }
 #boss-summon-bar.folded .bs-fold { flex-direction:row; flex-wrap:wrap; justify-content:center; max-width:72px; }
 .bs-cd { display:block; width:100%; text-align:center; font:700 10px var(--font-px); color:var(--text-mid); }
 .bs-cd:empty { display:none; }
+
+/* v3.13 3D 기울기: 게임 판을 살짝 눕혀 깊이감 (engine.js TILT 값과 같게 유지) */
+#game-screen { background:#1f3a14; perspective-origin:50% 60%; }
+#game-canvas { transform:perspective(1100px) rotateX(16deg) scale(1.12); transform-origin:50% 60%; }
+/* 먼 쪽(위) 안개로 원근감 */
+#game-screen::before { content:''; position:absolute; left:0; right:0; top:0; height:30%; z-index:1; pointer-events:none;
+  background:linear-gradient(180deg, rgba(12,18,10,.55), rgba(12,18,10,0)); }

@@ -800,7 +800,7 @@ class GameEngine {
         bctx.fillRect(0, 0, this.worldWidth, this.worldHeight);
         const ent = this._texCache[map.name + '_bg_' + (map.bgTileSize || 300)];
         if (pat && ent && ent.patterns) this._blendBgPatches(bctx, ent.patterns, map.name);
-        bctx.fillStyle = 'rgba(0,0,0,0.30)'; // 게임 톤(어두운)과 어우러지게
+        bctx.fillStyle = `rgba(0,0,0,${map.bgDim ?? 0.30})`; // 게임 톤(어두운)과 어우러지게 (맵별 조절)
         bctx.fillRect(0, 0, this.worldWidth, this.worldHeight);
       } else if (map.bgImage) {
         if (!this._bgImg || this._bgImg._src !== map.bgImage) {
@@ -844,46 +844,19 @@ class GameEngine {
       const map = this.currentMap;
       const pw = map.pathWidth || 34;
 
-      // v3.13 길: 그림자 → 돌 테두리 → 흙 바닥(텍스처) → 안쪽 음영 → 가운데 닳은 자국 → 오르막 계단 → 가장자리 자갈·풀 (배경 캐시에 1회)
-      const trace = (dx = 0, dy = 0) => { ctx.beginPath(); ctx.moveTo(path[0].x + dx, path[0].y + dy); for (let i = 1; i < path.length; i++) ctx.lineTo(path[i].x + dx, path[i].y + dy); };
-      let seed = 1234567; const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
+      // v3.13 길: CC0 돌바닥 텍스처 + 부드러운 바닥 그림자 + 가장자리 음영(살짝 파인 느낌). 배경 캐시에 1회만 그림
+      const trace = (dy = 0) => { ctx.beginPath(); ctx.moveTo(path[0].x, path[0].y + dy); for (let i = 1; i < path.length; i++) ctx.lineTo(path[i].x, path[i].y + dy); };
       ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-      ctx.strokeStyle = 'rgba(0,0,0,0.38)'; ctx.lineWidth = pw + 14; trace(0, 6); ctx.stroke();                 // 바닥 그림자
-      ctx.strokeStyle = map.rim || map.pathColorDark || '#5a4a32'; ctx.lineWidth = pw + 11; trace(); ctx.stroke(); // 돌 테두리
-      ctx.strokeStyle = map.rimLight || 'rgba(255,240,200,0.35)'; ctx.lineWidth = pw + 5; trace(0, -1); ctx.stroke(); // 테두리 윗면 빛
+      for (const [extra, a] of [[22, 0.08], [14, 0.12], [8, 0.18]]) { ctx.strokeStyle = `rgba(0,0,0,${a})`; ctx.lineWidth = pw + extra; trace(4); ctx.stroke(); } // 바닥 그림자(번짐 단계)
       let pathFill = map.pathColor;
       if (map.pathTextures) { const ppat = this._getMosaicPattern(ctx, map.name + '_path', map.pathTextures, map.pathTileSize || 40); if (ppat) pathFill = ppat; }
-      ctx.strokeStyle = pathFill; ctx.lineWidth = pw + 2; trace(); ctx.stroke();                                // 흙 바닥
-      ctx.strokeStyle = 'rgba(0,0,0,0.22)'; ctx.lineWidth = pw + 2; trace(); ctx.stroke();                      // 안쪽 음영(가장자리)
-      ctx.strokeStyle = pathFill; ctx.lineWidth = pw - 5; trace(); ctx.stroke();
-      ctx.strokeStyle = 'rgba(255,238,200,0.10)'; ctx.lineWidth = pw * 0.42; trace(); ctx.stroke();            // 가운데 닳은 자국
-      // 오르막·내리막 계단: 세로로 많이 움직이는 구간(단 사이 굽이·왼쪽 복귀로)에 가로줄
-      let acc = 0;
-      for (let i = 1; i < path.length; i++) {
-        const p0 = path[i - 1], p1 = path[i], dx = p1.x - p0.x, dy = p1.y - p0.y, L = Math.hypot(dx, dy) || 1;
-        acc += L;
-        if (Math.abs(dy) < Math.abs(dx) * 1.6 || acc < 9) continue;
-        acc = 0;
-        const nx = -dy / L, ny = dx / L, hw = pw / 2 - 1;
-        ctx.strokeStyle = 'rgba(0,0,0,0.28)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(p1.x + nx * hw, p1.y + ny * hw); ctx.lineTo(p1.x - nx * hw, p1.y - ny * hw); ctx.stroke();
-        ctx.strokeStyle = 'rgba(255,240,210,0.16)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(p1.x + nx * hw, p1.y + ny * hw - 2); ctx.lineTo(p1.x - nx * hw, p1.y - ny * hw - 2); ctx.stroke();
-      }
-      // 가장자리 자갈·풀
-      acc = 0;
-      for (let i = 1; i < path.length; i++) {
-        const p0 = path[i - 1], p1 = path[i], dx = p1.x - p0.x, dy = p1.y - p0.y, L = Math.hypot(dx, dy) || 1;
-        acc += L; if (acc < 8) continue; acc = 0;
-        const nx = -dy / L, ny = dx / L;
-        for (const side of [1, -1]) {
-          const off = pw / 2 + 6 + rnd() * 4, x = p1.x + nx * off * side, y = p1.y + ny * off * side;
-          if (rnd() < 0.55) { ctx.fillStyle = `rgba(${150 + rnd() * 60 | 0},${140 + rnd() * 50 | 0},${120 + rnd() * 40 | 0},0.75)`; ctx.beginPath(); ctx.ellipse(x, y, 1.4 + rnd() * 2, 1 + rnd() * 1.4, rnd() * 3, 0, 7); ctx.fill(); }
-          else if (map.deco && map.deco.theme === 'forest') { ctx.strokeStyle = 'rgba(110,180,80,0.65)'; ctx.lineWidth = 1.1; ctx.beginPath(); ctx.moveTo(x, y + 3); ctx.lineTo(x - 2, y - 4); ctx.moveTo(x, y + 3); ctx.lineTo(x + 2, y - 5); ctx.stroke(); }
-        }
-      }
+      ctx.strokeStyle = pathFill; ctx.lineWidth = pw; trace(); ctx.stroke();                          // 돌바닥
+      ctx.strokeStyle = 'rgba(0,0,0,0.30)'; ctx.lineWidth = pw; trace(); ctx.stroke();               // 가장자리 음영: 전체를 어둡게 한 뒤
+      ctx.strokeStyle = pathFill; ctx.lineWidth = pw - 6; trace(); ctx.stroke();                      // 안쪽만 다시 밝게 → 테두리 3px 음영
+      ctx.strokeStyle = 'rgba(255,245,220,0.08)'; ctx.lineWidth = pw - 14; trace(-1); ctx.stroke();   // 가운데 살짝 밝게(볼록)
+      if (map.pathTint) { ctx.strokeStyle = map.pathTint; ctx.lineWidth = pw; trace(); ctx.stroke(); } // 맵 분위기에 맞춘 톤
       ctx.restore();
-
-      // 방향 화살표
-      this._drawArrows(ctx, path, map);
+      // v3.13: 방향 화살표 제거 (돌바닥 위 화살표가 지저분해 보였음 — 몬스터 이동으로 방향이 보임)
     }
   }
 
@@ -1011,7 +984,7 @@ class GameEngine {
     if (!this._bossBarAt || now - this._bossBarAt > 2000) {
       this._bossBarAt = now;
       const wb = document.getElementById('btn-wave'), cv = this.canvas || document.getElementById('game-canvas');
-      this._bossBarY = wb && cv ? Math.round(wb.getBoundingClientRect().bottom - cv.getBoundingClientRect().top + 30) : 60; // 이름 줄(18px)까지 스킵 버튼 아래로
+      this._bossBarY = wb && cv ? Math.round(window.untiltPoint(cv, cv.getBoundingClientRect().left + 10, wb.getBoundingClientRect().bottom).y + 30) : 60; // v3.13 기울기 반영 // 이름 줄(18px)까지 스킵 버튼 아래로
     }
     const by = this._bossBarY || 60;
     const bh = 14;
@@ -1107,6 +1080,22 @@ class GameEngine {
     return best;
   }
 }
+
+// ===== v3.13 3D 기울기 (CSS perspective + rotateX) =====
+// 캔버스만 CSS로 눕히고(GPU 합성이라 그리기 비용 0), 입력은 아래 역변환으로 원래 캔버스 좌표로 되돌림.
+// style.css의 #game-canvas transform 값과 반드시 같게 유지할 것.
+const TILT = { p: 1100, deg: 16, k: 1.12, ox: 0.5, oy: 0.6 };
+window.TILT = TILT;
+window.untiltPoint = function (canvas, clientX, clientY) {
+  const box = (canvas.parentElement || canvas).getBoundingClientRect(); // 변형 전 레이아웃 박스(캔버스는 부모를 꽉 채움)
+  const W = canvas.clientWidth, H = canvas.clientHeight, ox = W * TILT.ox, oy = H * TILT.oy;
+  const X = clientX - box.left - ox, Y = clientY - box.top - oy;
+  if (!TILT.deg) return { x: X + ox, y: Y + oy };
+  const a = TILT.deg * Math.PI / 180, p = TILT.p, tn = Math.tan(a);
+  const yr = Y * p / (p + Y * tn);          // 회전 후 y (투영 전)
+  const s = p / (p - yr * tn);              // 그 깊이의 원근 배율
+  return { x: (X / s) / TILT.k + ox, y: (yr / Math.cos(a)) / TILT.k + oy };
+};
 
 // ===== 파티클 클래스들 =====
 class FloatingText {

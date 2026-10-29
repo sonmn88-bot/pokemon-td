@@ -1573,14 +1573,8 @@ class App {
 
     const canvas = this.els.canvas;
     const getPos = (e) => {
-      const rect = canvas.getBoundingClientRect();
       const t = e.touches ? e.touches[0] : e;
-      // canvas.width는 DPR 적용된 물리 픽셀, rect.width는 CSS 픽셀
-      // engine 내부는 논리 좌표(CSS px)로 동작하므로 그냥 CSS 좌표 사용
-      return {
-        x: t.clientX - rect.left,
-        y: t.clientY - rect.top,
-      };
+      return window.untiltPoint(canvas, t.clientX, t.clientY); // v3.13: 3D 기울기 역변환 → 캔버스 논리 좌표(CSS px)
     };
     const touchDist = (e) => {
       if (e.touches.length < 2) return null;
