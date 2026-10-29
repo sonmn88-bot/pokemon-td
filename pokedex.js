@@ -197,6 +197,7 @@ const DEX_KEEP_FIRE = ['articuno','zapdos','moltres','dragonite','gengar','mewtw
 
 (function buildPokedex() {
   const T = DEX_TEMPLATE;
+  const DEX_HERO_SPECIES = new Set(['pikachu','raichu','eevee','vaporeon','jolteon','flareon','togepi','togetic','togekiss']); // v3.14 영웅과 겹치는 종
   const old = { ...GachaTowerDefs };
   const rows = DEX_RAW.trim().split('\n').map(l => {
     const [no, id, name, type, grade, line, role, prof, tags, emoji] = l.split('|');
@@ -229,7 +230,7 @@ const DEX_KEEP_FIRE = ['articuno','zapdos','moltres','dragonite','gengar','mewtw
       Object.assign(d, { damage:o.damage, fireRate:o.fireRate, range:o.range, desc:o.desc, fire:o.fire, emoji:o.emoji || d.emoji, _signature:true });
     } else d.fire = _dexFire(d, typeColor(r.type));
     GachaTowerDefs[r.id] = d;
-    if (r.id !== 'mew') GRADE_POOLS[r.grade].push(r.id); // 뮤는 레시피 전용
+    if (r.id !== 'mew' && !DEX_HERO_SPECIES.has(r.id)) GRADE_POOLS[r.grade].push(r.id); // 뮤는 레시피 전용, 영웅 포켓몬(피카츄·이브이·토게피 계열)은 타워로 안 나옴
     if (DEX_HAS_IMG.has(r.id)) window.TowerSpriteImages[r.id] = `assets/towers/${r.id}.png`; // v3.1: 151종 공식 일러스트로 통일 (예전 enemies/heroes 경로보다 우선)
     else if (!window.TowerSpriteImages[r.id] && ['pikachu','raichu','eevee','vaporeon','jolteon','flareon'].includes(r.id)) window.TowerSpriteImages[r.id] = `assets/heroes/${r.id}.png`; // 영웅 이미지 재사용
   }

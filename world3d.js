@@ -19,11 +19,11 @@ const VIEW = { fov: 50, el: 44 * Math.PI / 180, yaw: 9 * Math.PI / 180 };
 W3.groundK = Math.sin(VIEW.el);           // 바닥 세로 압축률(세워 그리는 스프라이트 보정용)
 
 const THEMES = {
-  forest: { sky: 0xc4dde6, fog: 0xbfd6d2, ground: [0x5c9a38, 0x6dab44, 0x8ab84f, 0x4a8a33], low: 0x3c6e2c, side: 0x7d7a4a,
+  forest: { tex: 'assets/terrain/grass_3d.jpg', slotTex: 'assets/terrain/cobble.jpg', pathTex: 'assets/terrain/cobble.jpg', sky: 0xc4dde6, fog: 0xbfd6d2, ground: [0x5c9a38, 0x6dab44, 0x8ab84f, 0x4a8a33], low: 0x3c6e2c, side: 0x7d7a4a,
     path: [0xd2ad74, 0xbd935d, 0x8e6b46], slot: 0x9b958a, amp: 22, sunC: 0xfff0d4, sunI: 2.2, hemiS: 0xdcefff, hemiG: 0x5a6a30, hemiI: 1.45, props: 'forest' },
-  volcano: { sky: 0x3b1a12, fog: 0x4a2016, ground: [0x3d2b25, 0x4b3029, 0x2f2321, 0x58372b], low: 0x231310, side: 0x2a1a14,
+  volcano: { pathTex: 'assets/terrain/rock.jpg', sky: 0x3b1a12, fog: 0x4a2016, ground: [0x3d2b25, 0x4b3029, 0x2f2321, 0x58372b], low: 0x231310, side: 0x2a1a14,
     path: [0x7a5440, 0x664532, 0x3e2a20], slot: 0x7d6d63, amp: 26, sunC: 0xffb48a, sunI: 2.2, hemiS: 0xff9a6a, hemiG: 0x2a0a00, hemiI: 0.9, props: null },
-  cave: { sky: 0x130d24, fog: 0x1b1531, ground: [0x3b3549, 0x463e57, 0x302b3d, 0x4e4662], low: 0x221d2e, side: 0x2a2438,
+  cave: { pathTex: 'assets/terrain/slate.jpg', sky: 0x130d24, fog: 0x1b1531, ground: [0x3b3549, 0x463e57, 0x302b3d, 0x4e4662], low: 0x221d2e, side: 0x2a2438,
     path: [0x625284, 0x4f416d, 0x302548], slot: 0x8c849b, amp: 24, sunC: 0xd0c0ff, sunI: 1.9, hemiS: 0x8a7acc, hemiG: 0x140f20, hemiI: 0.95, props: null },
 };
 
@@ -38,7 +38,7 @@ W3.init = function (host, gameCanvas) {
     R = new THREE.WebGLRenderer({ canvas: cvs, antialias: true, powerPreference: 'low-power' });
     R.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
     R.shadowMap.enabled = true; R.shadowMap.type = THREE.PCFSoftShadowMap; R.shadowMap.autoUpdate = false;
-    R.toneMapping = THREE.ACESFilmicToneMapping; R.toneMappingExposure = 1.0;
+    R.toneMapping = THREE.ACESFilmicToneMapping; R.toneMappingExposure = 1.3;
     scene = new THREE.Scene();
     cam = new THREE.PerspectiveCamera(VIEW.fov, 1, 5, 9000);
     hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 1); scene.add(hemi);
@@ -55,6 +55,17 @@ W3.resize = function (w, h) {
   Wpx = w; Hpx = h; R.setSize(w, h, false);
   cam.aspect = w / h; cam.updateProjectionMatrix(); dirty = true;
 };
+
+const texLoader = new THREE.TextureLoader(), texCache = {};
+function tex(url, rep) {
+  if (!texCache[url]) {
+    const t = texLoader.load(url, () => { dirty = true; });
+    t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace;
+    t.anisotropy = R ? R.capabilities.getMaxAnisotropy() : 1;          // 비스듬히 누운 바닥도 선명하게
+    texCache[url] = t;
+  }
+  return texCache[url];
+}
 
 // ---------- 높이맵 ----------
 // 맵 안: 완만한 언덕(길이 오르내림) + 길은 둑이 있는 골짜기 + 타워 자리는 평평한 단
@@ -107,18 +118,19 @@ function axis(min, max, inner0, inner1, fine) {
 function buildTerrain(th) {
   const { W, H } = hf, FAR = 2200;
   const xs = axis(-FAR, W + FAR, -hf.M, W + hf.M, 9), ys = axis(-FAR, H + FAR, -hf.M, H + hf.M, 9);
-  const nx = xs.length, ny = ys.length, pos = new Float32Array(nx * ny * 3), col = new Float32Array(nx * ny * 3);
+  const nx = xs.length, ny = ys.length, pos = new Float32Array(nx * ny * 3), col = new Float32Array(nx * ny * 3), uv = new Float32Array(nx * ny * 2);
   const nz2 = _vnoise(4321), C = th.ground.map(c => new THREE.Color(c)), low = new THREE.Color(th.low), side = new THREE.Color(th.side);
   const pc = new THREE.Color(th.path[2]), tmp = new THREE.Color();
   for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
     const x = xs[i], y = ys[j], z = hAt(x, y), k = (j * nx + i) * 3;
-    pos[k] = x; pos[k + 1] = z; pos[k + 2] = y;
+    pos[k] = x; pos[k + 1] = z; pos[k + 2] = y; uv[(j * nx + i) * 2] = x / 150; uv[(j * nx + i) * 2 + 1] = y / 150;
     const n = _fbm(nz2, x / 170, y / 170, 3), m = _fbm(nz2, x / 45 + 50, y / 45, 2);
     tmp.copy(C[0]).lerp(C[2], _sstep(0.52, 0.72, n)).lerp(C[3], _sstep(0.45, 0.28, n)).lerp(C[1], m * 0.5);
     const base = outerH(x, y, W, H, hf.amp, hf.nz);
     tmp.lerp(low, Math.max(0, Math.min(0.6, (base - z) * 0.08 + (-base) * 0.012)));   // 낮은 곳·골짜기 짙게
     const inW = x > -hf.M && x < W + hf.M && y > -hf.M && y < H + hf.M;
     if (inW) { const d = pdAt(x, y); tmp.lerp(pc, 0.55 * (1 - _sstep(14, 30, d))); }  // 길 둑: 흙빛
+    if (th.tex) { { const l = (tmp.r + tmp.g + tmp.b) / 3; tmp.setRGB(0.5 + l * 0.5 + (tmp.r - l) * 0.35, 0.5 + l * 0.5 + (tmp.g - l) * 0.35, 0.5 + l * 0.5 + (tmp.b - l) * 0.35); } } // 텍스처 위엔 색조·밝기 변화만
     col[k] = tmp.r; col[k + 1] = tmp.g; col[k + 2] = tmp.b;
   }
   const idx = [];
@@ -129,8 +141,10 @@ function buildTerrain(th) {
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
   g.setIndex(idx); g.computeVertexNormals();
-  const mesh = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }));
+  const mesh = new THREE.Mesh(g, th.tex ? new THREE.MeshLambertMaterial({ vertexColors: true, map: tex(th.tex) })
+    : new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }));
   mesh.receiveShadow = true;
   return mesh;
 }
@@ -146,23 +160,26 @@ function buildPath(path, pw, th) {
   }
   const n = pts.length, OFF = [-1.18, -0.62, 0, 0.62, 1.18], LIFT = [0.15, 0.7, 0.9, 0.7, 0.15];
   const cols = [th.path[2], th.path[1], th.path[0], th.path[1], th.path[2]].map(c => new THREE.Color(c));
-  const nz = _vnoise(77), pos = [], col = [], idx = [], tmp = new THREE.Color();
+  const nz = _vnoise(77), pos = [], col = [], idx = [], uvs = [], tmp = new THREE.Color(); let dist = 0;
   for (let i = 0; i <= n; i++) {
     const p = pts[i % n], q = pts[(i + 1) % n], o = pts[(i - 1 + n) % n];
-    let tx = q.x - o.x, ty = q.y - o.y; const tl = Math.hypot(tx, ty) || 1; tx /= tl; ty /= tl;
+    let tx = q.x - o.x, ty = q.y - o.y; const tl = Math.hypot(tx, ty) || 1; tx /= tl; ty /= tl; if (i) dist += 5;
     const r = pw / 2 * (1 + 0.1 * Math.sin(i * 0.09) + 0.06 * Math.sin(i * 0.31 + 1));
     for (let k = 0; k < 5; k++) {
       const x = p.x - ty * r * OFF[k], y = p.y + tx * r * OFF[k];
       pos.push(x, hAt(x, y) + LIFT[k], y);
-      tmp.copy(cols[k]).multiplyScalar(0.9 + 0.2 * _fbm(nz, x / 18, y / 18, 2)); col.push(tmp.r, tmp.g, tmp.b);
+      tmp.copy(cols[k]).multiplyScalar(0.9 + 0.2 * _fbm(nz, x / 18, y / 18, 2));
+      if (th.pathTex) tmp.setRGB(1, 1, 1).multiplyScalar(k === 2 ? 1.08 : k === 0 || k === 4 ? 0.62 : 0.92);   // 텍스처 + 가장자리 어둡게
+      col.push(tmp.r, tmp.g, tmp.b); uvs.push(OFF[k] * r / 60 + 0.5, dist / 60);
     }
     if (i < n) for (let k = 0; k < 4; k++) { const a = i * 5 + k, b = a + 1, c = a + 5, d = c + 1; idx.push(a, b, c, b, d, c); }
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
   g.setIndex(idx); g.computeVertexNormals();
-  const m = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+  const m = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true, map: th.pathTex ? tex(th.pathTex) : null, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
   m.receiveShadow = true;
   return m;
 }
@@ -170,12 +187,18 @@ function buildPath(path, pw, th) {
 // ---------- 모델 로드 (색 보정·캐시) ----------
 const loader = new GLTFLoader(), models = {};
 function loadModel(name) {
-  if (!models[name]) models[name] = new Promise(res => loader.load(`assets/3d/${name}.glb`, gl => {
+  const mk = name.startsWith('mk/');
+  if (!models[name]) models[name] = new Promise(res => loader.load(mk ? `assets/3d/${name}.gltf` : `assets/3d/${name}.glb`, gl => {
     const parts = [];
     gl.scene.updateMatrixWorld(true);
     gl.scene.traverse(o => {
       if (!o.isMesh) return;
       const mats = (Array.isArray(o.material) ? o.material : [o.material]).map(m => {
+        if (mk) { // 정점색 = 풀·잎 색조. 잎·껍질은 그늘이 탁해지지 않게 텍스처 자체발광을 살짝 (스타일라이즈드 톤)
+          const lit = /Leaves|Leaf|Bark/.test(m.name);
+          return new THREE.MeshLambertMaterial({ map: m.map, color: m.color, vertexColors: !!o.geometry.attributes.color, alphaTest: m.alphaTest || 0, side: m.side, transparent: false,
+            emissive: lit ? 0x4a4a4a : 0x000000, emissiveMap: lit ? m.map : null });
+        }
         const c = MAT_COLORS[m.name]; const nm = new THREE.MeshLambertMaterial({ color: c !== undefined ? c : m.color, flatShading: true });
         return nm;
       });
@@ -200,70 +223,111 @@ async function addInstances(group, name, list, shadow) {
   }
 }
 
-// ---------- 소품 배치 (숲) ----------
+// ---------- 임포스터: 먼 숲 나무는 실제 모델을 카메라 각도에서 한 번 찍은 그림판으로 (삼각형 수천 개 → 2개) ----------
+const impostors = {};
+const _fwd = () => new THREE.Vector3(Math.sin(VIEW.yaw) * Math.cos(VIEW.el), -Math.sin(VIEW.el), -Math.cos(VIEW.yaw) * Math.cos(VIEW.el)).normalize();
+async function makeImpostor(name) {
+  if (impostors[name]) return impostors[name];
+  const parts = await loadModel(name), g = new THREE.Group();
+  for (const p of parts) { const m = new THREE.Mesh(p.geo, p.mat); m.applyMatrix4(p.mtx); g.add(m); }
+  const box = new THREE.Box3().setFromObject(g), c = box.getCenter(new THREE.Vector3()), fwd = _fwd();
+  const oc = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 200);
+  oc.position.copy(c).addScaledVector(fwd, -60); oc.up.set(0, 1, 0); oc.lookAt(c); oc.updateMatrixWorld();
+  const inv = oc.matrixWorldInverse; let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+  for (let k = 0; k < 8; k++) { const v = new THREE.Vector3(k & 1 ? box.max.x : box.min.x, k & 2 ? box.max.y : box.min.y, k & 4 ? box.max.z : box.min.z).applyMatrix4(inv); x0 = Math.min(x0, v.x); x1 = Math.max(x1, v.x); y0 = Math.min(y0, v.y); y1 = Math.max(y1, v.y); }
+  oc.left = x0; oc.right = x1; oc.bottom = y0; oc.top = y1; oc.updateProjectionMatrix();
+  const base = new THREE.Vector3(0, 0, 0).applyMatrix4(inv), w = x1 - x0, h = y1 - y0, PX = 200;
+  const rt = new THREE.WebGLRenderTarget(Math.round(PX * w / h), PX, { samples: 4 });
+  const sc = new THREE.Scene(); sc.add(g, hemi.clone(), (() => { const l = sun.clone(); l.castShadow = false; l.position.copy(sun.position).sub(sun.target.position).normalize().multiplyScalar(50); return l; })());
+  const prevT = R.getRenderTarget(), prevC = R.getClearColor(new THREE.Color()), prevA = R.getClearAlpha();
+  R.setRenderTarget(rt); R.setClearColor(0x000000, 0); R.clear(); R.render(sc, oc); R.setRenderTarget(prevT); R.setClearColor(prevC, prevA);
+  return (impostors[name] = { tex: rt.texture, w, h, bx: base.x - x0, by: base.y - y0 });
+}
+async function addImpostors(group, name, list) {
+  if (!list.length) return;
+  const im0 = await makeImpostor(name), fwd = _fwd(), right = fwd.clone().cross(new THREE.Vector3(0, 1, 0)).normalize(), up = right.clone().cross(fwd).normalize();
+  const geo = new THREE.PlaneGeometry(1, 1); geo.translate(0.5, 0.5, 0);
+  const mat = new THREE.MeshBasicMaterial({ map: im0.tex, alphaTest: 0.45, side: THREE.DoubleSide });
+  const im = new THREE.InstancedMesh(geo, mat, list.length);
+  im.customDepthMaterial = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map: im0.tex, alphaTest: 0.45 }); // 그림자도 나무 모양
+  const B = new THREE.Matrix4().makeBasis(right, up, fwd.clone().negate()), M = new THREE.Matrix4(), T = new THREE.Matrix4(), S = new THREE.Matrix4(), O = new THREE.Matrix4();
+  list.forEach((o, i) => {
+    T.makeTranslation(o.x, hAt(o.x, o.y) - 0.5, o.y); S.makeScale(im0.w * o.s * (o.flip ? -1 : 1), im0.h * o.s, 1); O.makeTranslation(-im0.bx / im0.w, -im0.by / im0.h, 0);
+    M.copy(T).multiply(B).multiply(S).multiply(O); im.setMatrixAt(i, M);
+  });
+  im.castShadow = true; im.receiveShadow = false;
+  group.add(im);
+}
+
+// ---------- 소품 배치 (숲): Quaternius Stylized Nature MegaKit (CC0) ----------
+// s = 모델 단위 → 월드 배율. 나무 높이 ≈ 100~150 (타워 포켓몬 ≈ 50)
 const FOREST = {
-  outer: ['tree_pineRoundA', 'tree_pineRoundC', 'tree_default', 'tree_pineDefaultA', 'tree_oak', 'tree_pineTallA_detailed', 'tree_fat', 'tree_pineRoundE', 'tree_detailed', 'tree_tall'],
-  grove: ['tree_oak', 'tree_default', 'tree_detailed', 'tree_fat', 'tree_pineRoundA', 'tree_pineTallB_detailed', 'tree_plateau'],
-  bush: ['plant_bush', 'plant_bushDetailed', 'plant_bushLarge', 'plant_bushSmall'],
-  grass: ['grass', 'grass_large', 'grass_leafs', 'grass_leafsLarge'],
-  flower: ['flower_redA', 'flower_redB', 'flower_yellowA', 'flower_yellowB', 'flower_purpleA', 'flower_purpleB'],
-  rock: ['rock_largeA', 'rock_largeB', 'rock_largeC', 'stone_largeA'],
-  pebble: ['rock_smallA', 'rock_smallB', 'rock_smallC', 'rock_smallFlatA', 'rock_smallFlatB', 'stone_smallA', 'stone_smallB'],
-  forestFloor: ['mushroom_red', 'mushroom_redGroup', 'mushroom_tanGroup', 'log', 'stump_round', 'stump_old'],
+  tree: ['mk/CommonTree_1', 'mk/CommonTree_2', 'mk/CommonTree_3', 'mk/CommonTree_5', 'mk/Pine_1', 'mk/Pine_3', 'mk/Pine_4'],
+  far: ['mk/CommonTree_1', 'mk/CommonTree_2', 'mk/CommonTree_4', 'mk/Pine_1', 'mk/Pine_2', 'mk/Pine_5'],
+  bush: ['mk/Bush_Common', 'mk/Bush_Common_Flowers', 'mk/Bush_Common'],
+  grass: ['mk/Grass_Common_Short', 'mk/Grass_Common_Short', 'mk/Grass_Common_Tall'],
+  flower: ['mk/Flower_3_Single', 'mk/Flower_4_Single', 'mk/Flower_3_Group'],
+  low: ['mk/Clover_1', 'mk/Clover_2', 'mk/Plant_7_Big'],
+  rock: ['mk/Rock_Medium_1', 'mk/Rock_Medium_2', 'mk/Rock_Medium_3'],
+  pebble: ['mk/Pebble_Round_1', 'mk/Pebble_Round_2', 'mk/Pebble_Round_3', 'mk/Pebble_Round_4', 'mk/Pebble_Square_1', 'mk/Pebble_Square_2', 'mk/Pebble_Square_3'],
+  floor: ['mk/Mushroom_Common'],
 };
 function placeForest(W, H, path, slots, pw) {
-  const rnd = _mapRng(4242), pick = a => a[Math.floor(rnd() * a.length)], out = {}, trees = [];
+  const rnd = _mapRng(4242), pick = a => a[Math.floor(rnd() * a.length)], out = {}, far = {}, trees = [];
   const add = (name, x, y, s, extra) => { (out[name] = out[name] || []).push({ x, y, s, rot: rnd() * Math.PI * 2, ...(extra || {}) }); };
   const pS = path.filter((_, i) => i % 2 === 0);
-  const clr = (x, y) => Math.min(_distToPath(x, y, pS) - pw / 2, ...slots.map(s => Math.hypot(s.x - x, s.y - y) - 26));
-  const farFromTrees = (x, y, r) => trees.every(t => Math.hypot(t.x - x, t.y - y) > (t.r + r) * 0.8);
-  // ① 바깥 숲: 맵 밖 언덕을 빽빽한 숲으로 (멀수록 크게 — 분지를 둘러싼 숲)
-  // 카메라가 왼쪽 아래에서 오른쪽 위를 보므로 먼 쪽(위·오른쪽)은 깊게, 가까운 쪽(왼쪽·아래)은 얇게 (삼각형 수 절약)
-  for (let y = -440; y < H + 240; y += 34) for (let x = -260; x < W + 440; x += 34) {
-    const jx = x + (rnd() - 0.5) * 30, jy = y + (rnd() - 0.5) * 30, o = Math.max(-jx, jx - W, -jy, jy - H);
-    if (o < 6 || o > (jx > W || jy < 0 ? 430 : 230)) continue;
-    if (rnd() < 0.18 + Math.min(0.6, o / 140)) { const s = 46 + rnd() * 34 + Math.min(40, o * 0.08); if (_distToPath(jx, jy, pS) > pw / 2 + s * 0.45) { add(pick(FOREST.outer), jx, jy, s); trees.push({ x: jx, y: jy, r: s * 0.35, s, out: true }); } }
-    else if (o < 160 && rnd() < 0.5) add(pick(FOREST.bush), jx, jy, 34 + rnd() * 26);
+  const dP = (x, y) => _distToPath(x, y, pS) - pw / 2, dS = (x, y) => Math.min(...slots.map(s => Math.hypot(s.x - x, s.y - y) - 24));
+  const clr = (x, y) => Math.min(dP(x, y), dS(x, y));
+  // ① 바깥 숲: 맵 가장자리 가까운 줄은 실제 모델, 그 너머는 임포스터 (먼 쪽 위·오른쪽은 깊게)
+  let nearReal = 0;
+  for (let y = -460; y < H + 260; y += 30) for (let x = -300; x < W + 460; x += 30) {
+    const jx = x + (rnd() - 0.5) * 26, jy = y + (rnd() - 0.5) * 26, o = Math.max(-jx, jx - W, -jy, jy - H);
+    const nearSide = !(jx > W || jy < 0);                                  // 카메라 쪽(왼쪽·아래)은 얇고 성기게 → 앞이 막히지 않게
+    if (o < 10 || o > (nearSide ? 130 : 450) || dP(jx, jy) < 30 || (nearSide && rnd() < 0.45)) continue;
+    if (rnd() > 0.35 + Math.min(0.5, o / 160)) { if (o < 120 && rnd() < 0.18) add(pick(FOREST.bush), jx, jy, 15 + rnd() * 8); continue; }
+    const s = 14 + rnd() * 5 + Math.min(4, o * 0.012);
+    if (o < 46 && nearReal < 22) { add(pick(FOREST.tree), jx, jy, s); nearReal++; trees.push({ x: jx, y: jy, s: s * 8, r: s * 2 }); }
+    else (far[pick(FOREST.far)] = far[pick(FOREST.far)] || []).push({ x: jx, y: jy, s, flip: rnd() < 0.5 });
   }
-  // ② 맵 안 빈터: 길·타워에서 먼 곳에 나무 군락 + 밑에 덤불·버섯·통나무
+  // ② 맵 안 빈터: 나무 한두 그루 + 덤불·버섯 (길·타워에서 먼 곳만)
   const cand = [];
   for (let y = 16; y < H - 8; y += 12) for (let x = 12; x < W - 12; x += 12) { const c = clr(x, y); if (c > 24) cand.push({ x, y, c }); }
   cand.sort((a, b) => b.c - a.c);
   const groves = [];
-  for (const c of cand) { if (groves.length >= 16) break; if (groves.every(g => Math.hypot(g.x - c.x, g.y - c.y) > 80)) groves.push(c); }
+  for (const c of cand) { if (groves.length >= 14) break; if (groves.every(g => Math.hypot(g.x - c.x, g.y - c.y) > 85)) groves.push(c); }
   for (const g of groves) {
-    const s = Math.min(70, 22 + g.c * 1.0);
-    if (g.c > 30 && farFromTrees(g.x, g.y, s * 0.35)) {
-      add(pick(FOREST.grove), g.x, g.y, s); trees.push({ x: g.x, y: g.y, r: s * 0.35, s });
-      for (let i = 0; i < 3; i++) { const a = rnd() * 6.28, d = s * (0.3 + rnd() * 0.25); add(pick(FOREST.bush), g.x + Math.cos(a) * d, g.y + Math.sin(a) * d, 26 + rnd() * 16); }
-      if (rnd() < 0.7) add(pick(FOREST.forestFloor), g.x + (rnd() - 0.5) * s * 0.7, g.y + (rnd() - 0.5) * s * 0.5, 30 + rnd() * 12);
-    } else {
-      for (let i = 0; i < 3; i++) add(pick(FOREST.bush), g.x + (rnd() - 0.5) * 30, g.y + (rnd() - 0.5) * 20, 22 + rnd() * 14);
-    }
+    if (g.c > 32) {
+      const s = Math.min(16, 7 + g.c * 0.16);
+      add(pick(FOREST.tree), g.x, g.y, s); trees.push({ x: g.x, y: g.y, s: s * 8, r: s * 2 });
+      for (let i = 0; i < 2 + (rnd() < 0.5); i++) { const a = rnd() * 6.28, d = s * (2.2 + rnd() * 1.4); add(pick(FOREST.bush), g.x + Math.cos(a) * d, g.y + Math.sin(a) * d, 12 + rnd() * 6); }
+      if (rnd() < 0.8) for (let i = 0; i < 3; i++) add('mk/Mushroom_Common', g.x + (rnd() - 0.5) * s * 3, g.y + (rnd() - 0.2) * s * 2, 12 + rnd() * 6);
+    } else for (let i = 0; i < 2; i++) add(pick(FOREST.bush), g.x + (rnd() - 0.5) * 24, g.y + (rnd() - 0.5) * 14, 11 + rnd() * 6);
   }
-  // ③ 꽃밭·풀: 빈 땅 곳곳에 무리 지어 (작아서 타워·적을 가리지 않음)
+  // ③ 풀·꽃·클로버: 노이즈가 높은 곳에 무리 지어 (길·타워 바로 옆은 비움)
   const nz = _vnoise(99);
-  for (let t = 0; t < 2600; t++) {
-    const x = rnd() * W, y = rnd() * H, n = _fbm(nz, x / 120, y / 120, 2), c = clr(x, y);
-    if (c < 6) continue;
-    if (n > 0.6 && rnd() < 0.5) add(pick(FOREST.flower), x, y, 26 + rnd() * 14);
-    else if (rnd() < 0.22) add(pick(FOREST.grass), x, y, 26 + rnd() * 18);
+  for (let t = 0; t < 3400; t++) {
+    const x = -60 + rnd() * (W + 120), y = -60 + rnd() * (H + 120), n = _fbm(nz, x / 110, y / 110, 2), c = clr(x, y);
+    if (c < 4) continue;
+    const r = rnd();
+    if (n > 0.6 && r < 0.12) add(pick(FOREST.flower), x, y, 6 + rnd() * 2.5);
+    else if (n > 0.5 && r < 0.3) add(pick(FOREST.grass), x, y, 9 + rnd() * 5);
+    else if (r < 0.03) add(pick(FOREST.low), x, y, 8 + rnd() * 4);
   }
-  // ④ 길 가장자리 자갈·바위 (굽이 바깥쪽에 큰 바위)
-  for (let i = 0; i < path.length; i += 3) {
+  // ④ 길 가장자리 자갈 + 굽이 바깥 바위
+  for (let i = 0; i < path.length; i += 2) {
     const p = path[i], q = path[(i + 2) % path.length], tx = q.x - p.x, ty = q.y - p.y, tl = Math.hypot(tx, ty) || 1, side = rnd() < 0.5 ? 1 : -1;
-    const d = pw / 2 + 2 + rnd() * 5, x = p.x - ty / tl * d * side, y = p.y + tx / tl * d * side;
-    if (rnd() < 0.22 && clr(x, y) > -pw / 2 - 1) add(pick(FOREST.pebble), x, y, 12 + rnd() * 12);
+    const d = pw / 2 - 1 + rnd() * 6, x = p.x - ty / tl * d * side, y = p.y + tx / tl * d * side;
+    if (rnd() < 0.3 && dS(x, y) > 2) add(pick(FOREST.pebble), x, y, 12 + rnd() * 10);
   }
-  for (let i = 10; i < path.length - 10; i += 14) {
+  for (let i = 10; i < path.length - 10; i += 12) {
     const a = path[i - 10], p = path[i], b = path[i + 10];
     let turn = Math.atan2(b.y - p.y, b.x - p.x) - Math.atan2(p.y - a.y, p.x - a.x); while (turn > Math.PI) turn -= 6.283; while (turn < -Math.PI) turn += 6.283;
-    if (Math.abs(turn) < 0.8 || rnd() < 0.4) continue;
-    const tx = b.x - a.x, ty = b.y - a.y, tl = Math.hypot(tx, ty) || 1, sg = turn > 0 ? 1 : -1, d = pw / 2 + 16;
+    if (Math.abs(turn) < 0.8 || rnd() < 0.35) continue;
+    const tx = b.x - a.x, ty = b.y - a.y, tl = Math.hypot(tx, ty) || 1, sg = turn > 0 ? 1 : -1, d = pw / 2 + 18;
     const x = p.x + ty / tl * d * sg, y = p.y - tx / tl * d * sg;
-    if (clr(x, y) > 4) { add(pick(FOREST.rock), x, y, 22 + rnd() * 10); add(pick(FOREST.pebble), x + 12, y + 6, 14); }
+    if (clr(x, y) > 4) { add(pick(FOREST.rock), x, y, 6 + rnd() * 3); for (let k = 0; k < 3; k++) add(pick(FOREST.grass), x + (rnd() - 0.5) * 30, y + (rnd() - 0.5) * 16, 10); }
   }
-  return { out, trees };
+  return { out, far, trees };
 }
 
 // ---------- 월드 생성 ----------
@@ -285,16 +349,17 @@ W3.build = async function ({ W, H, path, slots, pw, theme }) {
   root.add(buildTerrain(th));
   root.add(buildPath(path, pw, th));
   // 타워 자리: 땅에 박힌 낮은 돌판 (각진 low-poly)
-  const sg = new THREE.CylinderGeometry(19, 21.5, 6, 9), sm = new THREE.MeshLambertMaterial({ color: th.slot, flatShading: true });
+  const sg = new THREE.CylinderGeometry(19, 21.5, 6, 9), sm = th.slotTex ? new THREE.MeshLambertMaterial({ map: tex(th.slotTex), color: 0xfff6e8, flatShading: true }) : new THREE.MeshLambertMaterial({ color: th.slot, flatShading: true }); // 돌판: 돌 텍스처
   const sIm = new THREE.InstancedMesh(sg, sm, slots.length), M = new THREE.Matrix4(), q = new THREE.Quaternion();
   slots.forEach((s, i) => { q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), i * 1.7); M.compose(new THREE.Vector3(s.x, hAt(s.x, s.y) + 1, s.y), q, new THREE.Vector3(1, 1, 1)); sIm.setMatrixAt(i, M); });
   sIm.receiveShadow = true; sIm.castShadow = true; root.add(sIm);
   occluders = [];
   W3._trees = [];
   if (th.props === 'forest') {
-    const { out, trees } = placeForest(W, H, path, slots, pw);
-    W3._trees = trees.filter(t => !t.out || t.x > -120 && t.x < W + 120 && t.y > -120 && t.y < H + 120);
-    await Promise.all(Object.entries(out).map(([name, list]) => addInstances(root, name, list, !/^(grass|flower|rock_small|stone_small)/.test(name))));
+    const { out, far, trees } = placeForest(W, H, path, slots, pw);
+    W3._trees = trees;
+    await Promise.all(Object.entries(out).map(([name, list]) => addInstances(root, name, list, /Tree|Pine|Bush|Rock_/.test(name))));
+    for (const [name, list] of Object.entries(far)) await addImpostors(root, name, list);
   }
   R.shadowMap.needsUpdate = true; dirty = true;
 };
@@ -307,12 +372,12 @@ W3.setView = function (x, y, zoom) {
   const p = new THREE.Vector3(x - hx * dist * Math.cos(VIEW.el), tz + dist * Math.sin(VIEW.el), y - hy * dist * Math.cos(VIEW.el));
   if (p.distanceToSquared(cam.position) < 1e-6 && !dirty) return;
   cam.position.copy(p); cam.lookAt(x, tz, y); cam.updateMatrixWorld(); camPos.copy(p);
-  if (scene.fog) { scene.fog.near = dist * 1.05; scene.fog.far = dist * 2.6; } // 판은 선명, 바깥 숲만 멀수록 안개
+  if (scene.fog) { scene.fog.near = dist * 0.85; scene.fog.far = dist * 2.1; } // 판은 선명, 바깥 숲만 멀수록 안개
   const m = new THREE.Matrix4().multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse);
   E.set(m.elements); dirty = true;
   // 유닛 가림 판정용: 맵 안·가장자리 나무의 화면 사각형(밑동~꼭대기)
   occluders = W3._trees.map(t => {
-    const b = W3.project(t.x, t.y), top = W3.project(t.x, t.y, hAt(t.x, t.y) + t.s * 1.25), hw = t.s * 0.36 * b.s;
+    const b = W3.project(t.x, t.y), top = W3.project(t.x, t.y, hAt(t.x, t.y) + t.s), hw = t.s * 0.3 * b.s; // t.s = 나무 높이(월드)
     return { x0: b.x - hw, x1: b.x + hw, y0: top.y, y1: b.y - hw * 0.25, d: b.d };
   });
 };
@@ -353,7 +418,7 @@ W3.fit = function (slots, top, bottom, path) {
     return { x0, x1, y0, y1 }; };
   for (let it = 0; it < 18; it++) {
     dirty = true; W3.setView(x, y, zoom);
-    const b = box(), sh = (bottom - top) / (b.y1 - b.y0), sw = Wpx / (b.x1 - b.x0);
+    const b = box(), sh = (bottom - top) / (b.y1 - b.y0), sw = Wpx * 0.86 / (b.x1 - b.x0); // 좌우 7%씩 배경 여백(균형)
     zoom *= Math.pow(Math.min(sh, sw), 0.7);
     const g = W3.pick((b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2), c = W3.pick(Wpx / 2, (top + bottom) / 2);
     x += (g.x - c.x) * 0.8; y += (g.y - c.y) * 0.8;
@@ -363,4 +428,4 @@ W3.fit = function (slots, top, bottom, path) {
 };
 W3.markDirty = () => { dirty = true; };
 W3.info = () => R && R.info;
-W3.stats = () => { const o = {}; root.traverse(m => { if (m.isInstancedMesh) { const t = (m.geometry.index ? m.geometry.index.count : m.geometry.attributes.position.count) / 3; const k = m.geometry.uuid.slice(0, 4); o[k] = o[k] || { t, n: m.count, tot: 0 }; o[k].tot += t * m.count; } }); return Object.values(o).sort((a, b) => b.tot - a.tot).slice(0, 12); };
+W3.stats = () => { const o = {}; let other = 0; root.traverse(m => { if (m.isMesh && !m.isInstancedMesh) other += (m.geometry.index ? m.geometry.index.count : 0) / 3; if (m.isInstancedMesh) { const t = (m.geometry.index ? m.geometry.index.count : m.geometry.attributes.position.count) / 3; const k = m.geometry.uuid.slice(0, 4); o[k] = o[k] || { t, n: m.count, tot: 0 }; o[k].tot += t * m.count; } }); const v = Object.values(o); return { other, inst: v.reduce((a, b) => a + b.tot, 0), top: v.sort((a, b) => b.tot - a.tot).slice(0, 5) }; };

@@ -30,6 +30,28 @@ const EnemySpriteImages = {
 
 // 스프라이트 실루엣 틴트 캐시 (피격 흰색·흑화 엘리트) — 경로·색·크롭 여부별 1회 생성
 const _tintCache = {};
+// v3.14 입체감: 3D 장면 햇빛(왼쪽 위)과 같은 방향으로 밝은 면·그늘, 윤곽 한쪽 림라이트, 발치 그늘. 이미지당 1회 생성 (3D 모드만)
+const _litCache = new Map();
+function litSprite(img) {
+  if (!window.__3d || !img) return img;
+  const w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+  if (!w || !h) return img;
+  let c = _litCache.get(img); if (c) return c;
+  c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d');
+  x.drawImage(img, 0, 0);
+  x.globalCompositeOperation = 'source-atop';
+  const g = x.createLinearGradient(w * 0.1, 0, w * 0.9, h);
+  g.addColorStop(0, 'rgba(255,246,220,0.20)'); g.addColorStop(0.5, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(12,22,55,0.34)');
+  x.fillStyle = g; x.fillRect(0, 0, w, h);
+  const f = x.createLinearGradient(0, h * 0.68, 0, h); f.addColorStop(0, 'rgba(0,0,0,0)'); f.addColorStop(1, 'rgba(0,12,0,0.28)');
+  x.fillStyle = f; x.fillRect(0, h * 0.68, w, h * 0.32);
+  const r = document.createElement('canvas'); r.width = w; r.height = h; const y = r.getContext('2d'), k = Math.max(2, Math.round(w / 80));
+  y.drawImage(img, 0, 0); y.globalCompositeOperation = 'destination-out'; y.drawImage(img, k, k);       // 빛 받는 쪽(왼쪽 위) 윤곽만 남김
+  y.globalCompositeOperation = 'source-in'; y.fillStyle = 'rgba(255,250,228,0.6)'; y.fillRect(0, 0, w, h);
+  x.drawImage(r, 0, 0);
+  _litCache.set(img, c); return c;
+}
+window.litSprite = litSprite;
 function tintedSprite(img, path, b, color) {
   const k = path + '|' + color + '|' + (b ? 1 : 0);
   if (_tintCache[k]) return _tintCache[k];
@@ -701,8 +723,8 @@ class Enemy {
       const SK = window.STAND_K || 1, dhS = drawSize * SK, dx = this.x - drawSize / 2, dy = drawY + drawSize / 2 - dhS;
       ctx.save(); ctx.globalAlpha *= 0.35; ctx.fillStyle = '#000'; ctx.beginPath(); ctx.ellipse(this.x, drawY + drawSize * 0.42, drawSize * 0.3, drawSize * 0.09, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
       this._standLift = dhS - drawSize; // HP바를 머리 위로 올릴 만큼
-      if (b) ctx.drawImage(img, b.x, b.y, b.w, b.h, dx, dy, drawSize, dhS);
-      else ctx.drawImage(img, dx, dy, drawSize, dhS);
+      if (b) ctx.drawImage(litSprite(img), b.x, b.y, b.w, b.h, dx, dy, drawSize, dhS);
+      else ctx.drawImage(litSprite(img), dx, dy, drawSize, dhS);
       // v3.6: 메인 캔버스에 source-atop을 쓰면 배경까지 칠해져 네모 박스가 보였음 → 오프스크린 실루엣을 덧그림
       const tint = this.flashTimer > 0 ? 'rgba(255,255,255,0.75)' : isDarkElite ? 'rgba(60,0,90,0.55)' : null;
       if (tint) ctx.drawImage(tintedSprite(img, imgPath, b, tint), dx, dy, drawSize, dhS);

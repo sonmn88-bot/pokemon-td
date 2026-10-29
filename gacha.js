@@ -821,8 +821,8 @@ function _createGachaTower(def, x, y, engine) {
         // v3.13 세워 그리기: 받침은 땅에, 포켓몬은 받침 위에 발을 딛고 서 있게 (세로 STAND_K배, 발끝 기준)
         const SK = window.STAND_K || 1, sh = dh * SK, feet = this.y + dh * 0.3, sy = feet - sh + bobY;
         ctx.fillStyle = 'rgba(0,0,0,0.30)'; ctx.beginPath(); ctx.ellipse(this.x, feet - 1, dw * 0.34, 4, 0, 0, Math.PI * 2); ctx.fill();
-        if (b) ctx.drawImage(img, b.x, b.y, b.w, b.h, this.x-dw/2, sy, dw, sh);
-        else ctx.drawImage(img,this.x-dw/2,sy,dw,sh);
+        if (b) ctx.drawImage(window.litSprite ? litSprite(img) : img, b.x, b.y, b.w, b.h, this.x-dw/2, sy, dw, sh); // 3D: 햇빛 방향 입체감
+        else ctx.drawImage(window.litSprite ? litSprite(img) : img,this.x-dw/2,sy,dw,sh);
         if (this._evolveGlowTimer > 0.6 && window.tintedSprite) { // 진화 직후 0.6초: 흰 실루엣이 걷히며 새 모습 등장
           ctx.globalAlpha = Math.min(1, (this._evolveGlowTimer - 0.6) / 0.6);
           ctx.drawImage(tintedSprite(img, imgPath, b, '#ffffff'), this.x-dw/2, sy, dw, sh);
