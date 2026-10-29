@@ -173,22 +173,126 @@ function drawNaturalTerrain(ctx, w, h, map) {
   }
   ctx.restore();
 
-  // 3) v3.13 장식: CC0 손그림 나무 스프라이트(그림자 포함)만 — 길·타워 자리를 피해서 무리 지어 배치
-  if (!map.trees) return;
-  const tree = _treeImg();
-  if (!tree.complete || !tree.naturalWidth) { tree.onload = () => { if (window.app && app.engine) app.engine._bgDirty = true; }; return; }
-  const count = Math.round((w * h) / 26000);
-  for (let n = 0, tries = 0; n < count && tries < count * 10; tries++) {
-    const x = rnd() * w, y = rnd() * h, sz = 56 + rnd() * 34; // 원본 192px라 너무 크게 그리면 흐려짐
-    if (_distToPath(x, y, pathS) < sz * 0.45 + 18) continue;
-    if (slots.some(s => (s.x - x)**2 + (s.y - y)**2 < (sz * 0.45 + 26) ** 2)) continue;
-    ctx.save(); ctx.translate(x, y); ctx.rotate(rnd() * 6.283); ctx.globalAlpha = 0.95;
-    ctx.drawImage(tree, -sz / 2, -sz / 2, sz, sz); ctx.restore();
-    n++;
-  }
+  // 3) v3.13 소품 그림자·바닥 데칼은 평평하니 배경 캐시에 구움 (서 있는 소품 본체는 엔진이 유닛과 함께 앞뒤 정렬해서 그림)
+  const P = buildMapProps(w, h, map);
+  ctx.save();
+  for (const d of P.decals) { const im = _propCanvas(d.key, d.w, d.h, d.filter); if (!im) continue; ctx.globalAlpha = d.a; ctx.drawImage(im, d.x - d.w / 2, d.y - d.h / 2, d.w, d.h); }
+  ctx.globalAlpha = 1; ctx.fillStyle = 'rgba(0,0,0,0.2)';
+  for (const o of P.props) { ctx.beginPath(); ctx.ellipse(o.x + o.w * 0.06, o.y - 1, o.w * 0.44, Math.max(3, o.w * 0.11), 0, 0, Math.PI * 2); ctx.fill(); }
+  ctx.restore();
 }
-let _treeImgObj = null;
-function _treeImg() { if (!_treeImgObj) { _treeImgObj = new Image(); _treeImgObj.src = 'assets/terrain/tree.png'; } return _treeImgObj; }
+
+// ===== v3.13 소품(3/4 시점): CC0 Glitch 아트 스프라이트를 테마별로 배치 =====
+// h: 월드 기준 높이(px). 큰 나무는 가장자리·빈터, 덤불/바위는 길 앞쪽에 붙여 길이 살짝 가려지게(깊이감)
+const PROP_SETS = {
+  forest: {
+    big: [['tree_oak', 118], ['tree_pine', 128], ['tree_oak', 100], ['tree_pine', 110], ['tree_oak', 132], ['tree_acacia', 74]],
+    mid: [['bush_a', 30], ['bush_b', 27], ['bush_tall', 32], ['flower_bush', 38], ['flower_bush2', 28], ['pampas', 42], ['pampas2', 44], ['rock_mound', 26], ['bush_a', 26], ['bush_tall', 28]],
+    edge: [['bush_a', 26], ['bush_b', 24], ['bush_wide', 20], ['flower_bush2', 24], ['rock_mound', 22, 'brightness(0.85)'], ['pampas', 34], ['bush_tall', 26]],
+    small: [['mush_red', 16], ['flowers', 22], ['rock_dull', 12, 'brightness(0.62) sepia(0.3)'], ['flowers', 18]],
+    decal: [['decal_flowers', 9]],
+  },
+  volcano: {
+    filter: 'brightness(0.45) sepia(0.6) saturate(1.6) hue-rotate(-15deg)',
+    big: [['tree_bare', 112], ['stalagmite', 78], ['tree_bare', 96], ['stalagmite', 64], ['rock_mound', 44]],
+    mid: [['rock_mound', 30], ['dirt_mound', 30], ['stalagmite', 40], ['rock_dull', 18], ['pampas2', 36]],
+    edge: [['rock_mound', 24], ['dirt_mound', 24], ['rock_dull', 15], ['rock_mound', 20]],
+    small: [['rock_dull', 11], ['dirt_mound', 12]],
+    decal: [],
+  },
+  cave: {
+    filter: 'brightness(0.5) sepia(0.4) hue-rotate(215deg) saturate(0.9)',
+    big: [['stalagmite', 92], ['crystal_c', 56], ['stalagmite', 76], ['crystal_a', 44], ['stalagmite', 64]],
+    mid: [['crystal_b', 24], ['mush_hood', 28], ['rock_dull', 16], ['crystal_a', 30], ['rock_mound', 26], ['stalagmite', 40]],
+    edge: [['crystal_b', 20], ['rock_dull', 14], ['mush_purple', 20], ['rock_mound', 20]],
+    small: [['mush_purple', 18], ['crystal_b', 14], ['rock_dull', 10]],
+    decal: [],
+  },
+};
+const PROP_NOFILTER = { crystal_a: 1, crystal_b: 1, crystal_c: 1, mush_purple: 1 };
+const _propImgs = {};
+function _propImg(key) {
+  let im = _propImgs[key];
+  if (!im) { im = _propImgs[key] = new Image(); im.onload = () => { clearTimeout(_propImgs._t); _propImgs._t = setTimeout(() => { if (window.app && app.engine) app.engine._bgDirty = true; }, 200); }; im.src = 'assets/props/' + key + '.png'; }
+  return im;
+}
+// 미리 축소·색보정한 캔버스(매 프레임 큰 원본을 줄이며 그리지 않게). 화면 배율(줌×CSS×DPR)을 감안해 2.4배 해상도
+const _propCache = {};
+function _propCanvas(key, w, h, filter) {
+  const ck = key + '|' + Math.round(w) + '|' + (filter || '');
+  if (_propCache[ck]) return _propCache[ck];
+  const im = _propImg(key);
+  if (!im.complete || !im.naturalWidth) return null;
+  const R = 2.4, c = document.createElement('canvas');
+  c.width = Math.max(2, Math.round(w * R)); c.height = Math.max(2, Math.round(h * R));
+  const g = c.getContext('2d'); g.imageSmoothingQuality = 'high';
+  if (filter) g.filter = filter;
+  g.drawImage(im, 0, 0, c.width, c.height);
+  return (_propCache[ck] = c);
+}
+window.propCanvas = _propCanvas;
+const PROP_ASPECT = { bush_a:2.8, bush_b:2.59, bush_tall:1.7, bush_wide:4.27, crystal_a:1.69, crystal_b:1.13, crystal_c:0.93, decal_flowers:10.2, decal_grass:5.08, dirt_mound:1.33, flower_bush:0.78, flower_bush2:1.94, flowers:0.6, mush_hood:0.72, mush_purple:0.44, mush_red:0.74, pampas:0.69, pampas2:0.65, rock_dull:2.05, rock_dull2:4, rock_mound:2.52, rock_sparkly:3.02, stalagmite:0.63, stones:1.56, stump:1.67, tree_acacia:1.6, tree_acacia2:2.19, tree_bare:0.88, tree_oak:0.74, tree_pine:0.41 };
+
+let _propsCache = null;
+function buildMapProps(w, h, map) {
+  const theme = (map.deco && map.deco.theme) || 'forest', set = PROP_SETS[theme] || PROP_SETS.forest;
+  const key = theme + '|' + w + 'x' + h;
+  if (_propsCache && _propsCache.key === key) return _propsCache;
+  const L = NaturalLayout.build(w, h), slots = L.slots, path = L.path, pathS = path.filter((_, i) => i % 2 === 0);
+  const rnd = _mapRng(theme === 'forest' ? 4242 : theme === 'cave' ? 9191 : 6161);
+  const pw = map.pathWidth || 30, props = [], decals = [];
+  const pick = (arr) => arr[Math.floor(rnd() * arr.length)];
+  const mk = (def, sc) => { const ph = def[1] * sc, w2 = ph * (PROP_ASPECT[def[0]] || 1); return { key: def[0], w: w2, h: ph, f: def[2] }; };
+  // 타워(자리 위로 ~45px 솟음)를 가리지 않게: 소품이 서 있는 박스와 슬롯이 겹치면 탈락
+  const slotFree = (x, y, o) => !slots.some(s => Math.abs(s.x - x) < o.w / 2 + 20 && s.y > y - o.h * (window.STAND_K || 1.13) - 26 && s.y < y + 30);
+  const pathClear = (x, y, o, pad) => !pathS.some(p => Math.abs(p.x - x) < o.w / 2 + pad && p.y > y - o.h * 1.13 - pad && p.y < y + pad);
+  const spaced = (x, y, o, k) => !props.some(q => Math.abs(q.x - x) < (q.w + o.w) * k && Math.abs(q.y - y) < Math.max(10, (q.h + o.h) * 0.18));
+  const add = (o, x, y) => { o.x = x; o.y = y; o.flip = rnd() < 0.5; o.filter = o.f || (PROP_NOFILTER[o.key] ? '' : (set.filter || '')); props.push(o); _propImg(o.key); };
+
+  // ① 큰 나무/바위: 빈터와 맵 가장자리(좌우 끝은 슬롯이 없어 숲 경계처럼)
+  const nBig = Math.round(w * h / 20000);
+  for (let n = 0, t = 0; n < nBig && t < nBig * 40; t++) {
+    const edge = rnd() < 0.55, x = edge ? (rnd() < 0.5 ? -10 + rnd() * w * 0.12 : w * 0.9 + rnd() * w * 0.12) : rnd() * w;
+    const y = 30 + rnd() * (h - 34), o = mk(pick(set.big), 0.85 + rnd() * 0.35);
+    if (x < o.w * 0.3 || x > w - o.w * 0.3) continue; // 배경 캐시 밖으로 잘리지 않게
+    if (!slotFree(x, y, o) || !pathClear(x, y, o, 10) || !spaced(x, y, o, 0.32)) continue;
+    add(o, x, y); n++;
+  }
+  // ② 길 앞쪽 가림막: 길 아래 가장자리에 덤불/바위를 붙여 길과 지나가는 적의 발밑이 살짝 가려지게 (먼 쪽=위쪽에 더 많이)
+  for (let i = 6; i < path.length - 6; i += 3) {
+    const p = path[i], q = path[i + 2] || p, dx = q.x - p.x, dy = q.y - p.y, len = Math.hypot(dx, dy) || 1;
+    if (Math.abs(dy) > len * 0.6) continue;                 // 세로로 꺾이는 구간은 제외 (가로 구간만)
+    const prob = 0.12 + 0.30 * (1 - p.y / h);
+    if (rnd() > prob) continue;
+    const o = mk(pick(set.edge), 0.85 + rnd() * 0.3), x = p.x + (rnd() - 0.5) * 10, y = p.y + pw * 0.5 + 3 + rnd() * 6;
+    if (x < 8 || x > w - 8 || !slotFree(x, y, o) || !spaced(x, y, o, 0.45)) continue;
+    add(o, x, y);
+  }
+  // ③ 중간 덤불·바위 ④ 작은 버섯·꽃·돌 (길·슬롯을 피해 무리 지어)
+  const scatter = (arr, n0, sc0, scR, pad, k) => {
+    for (let n = 0, t = 0; n < n0 && t < n0 * 30; t++) {
+      let x = rnd() * w, y = 10 + rnd() * h;
+      if (props.length && rnd() < 0.45) { const a = pick(props); x = a.x + (rnd() - 0.5) * (a.w + 40); y = a.y + (rnd() - 0.3) * 30; } // 군락
+      const o = mk(pick(arr), sc0 + rnd() * scR);
+      if (x < o.w * 0.3 || x > w - o.w * 0.3 || y > h - 3 || !slotFree(x, y, o) || !pathClear(x, y, o, pad) || !spaced(x, y, o, k)) continue;
+      add(o, x, y); n++;
+    }
+  };
+  scatter(set.mid, Math.round(w * h / 11000), 0.8, 0.45, 8, 0.4);
+  scatter(set.small, Math.round(w * h / 16000), 0.8, 0.5, 4, 0.5);
+  // ⑤ 바닥 데칼(평면, 배경에 구움)
+  for (let n = 0, t = 0, n0 = set.decal.length ? Math.round(w * h / 20000) : 0; n < n0 && t < n0 * 20; t++) {
+    const x = rnd() * w, y = rnd() * h, o = mk(pick(set.decal), 0.8 + rnd() * 0.6);
+    if (_distToPath(x, y, pathS) < pw * 0.5 + 10 || slots.some(s => (s.x - x) ** 2 + (s.y - y) ** 2 < 900)) continue;
+    o.x = x; o.y = y; o.a = 0.55 + rnd() * 0.35; o.filter = set.filter || ''; decals.push(o); _propImg(o.key); n++;
+  }
+  // 길(적이 지나는 곳)이 소품 뒤에 있을 때만 매 프레임 깊이 정렬 대상(dyn), 나머지는 정적 레이어에 1회 구움 (발열)
+  const K = window.STAND_K || 1.13;
+  for (const o of props) o.dyn = pathS.some(p => Math.abs(p.x - o.x) < o.w / 2 + 12 && p.y < o.y && p.y > o.y - o.h * K - 8);
+  props.sort((a, b) => a.y - b.y);
+  return (_propsCache = { key, props, decals });
+}
+window.buildMapProps = buildMapProps;
 
 const MapDefs = {
   // ===== 1. 태초마을 숲 =====

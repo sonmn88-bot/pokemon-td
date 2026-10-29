@@ -1621,7 +1621,7 @@ class App {
         if (didPan || Math.hypot(dx, dy) > PAN_THRESHOLD) {
           didPan = true;
           const cam = this.engine.camera;
-          cam.x -= dx / cam.zoom; cam.y -= dy / cam.zoom;
+          this.engine.panBy(dx, dy);
           this.engine.clampCamera();
           gestureStart = pos;
           return;
@@ -1660,7 +1660,7 @@ class App {
         if (mouseDidPan || Math.hypot(dx, dy) > PAN_THRESHOLD) {
           mouseDidPan = true;
           const cam = this.engine.camera;
-          cam.x -= dx / cam.zoom; cam.y -= dy / cam.zoom;
+          this.engine.panBy(dx, dy);
           this.engine.clampCamera();
           mouseStart = pos;
           return;

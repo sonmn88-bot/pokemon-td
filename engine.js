@@ -166,7 +166,7 @@ class GameEngine {
       const y1 = hud.getBoundingClientRect().bottom + 4, y2 = bar.getBoundingClientRect().top - 4;
       if (!(y2 > y1)) return;
       const c1 = window.untiltPoint(this.canvas, 0, y1).y, c2 = window.untiltPoint(this.canvas, 0, y2).y;
-      const fit = (c2 - c1) / this.worldHeight;
+      const yw = Math.abs(window.CAM_YAW || 0), fit = (c2 - c1) / (this.worldHeight * Math.cos(yw) + this.worldWidth * 0.55 * Math.sin(yw)); // 회전한 맵의 세로 폭
       this.minZoom = Math.min(0.8, fit);
       this._bandOffset = (c1 + c2) / 2 - this.height / 2; // 맵 중심을 화면 보이는 구간 중심에 맞추기 위한 캔버스 y 보정
     } catch (_) {}
@@ -189,10 +189,17 @@ class GameEngine {
 
   // v27-47: 화면 좌표 → 월드 좌표 변환 (입력처리에서 사용)
   screenToWorld(sx, sy) {
+    const g = -(window.CAM_YAW || 0), dx = sx - this.width / 2, dy = sy - this.height / 2; // 카메라 회전 역변환
     return {
-      x: this.camera.x + (sx - this.width / 2) / this.camera.zoom,
-      y: this.camera.y + (sy - this.height / 2) / this.camera.zoom,
+      x: this.camera.x + (dx * Math.cos(g) - dy * Math.sin(g)) / this.camera.zoom,
+      y: this.camera.y + (dx * Math.sin(g) + dy * Math.cos(g)) / this.camera.zoom,
     };
+  }
+  // 화면에서 드래그한 만큼 카메라 이동 (회전 반영)
+  panBy(dx, dy) {
+    const g = -(window.CAM_YAW || 0);
+    this.camera.x -= (dx * Math.cos(g) - dy * Math.sin(g)) / this.camera.zoom;
+    this.camera.y -= (dx * Math.sin(g) + dy * Math.cos(g)) / this.camera.zoom;
   }
 
   buildPaths() {
@@ -200,6 +207,10 @@ class GameEngine {
     // 기존의 HUD/BAR 여백 개념은 필요 없음 - UI는 화면에 고정되고 월드는 카메라로 자유롭게 움직이며 봄.
     const rawPaths = this.currentMap.getPaths(this.worldWidth, this.worldHeight);
     this.paths = rawPaths;
+    // v3.13 맵 소품(서 있는 나무·덤불·바위) - 유닛과 함께 깊이 정렬해서 그림
+    const all = window.buildMapProps ? buildMapProps(this.worldWidth, this.worldHeight, this.currentMap).props : [];
+    this.props = all.filter(p => p.dyn).map(p => ({ ...p, _prop: true }));
+    this._staticProps = all.filter(p => !p.dyn); this._bgDirty = true;
   }
   buildTowerSlots() {
     // v27-47: 카메라 시스템 도입으로 월드 크기 기준으로 생성 (요청A)
@@ -689,10 +700,11 @@ class GameEngine {
     // v3.3: 지난 프레임에 그리기 오류가 있었으면 캔버스 상태(저장 스택·투명도·변환)를 완전히 초기화
     if (this._ctxDirty) { this._ctxDirty = false; this.canvas.width = this.canvas.width; }
     ctx.save();
-    ctx.clearRect(0, 0, this.width, this.height);
+    ctx.fillStyle = (this.currentMap && this.currentMap.bgColor) || '#1f3a14'; ctx.fillRect(0, 0, this.width, this.height); // 회전으로 드러나는 모서리
     // v27-47: 카메라 변환 (요청A) - 이 시점부터 그리는 모든 것은 "월드 좌표"로 취급되어
     // 카메라 위치/줌에 따라 화면에 매핑됨. 개별 draw() 메서드들은 전혀 몰라도 됨.
     ctx.translate(this.width / 2, this.height / 2);
+    ctx.rotate(window.CAM_YAW || 0); // v3.13 3/4 시점 회전
     ctx.scale(this.camera.zoom, this.camera.zoom);
     ctx.translate(-this.camera.x, -this.camera.y);
     if (this.shakeTimer > 0) {
@@ -705,20 +717,23 @@ class GameEngine {
 
     // v28: 뷰포트 컬링 (v27-62 복구) - 카메라 밖 개체는 안 그림
     const cullMargin = 80;
-    const viewHalfW = this.width / 2 / this.camera.zoom + cullMargin;
-    const viewHalfH = this.height / 2 / this.camera.zoom + cullMargin;
+    const viewHalfW = this.width / 2 / this.camera.zoom * 1.25 + cullMargin; // 회전·원근 여유
+    const viewHalfH = this.height / 2 / this.camera.zoom * 1.25 + cullMargin;
     const cx = this.camera.x, cy = this.camera.y;
     const inView = (o) => Math.abs(o.x - cx) <= viewHalfW && Math.abs(o.y - cy) <= viewHalfH;
 
     const safe = (o) => { ctx.save(); try { o.draw(ctx); } catch (err) { this._logError('draw ' + (o._gachaId || o.typeId || o.constructor.name), err); this._ctxDirty = true; } ctx.restore(); };
-    // v3.13 세워 그린 포켓몬이 앞뒤로 겹치니 위(먼 쪽)→아래(가까운 쪽) 순으로
-    const _tw = this._towerDrawOrder || (this._towerDrawOrder = []); _tw.length = 0; for (const t of this.towers) if (inView(t)) _tw.push(t);
-    _tw.sort((a, b) => a.y - b.y); for (const t of _tw) safe(t);
-    for (const h of this.heroes) safe(h);
-
-    // Y순 정렬 (제자리 정렬 - 매 프레임 배열 복사 제거)
-    this.enemies.sort((a,b)=>a.y-b.y);
-    for (const e of this.enemies) if (inView(e)) safe(e);
+    // v3.13 3/4 시점: 소품·타워·영웅·적을 화면상 깊이(회전 반영한 발끝 y) 순으로 한 번에 그림 → 앞 덤불이 뒤 적을 가림
+    const yaw = window.CAM_YAW || 0, sY = Math.sin(yaw), cY = Math.cos(yaw);
+    const up = (o) => { ctx.save(); ctx.translate(o.x, o.y); ctx.rotate(-yaw); ctx.translate(-o.x, -o.y); safe(o); ctx.restore(); };
+    const L = this._drawList || (this._drawList = []); L.length = 0;
+    const push = (o, foot) => { o._dk = o.x * sY + (o.y + foot) * cY; L.push(o); };
+    for (const p of (this.props || [])) if (inView(p)) push(p, 0);
+    for (const t of this.towers) if (inView(t)) push(t, 12);
+    for (const h of this.heroes) push(h, 16);
+    for (const e of this.enemies) if (inView(e)) push(e, (e.size || 14) * 0.7);
+    L.sort((a, b) => a._dk - b._dk);
+    for (const o of L) { if (o._prop) this._drawProp(ctx, o); else up(o); }
 
     for (const p of this.projectiles) if (inView(p)) safe(p);
     // v27-47: RedFlash(전체화면 빨간 비네트)는 스크린 좌표 기준이라 카메라 변환 밖에서 그려야 함
@@ -735,6 +750,23 @@ class GameEngine {
 
     // v27-47: 보스 HP바는 화면 상단 고정 UI라서 카메라 변환 밖(화면좌표)에서 그림
     if (this.activeBoss) this._drawBossBar(ctx);
+  }
+
+  // v3.13 서 있는 소품: 발끝 기준으로 화면에 수직(카메라 회전 상쇄) + 세로 STAND_K배, 앞에 적이 겹치면 살짝 투명
+  _drawProp(ctx, o) {
+    const im = window.propCanvas && propCanvas(o.key, o.w, o.h, o.filter);
+    if (!im) return;
+    ctx.save(); ctx.translate(o.x, o.y); ctx.rotate(-(window.CAM_YAW || 0)); ctx.scale(o.flip ? -1 : 1, window.STAND_K || 1);
+    if (o._prop && o.h > 50) { o._fade = Math.min(1, Math.max(0.55, (o._fade || 1) + (this._propBehind(o) ? -0.06 : 0.06))); ctx.globalAlpha = o._fade; }
+    ctx.drawImage(im, -o.w / 2, -o.h, o.w, o.h);
+    ctx.restore();
+  }
+  // 큰 소품 뒤에 적·타워가 숨어 있는지 (있으면 반투명 처리해 가독성 유지)
+  _propBehind(o) {
+    const top = o.y - o.h * (window.STAND_K || 1), hw = o.w * 0.4;
+    for (const e of this.enemies) if (e.y < o.y && e.y > top && Math.abs(e.x - o.x) < hw) return true;
+    for (const t of this.towers) if (t.y < o.y && t.y > top && Math.abs(t.x - o.x) < hw) return true;
+    return false;
   }
 
   // v28: 텍스처 여러 장을 모자이크로 합쳐(일부 반전) 반복 티를 줄인 CanvasPattern. 로딩 전엔 null.
@@ -800,14 +832,15 @@ class GameEngine {
     // v27-36: 배경이 까매지는 문제 방어 (요청3) - width/height가 비정상(0 이하 등)이면 배경 재생성을
     // 건너뛰고 기존 캐시를 그대로 사용 (레이아웃 과도기에 순간적으로 크기가 이상해지는 경우 대비)
     if (this.worldWidth <= 0 || this.worldHeight <= 0) {
-      if (this._bgCanvas) ctx.drawImage(this._bgCanvas, 0, 0);
+      if (this._bgCanvas) ctx.drawImage(this._bgCanvas, 0, 0, this._bgW, this._bgH);
       return;
     }
     if (this._bgDirty || !this._bgCanvas ||
-        this._bgCanvas.width !== this.worldWidth || this._bgCanvas.height !== this.worldHeight) {
+        this._bgW !== this.worldWidth || this._bgH !== this.worldHeight) {
       const bc = document.createElement('canvas');
-      bc.width = this.worldWidth; bc.height = this.worldHeight; // v27-47: 배경도 월드 크기 전체로
-      const bctx = bc.getContext('2d');
+      const BR = 1.6; // v3.13 배경 캐시 1.6배 해상도 (기울여 확대해도 텍스처·소품이 선명하게)
+      bc.width = Math.round(this.worldWidth * BR); bc.height = Math.round(this.worldHeight * BR); // v27-47: 배경도 월드 크기 전체로
+      const bctx = bc.getContext('2d'); bctx.scale(BR, BR); this._bgW = this.worldWidth; this._bgH = this.worldHeight;
       const map = this.currentMap;
 
       // v28: 반복 타일 텍스처(잔디/용암) 우선 - 모자이크 패턴 (v27-58 복구)
@@ -851,9 +884,11 @@ class GameEngine {
       // 맵별 이모지/장식 오버레이
       if (map.drawBg) map.drawBg(bctx, this.worldWidth, this.worldHeight);
       this.drawPaths(bctx); // v28: 정적인 경로를 캐시에 1회만 그림
+      // v3.13 유닛이 뒤로 지나갈 일 없는 나무·덤불은 배경에 함께 구움 (매 프레임 비용 0)
+      for (const o of (this._staticProps || [])) this._drawProp(bctx, o);
       this._bgCanvas = bc; this._bgDirty = false;
     }
-    ctx.drawImage(this._bgCanvas, 0, 0);
+    ctx.drawImage(this._bgCanvas, 0, 0, this.worldWidth, this.worldHeight);
   }
 
   drawPaths(ctx) {
@@ -1120,6 +1155,12 @@ class GameEngine {
 // style.css의 #game-canvas transform 값과 반드시 같게 유지할 것.
 const TILT = { p: 1000, deg: 28, k: 1.35, ox: 0.5, oy: 0.6 };
 window.STAND_K = 1 / Math.cos(TILT.deg * Math.PI / 180); // 캐릭터를 세울 때 세로로 늘리는 배율(기울기로 눌린 만큼 되돌림)
+// v3.13 3/4 시점: 맵은 카메라 안에서 YAW만큼 돌리고(확대 없이), 세워 그리는 것들은 반대로 돌려 화면에서 똑바로 서게
+window.CAM_YAW = -9 * Math.PI / 180;
+// 세워 그리기 공통: 발끝(cx, feetY) 기준으로 화면 수직이 되게 돌리고 세로 STAND_K배 → fn은 (0,0)=발끝, 위쪽이 음수 y
+window.billboard = function (ctx, cx, feetY, fn) {
+  ctx.save(); ctx.translate(cx, feetY); ctx.rotate(-window.CAM_YAW); ctx.scale(1, window.STAND_K); fn(ctx); ctx.restore();
+};
 window.TILT = TILT;
 window.untiltPoint = function (canvas, clientX, clientY) {
   const box = (canvas.parentElement || canvas).getBoundingClientRect(); // 변형 전 레이아웃 박스(캔버스는 부모를 꽉 채움)
