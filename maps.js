@@ -93,6 +93,7 @@ const NaturalLayout = {
       }
       return out.sort((p, q) => p - q);
     };
+    const ledges = []; for (let r = 0; r + 1 < ys.length; r++) ledges.push(ys[r] + (ys[r + 1] - ys[r]) * 0.8); // 테라스 절벽 y
     const place = (sp) => {
       const res = [], x0 = w * 0.12, x1 = w * 0.92; // v3.13: 맵이 좁아진 만큼 가로 범위 확대
       const n = Math.max(2, Math.round((x1 - x0) / sp) + 1);
@@ -100,7 +101,7 @@ const NaturalLayout = {
         const x = x0 + (x1 - x0) * (k + half * 0.5) / (n - 0.5);
         const ys = crossings(x);
         const cand = [];
-        if (ys.length && ys[0] - 72 > h * 0.12 && half === 0) cand.push(ys[0] - 72);                       // 맨 위 길 바깥 (HUD 아래만)
+        if (ys.length && ys[0] - 72 > h * 0.15 && half === 0) cand.push(ys[0] - 72);                       // 맨 위 길 바깥 (HUD 아래만)
         if (ys.length && ys[ys.length - 1] + 72 < h * 0.86 && half === 0) cand.push(ys[ys.length - 1] + 72); // 맨 아래 길 바깥 (하단 바 위만)
         for (let j = 0; j < ys.length - 1; j++) {
           const g = ys[j + 1] - ys[j];
@@ -111,6 +112,7 @@ const NaturalLayout = {
         for (const y of cand) {
           const d = _distToPath(x, y, path);
           if (d < 44 || d > 120) continue;
+          if (ledges.some(yb => y > yb - 24 && y < yb + 34)) continue;                             // v3.13: 절벽(단 경계) 위엔 자리 안 만듦
           if (res.every(s => (s.x - x) ** 2 + (s.y - y) ** 2 >= 56 * 56)) res.push({ x: Math.round(x), y: Math.round(y) });
         }
       }
@@ -171,22 +173,66 @@ function drawNaturalTerrain(ctx, w, h, map) {
   }
   ctx.restore();
 
-  // 3) 자연 장식 - 길·타워 자리를 피해서, 높은 곳엔 큰 것(나무/바위), 낮은 곳엔 작은 것(풀/꽃)
-  const deco = map.deco || [];
-  if (!deco.length) return;
-  ctx.save(); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  const count = Math.round((w * h) / 9000);
+  // 3) v3.13 계단식 언덕(테라스): 길 줄 사이마다 단 경계 → 아래 단일수록 어둡게 + 절벽 단면
+  const ys = L.ys || [];
+  for (let r = 0; r + 1 < ys.length; r++) {
+    const yb = ys[r] + (ys[r + 1] - ys[r]) * 0.8, ltr = r % 2 === 0; // 아래 길 쪽에 붙여서 타워 자리 줄과 안 겹치게       // 짝수 줄은 오른쪽에서, 홀수 줄은 왼쪽에서 아래 단으로 내려감
+    const x0 = ltr ? w * 0.11 : w * 0.30, x1 = ltr ? w * 0.80 : w * 0.985;
+    // 아래 단 전체를 살짝 어둡게 (높이 차)
+    ctx.fillStyle = 'rgba(0,0,0,0.11)'; ctx.fillRect(0, yb, w, h - yb);
+    // 절벽 윗선(불규칙) + 단면
+    const pts = []; for (let x = x0; x <= x1; x += 10) pts.push([x, yb + (rnd() - 0.5) * 7]);
+    const FH = 30; // 절벽 높이
+    const face = ctx.createLinearGradient(0, yb, 0, yb + FH);
+    face.addColorStop(0, map.cliffTop || 'rgba(92,70,44,0.95)'); face.addColorStop(0.55, map.cliffMid || 'rgba(58,42,26,0.85)'); face.addColorStop(1, 'rgba(20,14,8,0)');
+    ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]); for (const [x, y] of pts) ctx.lineTo(x, y);
+    for (let i = pts.length - 1; i >= 0; i--) ctx.lineTo(pts[i][0], pts[i][1] + FH - 4 + (i % 3) * 3);
+    ctx.closePath(); ctx.fillStyle = face; ctx.fill();
+    for (let i = 0; i < pts.length - 1; i += 1 + (i % 2)) { const [x, y] = pts[i];                       // 세로 바위 결(단면 질감)
+      ctx.strokeStyle = `rgba(0,0,0,${0.18 + rnd() * 0.2})`; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(x + 3, y + 4); ctx.lineTo(x + 1 + rnd() * 4, y + 12 + rnd() * 12); ctx.stroke(); }
+    ctx.fillStyle = 'rgba(0,0,0,0.22)'; ctx.fillRect(x0, yb + FH - 6, x1 - x0, 8);                     // 절벽 아래 그림자
+    ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]); for (const [x, y] of pts) ctx.lineTo(x, y);
+    ctx.strokeStyle = map.cliffLight || 'rgba(255,236,190,0.42)'; ctx.lineWidth = 2.5; ctx.stroke();      // 단 가장자리 빛
+    ctx.strokeStyle = 'rgba(90,150,60,0.55)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1] - 2); for (const [x, y] of pts) ctx.lineTo(x, y - 2); if (!map.deco || map.deco.theme === 'forest') ctx.stroke(); // 단 위 풀 테두리
+    for (let i = 0; i < pts.length; i += 2) { const [x, y] = pts[i];                                     // 절벽 바위 결
+      ctx.fillStyle = `rgba(0,0,0,${0.18 + rnd() * 0.15})`; ctx.fillRect(x + rnd() * 6, y + 6 + rnd() * 10, 2 + rnd() * 5, 1.5); }
+  }
+
+  // 4) v3.13 장식: 이모지 대신 직접 그린 나무·바위·수정 (길·타워 자리 피해서)
+  const deco = map.deco;
+  if (!deco || !deco.big) return;
+  const drawDeco = (kind, x, y, sz) => {
+    const sh = () => { ctx.fillStyle = 'rgba(0,0,0,0.28)'; ctx.beginPath(); ctx.ellipse(x + sz * 0.15, y + sz * 0.45, sz * 0.55, sz * 0.18, 0, 0, 7); ctx.fill(); };
+    const shade = (base, light) => { const g = ctx.createRadialGradient(x - sz * 0.2, y - sz * 0.3, 1, x, y, sz * 0.7); g.addColorStop(0, light); g.addColorStop(1, base); return g; };
+    if (kind === 'pine') { sh(); ctx.fillStyle = '#4a3420'; ctx.fillRect(x - sz * 0.06, y + sz * 0.1, sz * 0.12, sz * 0.3);
+      for (let k = 0; k < 3; k++) { const yy = y - sz * 0.15 * k, ww = sz * (0.5 - k * 0.12); ctx.fillStyle = shade('#1f4d24', '#4f8f3f'); ctx.beginPath(); ctx.moveTo(x, yy - sz * 0.42); ctx.lineTo(x + ww, yy + sz * 0.15); ctx.lineTo(x - ww, yy + sz * 0.15); ctx.closePath(); ctx.fill(); } }
+    else if (kind === 'tree') { sh(); ctx.fillStyle = '#4a3420'; ctx.fillRect(x - sz * 0.06, y, sz * 0.12, sz * 0.38);
+      for (const [dx, dy, rr] of [[-0.2, -0.05, 0.3], [0.2, -0.05, 0.3], [0, -0.28, 0.34]]) { ctx.fillStyle = shade('#285c2a', '#62a64c'); ctx.beginPath(); ctx.arc(x + dx * sz, y + dy * sz, rr * sz, 0, 7); ctx.fill(); } }
+    else if (kind === 'rock' || kind === 'pebble') { if (kind === 'rock') sh();
+      const n = 7, pts = []; for (let k = 0; k < n; k++) { const a = k / n * 6.283, rr = sz * (0.32 + rnd() * 0.14); pts.push([x + Math.cos(a) * rr, y + Math.sin(a) * rr * 0.75]); }
+      ctx.fillStyle = shade(map.rockDark || '#5a5a60', map.rockLight || '#a8a8ad'); ctx.beginPath(); pts.forEach(([px, py], k) => k ? ctx.lineTo(px, py) : ctx.moveTo(px, py)); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.lineWidth = 1; ctx.stroke(); }
+    else if (kind === 'spire') { sh(); ctx.fillStyle = shade('#3a2418', '#7a4a2a'); ctx.beginPath(); ctx.moveTo(x - sz * 0.3, y + sz * 0.3); ctx.lineTo(x - sz * 0.08, y - sz * 0.5); ctx.lineTo(x + sz * 0.1, y - sz * 0.35); ctx.lineTo(x + sz * 0.3, y + sz * 0.3); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,120,40,0.55)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(x - sz * 0.05, y - sz * 0.3); ctx.lineTo(x + sz * 0.02, y + sz * 0.1); ctx.stroke(); }
+    else if (kind === 'crystal' || kind === 'crystal_s') { if (kind === 'crystal') sh();
+      for (const [dx, hh, ww] of [[-0.18, 0.5, 0.14], [0.05, 0.75, 0.16], [0.22, 0.42, 0.12]]) { const g = ctx.createLinearGradient(x + dx * sz, y - hh * sz, x + dx * sz, y + sz * 0.2); g.addColorStop(0, '#e9d8ff'); g.addColorStop(1, '#6b3fb5');
+        ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(x + dx * sz, y - hh * sz); ctx.lineTo(x + (dx + ww) * sz, y + sz * 0.05); ctx.lineTo(x + dx * sz, y + sz * 0.22); ctx.lineTo(x + (dx - ww) * sz, y + sz * 0.05); ctx.closePath(); ctx.fill(); } }
+    else if (kind === 'bush') { for (const [dx, dy] of [[-0.18, 0], [0.18, 0], [0, -0.12]]) { ctx.fillStyle = shade('#2c5f2a', '#5d9b47'); ctx.beginPath(); ctx.arc(x + dx * sz, y + dy * sz, sz * 0.26, 0, 7); ctx.fill(); } }
+    else if (kind === 'flower') { const c = ['#ffd84a', '#ff8fb1', '#ffffff', '#b18cff'][Math.floor(rnd() * 4)]; for (let k = 0; k < 4; k++) { ctx.fillStyle = c; ctx.beginPath(); ctx.arc(x + (rnd() - 0.5) * sz, y + (rnd() - 0.5) * sz * 0.6, 1.8, 0, 7); ctx.fill(); } }
+    else if (kind === 'grass') { ctx.strokeStyle = 'rgba(120,190,90,0.7)'; ctx.lineWidth = 1.2; for (let k = -1; k <= 1; k++) { ctx.beginPath(); ctx.moveTo(x + k * 3, y + 4); ctx.lineTo(x + k * 4.5, y - sz * 0.5); ctx.stroke(); } }
+    else if (kind === 'ember' || kind === 'glow') { const g = ctx.createRadialGradient(x, y, 0, x, y, sz * 0.6); g.addColorStop(0, kind === 'ember' ? 'rgba(255,140,40,0.55)' : 'rgba(190,140,255,0.45)'); g.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = g; ctx.fillRect(x - sz, y - sz, sz * 2, sz * 2); }
+    else if (kind === 'crack') { ctx.strokeStyle = 'rgba(255,110,30,0.5)'; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(x - sz * 0.5, y); ctx.lineTo(x - sz * 0.1, y - 3); ctx.lineTo(x + sz * 0.2, y + 2); ctx.lineTo(x + sz * 0.5, y - 2); ctx.stroke(); }
+  };
+  ctx.save();
+  const count = Math.round((w * h) / 7000);
   for (let n = 0, tries = 0; n < count && tries < count * 6; tries++) {
     const x = 14 + rnd() * (w - 28), y = 14 + rnd() * (h - 28);
-    if (_distToPath(x, y, pathS) < 34) continue;
-    if (slots.some(s => (s.x - x)**2 + (s.y - y)**2 < 40*40)) continue;
+    if (_distToPath(x, y, pathS) < 36) continue;
+    if (slots.some(s => (s.x - x)**2 + (s.y - y)**2 < 42*42)) continue;
     const hv = H[Math.round(y / S) * gw + Math.round(x / S)] || 0;
-    const big = deco.filter(d => d[2] === 'big'), small = deco.filter(d => d[2] !== 'big');
-    const pool = hv > 0.25 && big.length ? big : small.length ? small : big;
-    const [em, size] = pool[Math.floor(rnd() * pool.length)];
-    const sz = size * (0.75 + rnd() * 0.5);
-    ctx.globalAlpha = 0.22; ctx.font = `${sz}px serif`; ctx.fillText(em, x + sz * 0.12, y + sz * 0.18); // 그림자
-    ctx.globalAlpha = 0.55 + rnd() * 0.35; ctx.fillText(em, x, y);
+    const big = hv > 0.2 && rnd() < 0.6, pool = big ? deco.big : deco.small;
+    const kind = pool[Math.floor(rnd() * pool.length)];
+    drawDeco(kind, x, y, (big ? 24 : 12) * (0.8 + rnd() * 0.5));
     n++;
   }
   ctx.restore();
@@ -203,8 +249,8 @@ const MapDefs = {
     pathTextures:['assets/textures/dirt_02.jpg','assets/textures/dirt_03.jpg'],
     pathTileSize:44,
     pathColor:'#c8a44a', pathColorDark:'#5a4320',
-    pathArrow:'rgba(255,225,150,0.20)', pathWidth:22,
-    deco:[['🌲',30,'big'],['🌳',28,'big'],['🪨',18,'big'],['🌿',13],['🌼',11],['🍄',12],['🌱',11]],
+    pathArrow:'rgba(255,225,150,0.20)', pathWidth:22, rim:'#6b5a3e', rimLight:'#a8916a',
+    deco:{ big:['pine','tree','rock'], small:['bush','flower','grass'], theme:'forest' },
     getPaths:(w,h)=>NaturalLayout.getPaths(w,h),
     getSlots:(w,h)=>NaturalLayout.getSlots(w,h),
     drawBg(ctx,w,h){ drawNaturalTerrain(ctx,w,h,this); },
@@ -219,8 +265,8 @@ const MapDefs = {
     pathTextures:['assets/textures/brick_02.jpg','assets/textures/brick_03.jpg'],
     pathTileSize:46,
     pathColor:'#6b4428', pathColorDark:'#2a1206',
-    pathArrow:'rgba(255,160,90,0.22)', pathWidth:22,
-    deco:[['🌋',30,'big'],['🪨',20,'big'],['🔥',14],['🪨',12],['🏮',13]],
+    pathArrow:'rgba(255,160,90,0.22)', pathWidth:22, rim:'#3a2618', rimLight:'#7a5232', cliffTop:'rgba(40,18,8,0.9)', cliffLight:'rgba(255,140,60,0.35)', rockDark:'#2e1d16', rockLight:'#6e4a36',
+    deco:{ big:['rock','spire'], small:['ember','pebble','crack'], theme:'volcano' },
     getPaths:(w,h)=>NaturalLayout.getPaths(w,h),
     getSlots:(w,h)=>NaturalLayout.getSlots(w,h),
     drawBg(ctx,w,h){ drawNaturalTerrain(ctx,w,h,this); },
@@ -234,9 +280,9 @@ const MapDefs = {
     pathTextures:['assets/textures/ground_01.jpg','assets/textures/ground_02.jpg'],
     pathTileSize:48,
     pathColor:'#3e2860', pathColorDark:'#160b26',
-    pathArrow:'rgba(190,160,255,0.20)', pathWidth:22,
+    pathArrow:'rgba(190,160,255,0.20)', pathWidth:22, rim:'#2b2040', rimLight:'#5e4a86', cliffTop:'rgba(20,10,40,0.9)', cliffLight:'rgba(190,160,255,0.35)', rockDark:'#26203a', rockLight:'#5a4f7a',
     ghostBonus:0.30,
-    deco:[['🪨',22,'big'],['🪦',18,'big'],['💎',12],['🍄',12],['🦴',11],['🕯️',12]],
+    deco:{ big:['crystal','rock'], small:['crystal_s','pebble','glow'], theme:'cave' },
     getPaths:(w,h)=>NaturalLayout.getPaths(w,h),
     getSlots:(w,h)=>NaturalLayout.getSlots(w,h),
     drawBg(ctx,w,h){ drawNaturalTerrain(ctx,w,h,this); },

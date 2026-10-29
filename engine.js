@@ -142,14 +142,14 @@ class GameEngine {
     // v27-47: 월드는 뷰포트보다 넓게 (요청A: 카메라로 팬/줌해서 보는 넓은 맵)
     // v3.4: 정수로 반올림 - 소수(예: 1434.8)면 캔버스(1434)와 크기가 영영 안 맞아서 배경을 매 프레임 다시 그리고 있었음 (발열 주범)
     // v3.13: 1.7배면 최소 줌 0.8에서도 맵의 73%만 보여 위·아래 슬롯이 잘렸음 → 1.25배(=1/0.8)로 줄여 0.8배에서 맵 전체가 화면에 들어오게
-    this.worldWidth = Math.round(this.width * 1.25);
+    this.worldWidth = Math.round(this.width * 1.6);  // v3.13: 가로는 넓게(좌우로 밀어 보기) → 슬롯 확보
     this.worldHeight = Math.round(this.height * 1.25);
     if (!this._cameraInited) {
       this._cameraInited = true;
       this.camera.x = this.worldWidth / 2;
       this.camera.y = this.worldHeight / 2;
       this.camera.zoom = Math.max(this.minZoom, Math.min(this.maxZoom,
-        Math.min(this.width / this.worldWidth, this.height / this.worldHeight)));
+        (this.height / this.worldHeight)));
     }
     this._bgDirty = true;
   }
@@ -160,7 +160,7 @@ class GameEngine {
     this.camera.x = this.worldWidth / 2;
     this.camera.y = this.worldHeight / 2;
     this.camera.zoom = Math.max(this.minZoom, Math.min(this.maxZoom,
-      Math.min(this.width / this.worldWidth, this.height / this.worldHeight)));
+      (this.height / this.worldHeight)));
     this.clampCamera();
   }
   clampCamera() {
@@ -844,21 +844,43 @@ class GameEngine {
       const map = this.currentMap;
       const pw = map.pathWidth || 34;
 
-      // v3.0 자연 지형: 딱딱한 테두리 대신 '닳은 흙 가장자리'를 흐리게 → 골짜기 바닥 길처럼
-      const trace = () => { ctx.beginPath(); ctx.moveTo(path[0].x,path[0].y); for (let i=1;i<path.length;i++) ctx.lineTo(path[i].x,path[i].y); };
-      ctx.save(); ctx.lineCap='round'; ctx.lineJoin='round';
-      ctx.filter='blur(6px)'; ctx.strokeStyle='rgba(0,0,0,0.32)'; ctx.lineWidth=pw+22; trace(); ctx.stroke();   // 골짜기 그늘
-      ctx.filter='blur(3px)'; ctx.strokeStyle=map.pathColorDark||map.pathColor; ctx.globalAlpha=0.75;
-      ctx.lineWidth=pw+9; trace(); ctx.stroke();                                                                   // 흙 가장자리
-      ctx.filter='none'; ctx.globalAlpha=1;
+      // v3.13 길: 그림자 → 돌 테두리 → 흙 바닥(텍스처) → 안쪽 음영 → 가운데 닳은 자국 → 오르막 계단 → 가장자리 자갈·풀 (배경 캐시에 1회)
+      const trace = (dx = 0, dy = 0) => { ctx.beginPath(); ctx.moveTo(path[0].x + dx, path[0].y + dy); for (let i = 1; i < path.length; i++) ctx.lineTo(path[i].x + dx, path[i].y + dy); };
+      let seed = 1234567; const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
+      ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      ctx.strokeStyle = 'rgba(0,0,0,0.38)'; ctx.lineWidth = pw + 14; trace(0, 6); ctx.stroke();                 // 바닥 그림자
+      ctx.strokeStyle = map.rim || map.pathColorDark || '#5a4a32'; ctx.lineWidth = pw + 11; trace(); ctx.stroke(); // 돌 테두리
+      ctx.strokeStyle = map.rimLight || 'rgba(255,240,200,0.35)'; ctx.lineWidth = pw + 5; trace(0, -1); ctx.stroke(); // 테두리 윗면 빛
       let pathFill = map.pathColor;
-      if (map.pathTextures) {
-        const ppat = this._getMosaicPattern(ctx, map.name + '_path', map.pathTextures, map.pathTileSize || 40);
-        if (ppat) pathFill = ppat;
+      if (map.pathTextures) { const ppat = this._getMosaicPattern(ctx, map.name + '_path', map.pathTextures, map.pathTileSize || 40); if (ppat) pathFill = ppat; }
+      ctx.strokeStyle = pathFill; ctx.lineWidth = pw + 2; trace(); ctx.stroke();                                // 흙 바닥
+      ctx.strokeStyle = 'rgba(0,0,0,0.22)'; ctx.lineWidth = pw + 2; trace(); ctx.stroke();                      // 안쪽 음영(가장자리)
+      ctx.strokeStyle = pathFill; ctx.lineWidth = pw - 5; trace(); ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,238,200,0.10)'; ctx.lineWidth = pw * 0.42; trace(); ctx.stroke();            // 가운데 닳은 자국
+      // 오르막·내리막 계단: 세로로 많이 움직이는 구간(단 사이 굽이·왼쪽 복귀로)에 가로줄
+      let acc = 0;
+      for (let i = 1; i < path.length; i++) {
+        const p0 = path[i - 1], p1 = path[i], dx = p1.x - p0.x, dy = p1.y - p0.y, L = Math.hypot(dx, dy) || 1;
+        acc += L;
+        if (Math.abs(dy) < Math.abs(dx) * 1.6 || acc < 9) continue;
+        acc = 0;
+        const nx = -dy / L, ny = dx / L, hw = pw / 2 - 1;
+        ctx.strokeStyle = 'rgba(0,0,0,0.28)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(p1.x + nx * hw, p1.y + ny * hw); ctx.lineTo(p1.x - nx * hw, p1.y - ny * hw); ctx.stroke();
+        ctx.strokeStyle = 'rgba(255,240,210,0.16)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(p1.x + nx * hw, p1.y + ny * hw - 2); ctx.lineTo(p1.x - nx * hw, p1.y - ny * hw - 2); ctx.stroke();
       }
-      ctx.strokeStyle=pathFill; ctx.lineWidth=pw; trace(); ctx.stroke();                                          // 길 바닥
-      ctx.strokeStyle='rgba(0,0,0,0.18)'; ctx.lineWidth=pw*0.55; ctx.setLineDash([2,9]); trace(); ctx.stroke();   // 바퀴/발자국 자국
-      ctx.setLineDash([]); ctx.restore();
+      // 가장자리 자갈·풀
+      acc = 0;
+      for (let i = 1; i < path.length; i++) {
+        const p0 = path[i - 1], p1 = path[i], dx = p1.x - p0.x, dy = p1.y - p0.y, L = Math.hypot(dx, dy) || 1;
+        acc += L; if (acc < 8) continue; acc = 0;
+        const nx = -dy / L, ny = dx / L;
+        for (const side of [1, -1]) {
+          const off = pw / 2 + 6 + rnd() * 4, x = p1.x + nx * off * side, y = p1.y + ny * off * side;
+          if (rnd() < 0.55) { ctx.fillStyle = `rgba(${150 + rnd() * 60 | 0},${140 + rnd() * 50 | 0},${120 + rnd() * 40 | 0},0.75)`; ctx.beginPath(); ctx.ellipse(x, y, 1.4 + rnd() * 2, 1 + rnd() * 1.4, rnd() * 3, 0, 7); ctx.fill(); }
+          else if (map.deco && map.deco.theme === 'forest') { ctx.strokeStyle = 'rgba(110,180,80,0.65)'; ctx.lineWidth = 1.1; ctx.beginPath(); ctx.moveTo(x, y + 3); ctx.lineTo(x - 2, y - 4); ctx.moveTo(x, y + 3); ctx.lineTo(x + 2, y - 5); ctx.stroke(); }
+        }
+      }
+      ctx.restore();
 
       // 방향 화살표
       this._drawArrows(ctx, path, map);
@@ -866,7 +888,7 @@ class GameEngine {
   }
 
   _drawArrows(ctx, path, map) {
-    const interval = 120;
+    const interval = 170; // v3.13: 화살표 덜 촘촘하게
     let acc = 0;
     for (let i=0; i<path.length-1; i++) {
       const dx=path[i+1].x-path[i].x, dy=path[i+1].y-path[i].y;
