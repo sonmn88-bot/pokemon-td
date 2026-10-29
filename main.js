@@ -36,17 +36,34 @@ function bossWaveScaleMul(wave) { return 3 + Math.max(0, wave) * 0.15; }
 // v27-4: 존별 적 타입 편향 (item17) - 존마다 특정 타입이 더 자주 나와서 전략적 예측/대응 여지를 줌
 const ZONE_TYPE_BIAS = ['grass', 'psychic', 'fire']; // 숲=풀 위주 / 동굴=에스퍼 위주 / 도시=불 위주
 
-// v27-6: 다음 웨이브 등장 가능 타입 미리보기 (요청6 - 랜덤roll 없이 풀 구성만 계산, 실제 스폰과 분리된 순수함수)
-function previewWaveTypes(n) {
-  const posInZone = ((n - 1) % WAVES_PER_ZONE) + 1;
-  const progress = posInZone / WAVES_PER_ZONE;
+// v3.14 웨이브 편성: 한 웨이브 = 주력 속성 1개(약 70%) + 보조 속성 1개(약 30%), 속성마다 최대 2종.
+// 미리보기와 실제 스폰이 같은 시드(판마다 다름)로 같은 결과 → "다음: 불 70% · 물 30%"를 보고 타워·강화를 고르는 전략이 성립.
+// 같은 주력이 연속으로 나오지 않게, 존 대표 속성은 더 자주.
+const WAVE_MAIN_SHARE = 0.7;
+function _wavePoolIds(n) {
+  const progress = (((n - 1) % WAVES_PER_ZONE) + 1) / WAVES_PER_ZONE;
   let pool = [...ENEMY_TIERS.t1];
   if (progress > 0.15) pool = pool.concat(ENEMY_TIERS.t2);
   if (progress > 0.42) pool = pool.concat(ENEMY_TIERS.t3);
   if (progress > 0.68) pool = pool.concat(ENEMY_TIERS.t4);
+  return pool.filter(id => typeof EnemyTypes !== 'undefined' && EnemyTypes[id]);
+}
+function waveTypePlan(n) {
+  const seed = window.app?.engine?._runSeed || 1, cache = (window.__wavePlan = window.__wavePlan || {}), key = seed + ':' + n;
+  if (cache[key]) return cache[key];
+  const ids = _wavePoolIds(n), types = [...new Set(ids.map(id => EnemyTypes[id].type))];
+  const rnd = _mapRng((seed * 31 + n * 7919) >>> 0), fav = ZONE_TYPE_BIAS[zoneIndexForWave(n)];
+  const prev = n > 1 ? waveTypePlan(n - 1).main : null, emph = window.app?.engine?._runEmphasis || [];
+  const wpick = (arr, wf) => { let t = arr.reduce((a, x) => a + wf(x), 0), r = rnd() * t; for (const x of arr) { r -= wf(x); if (r <= 0) return x; } return arr[arr.length - 1]; };
+  const main = wpick(types, t => (t === fav ? 2 : 1) * (t === prev ? 0.2 : 1));
+  const rest = types.filter(t => t !== main), sec = rest.length ? wpick(rest, t => t === fav ? 1.5 : 1) : main;
+  const species = (t) => { const c = ids.filter(id => EnemyTypes[id].type === t), out = []; while (c.length && out.length < 2) { const id = wpick(c, x => emph.includes(EnemyTypes[x].special) ? 2.5 : 1); out.push(id); c.splice(c.indexOf(id), 1); } return out; };
+  return (cache[key] = { main, sec, mainIds: species(main), secIds: species(sec) });
+}
+function previewWaveTypes(n) {
   if (typeof EnemyTypes === 'undefined') return [];
-  const types = new Set(pool.map(id => EnemyTypes[id]?.type).filter(Boolean));
-  return [...types];
+  const p = waveTypePlan(n);
+  return p.main === p.sec ? [p.main] : [p.main, p.sec];
 }
 
 function generateWave(n) {
@@ -58,19 +75,8 @@ function generateWave(n) {
   if (progress > 0.42) pool = pool.concat(ENEMY_TIERS.t3);
   if (progress > 0.68) pool = pool.concat(ENEMY_TIERS.t4);
 
-  // 존별 편향: 해당 존 선호 타입 몬스터를 풀에 추가로 더 넣어서(가중치 효과) 등장 빈도를 높임
-  const zoneIdx = zoneIndexForWave(n);
-  const favType = ZONE_TYPE_BIAS[zoneIdx];
-  if (typeof EnemyTypes !== 'undefined' && favType) {
-    const favored = pool.filter(id => EnemyTypes[id]?.type === favType);
-    for (let i = 0; i < 2; i++) pool = pool.concat(favored); // 3배 가중치
-  }
-  // v3.2: 이번 판 몬스터 편성 - 강조된 특성 2가지는 3배 자주 등장
-  const emph = window.app?.engine?._runEmphasis;
-  if (emph && typeof EnemyTypes !== 'undefined') {
-    const fav = pool.filter(id => emph.includes(EnemyTypes[id]?.special));
-    for (let i = 0; i < 2; i++) pool = pool.concat(fav);
-  }
+  // v3.14: 존 편향·이번 판 강조 특성은 waveTypePlan(주력/보조 속성·종 선택)에 반영됨
+  const plan = typeof EnemyTypes !== 'undefined' ? waveTypePlan(n) : null;
 
   // 웨이브가 진행될수록 더 많이, 더 빽빽하게 스폰 (계속 돌면서 잡는 느낌). cycle이 늘수록(90웨이브 이후 반복) 한번 더 강화
   let enemyCount = Math.min(140, Math.round(18 + n * 1.0)) + cycle * 10; // v28 (설계서 §2): 18+웨이브, 최대 140 (+90 이후 사이클당 10) // v27-39: 선형계수 4.6→1.3 대폭 하향 (요청4 - wave44에 이미 228마리로 계산되어 단일 웨이브가 필드상한을 넘어서던 근본 문제)
@@ -85,7 +91,8 @@ function generateWave(n) {
     let delay = s * (baseInterval * 2.2);
     const countThisStream = Math.round(enemyCount / streams);
     for (let i = 0; i < countThisStream; i++) {
-      const type = pool[Math.floor(Math.random() * pool.length)];
+      const grp = plan ? (Math.random() < WAVE_MAIN_SHARE ? plan.mainIds : plan.secIds) : pool;
+      const type = grp.length ? grp[Math.floor(Math.random() * grp.length)] : pool[Math.floor(Math.random() * pool.length)];
       arr.push({ type, delay });
       delay += spread * streams * (0.75 + Math.random() * 0.5);
     }
@@ -1414,7 +1421,9 @@ class App {
       document.getElementById('game-screen').appendChild(el);
     }
     const types = typeof previewWaveTypes === 'function' ? previewWaveTypes(nextWave) : [];
-    const icons = types.map(t => ICON(t, 16)).join(''); // v3.8: 이모지 → 타입 배지
+    // v3.14: 주력 70% · 보조 30% (실제 등장과 같음)
+    const pct = types.length > 1 ? [Math.round(WAVE_MAIN_SHARE * 100), Math.round((1 - WAVE_MAIN_SHARE) * 100)] : [100];
+    const icons = types.map((t, i) => `${ICON(t, i ? 14 : 18)}<b style="font-size:${i ? 10 : 12}px;margin:0 4px 0 1px">${pct[i]}%</b>`).join('');
     el.innerHTML = `<span>다음 웨이브</span>${icons || '?'}`;
   }
 

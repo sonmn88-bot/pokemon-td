@@ -30,25 +30,50 @@ const EnemySpriteImages = {
 
 // 스프라이트 실루엣 틴트 캐시 (피격 흰색·흑화 엘리트) — 경로·색·크롭 여부별 1회 생성
 const _tintCache = {};
-// v3.14 입체감: 3D 장면 햇빛(왼쪽 위)과 같은 방향으로 밝은 면·그늘, 윤곽 한쪽 림라이트, 발치 그늘. 이미지당 1회 생성 (3D 모드만)
+// v3.14 입체감: 그림 윤곽에서 '두께'를 계산(거리변환 → 볼록한 높이)해 면마다 기울기(노멀)를 만들고,
+//   3D 장면과 같은 햇빛(왼쪽 위)으로 음영 + 하이라이트 → 종이 같은 평면이 아니라 통통한 입체로 보이게.
+//   이미지당 1회만 계산(저해상도 노멀 → 원본 크기로 부드럽게 확대해 곱함). 3D 모드에서만.
 const _litCache = new Map();
 function litSprite(img) {
   if (!window.__3d || !img) return img;
   const w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
   if (!w || !h) return img;
   let c = _litCache.get(img); if (c) return c;
+  const k = Math.min(1, 140 / Math.max(w, h)), sw = Math.max(8, Math.round(w * k)), sh = Math.max(8, Math.round(h * k));
+  const sc = document.createElement('canvas'); sc.width = sw; sc.height = sh;
+  const sx = sc.getContext('2d', { willReadFrequently: true }); sx.drawImage(img, 0, 0, sw, sh);
+  let A; try { A = sx.getImageData(0, 0, sw, sh).data; } catch (e) { _litCache.set(img, img); return img; }
+  // 1) 거리변환(2패스 챔퍼): 투명 경계에서 얼마나 안쪽인지
+  const N = sw * sh, D = new Float32Array(N), INF = 1e6;
+  for (let i = 0; i < N; i++) D[i] = A[i * 4 + 3] > 40 ? INF : 0;
+  for (let y = 0; y < sh; y++) for (let x = 0; x < sw; x++) { const i = y * sw + x; if (!D[i]) continue; let v = D[i];
+    if (x > 0) v = Math.min(v, D[i - 1] + 1); if (y > 0) v = Math.min(v, D[i - sw] + 1); if (x > 0 && y > 0) v = Math.min(v, D[i - sw - 1] + 1.414); if (x < sw - 1 && y > 0) v = Math.min(v, D[i - sw + 1] + 1.414); D[i] = v; }
+  for (let y = sh - 1; y >= 0; y--) for (let x = sw - 1; x >= 0; x--) { const i = y * sw + x; if (!D[i]) continue; let v = D[i];
+    if (x < sw - 1) v = Math.min(v, D[i + 1] + 1); if (y < sh - 1) v = Math.min(v, D[i + sw] + 1); if (x < sw - 1 && y < sh - 1) v = Math.min(v, D[i + sw + 1] + 1.414); if (x > 0 && y < sh - 1) v = Math.min(v, D[i + sw - 1] + 1.414); D[i] = v; }
+  // 2) 높이: 가장자리는 둥글게 솟고 안쪽은 완만 (베개 모양)
+  const Rr = Math.max(3, Math.min(sw, sh) * 0.22), Hm = new Float32Array(N);
+  for (let i = 0; i < N; i++) { const t = Math.min(1, D[i] / Rr); Hm[i] = D[i] ? Math.sqrt(1 - (1 - t) * (1 - t)) * Rr : 0; }
+  // 3) 노멀 → 햇빛 음영(곱하기) + 하이라이트(더하기)
+  const L = [-0.48, -0.56, 0.68], ll = Math.hypot(...L); L[0] /= ll; L[1] /= ll; L[2] /= ll;
+  const Hx = L[0], Hy = L[1], Hz = L[2] + 1, hl = Math.hypot(Hx, Hy, Hz);
+  const dark = sx.createImageData(sw, sh), lite = sx.createImageData(sw, sh), Dd = dark.data, Ld = lite.data;
+  for (let y = 0; y < sh; y++) for (let x = 0; x < sw; x++) {
+    const i = y * sw + x, j = i * 4; if (!D[i]) continue;
+    const gx = (Hm[y * sw + Math.min(sw - 1, x + 1)] - Hm[y * sw + Math.max(0, x - 1)]) * 0.5, gy = (Hm[Math.min(sh - 1, y + 1) * sw + x] - Hm[Math.max(0, y - 1) * sw + x]) * 0.5;
+    const nl = Math.hypot(gx, gy, 1), nx = -gx / nl, ny = -gy / nl, nz = 1 / nl;
+    const dif = Math.max(0, nx * L[0] + ny * L[1] + nz * L[2]), spec = Math.pow(Math.max(0, (nx * Hx + ny * Hy + nz * Hz) / hl), 24);
+    const shade = 0.58 + 0.62 * dif;                                       // 0.58(그늘) ~ 1.2(정면광)
+    const m = Math.min(1, shade); Dd[j] = Dd[j + 1] = 255 * m; Dd[j + 2] = 255 * Math.min(1, m + (1 - m) * 0.35); Dd[j + 3] = 255; // 그늘은 살짝 푸르게
+    const add = Math.max(0, shade - 1) * 0.9 + spec * 0.35; Ld[j] = 255; Ld[j + 1] = 250; Ld[j + 2] = 235; Ld[j + 3] = Math.min(255, add * 255);
+  }
+  const dC = document.createElement('canvas'), lC = document.createElement('canvas'); dC.width = lC.width = sw; dC.height = lC.height = sh;
+  dC.getContext('2d').putImageData(dark, 0, 0); lC.getContext('2d').putImageData(lite, 0, 0);
   c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d');
+  x.imageSmoothingQuality = 'high';
   x.drawImage(img, 0, 0);
-  x.globalCompositeOperation = 'source-atop';
-  const g = x.createLinearGradient(w * 0.1, 0, w * 0.9, h);
-  g.addColorStop(0, 'rgba(255,246,220,0.20)'); g.addColorStop(0.5, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(12,22,55,0.34)');
-  x.fillStyle = g; x.fillRect(0, 0, w, h);
-  const f = x.createLinearGradient(0, h * 0.68, 0, h); f.addColorStop(0, 'rgba(0,0,0,0)'); f.addColorStop(1, 'rgba(0,12,0,0.28)');
-  x.fillStyle = f; x.fillRect(0, h * 0.68, w, h * 0.32);
-  const r = document.createElement('canvas'); r.width = w; r.height = h; const y = r.getContext('2d'), k = Math.max(2, Math.round(w / 80));
-  y.drawImage(img, 0, 0); y.globalCompositeOperation = 'destination-out'; y.drawImage(img, k, k);       // 빛 받는 쪽(왼쪽 위) 윤곽만 남김
-  y.globalCompositeOperation = 'source-in'; y.fillStyle = 'rgba(255,250,228,0.6)'; y.fillRect(0, 0, w, h);
-  x.drawImage(r, 0, 0);
+  x.globalCompositeOperation = 'multiply'; x.drawImage(dC, 0, 0, w, h);
+  x.globalCompositeOperation = 'lighter'; x.drawImage(lC, 0, 0, w, h);
+  x.globalCompositeOperation = 'destination-in'; x.drawImage(img, 0, 0);   // 원래 윤곽(투명도) 그대로
   _litCache.set(img, c); return c;
 }
 window.litSprite = litSprite;

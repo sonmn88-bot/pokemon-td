@@ -164,6 +164,13 @@ class GameEngine {
     const a = P1.x - P0.x, b = P1.y - P0.y, c = P2.x - P0.x, e = P2.y - P0.y;
     ctx.setTransform(d * a, d * b, d * c, d * e, d * (P0.x - a * x - c * y + sh.x), d * (P0.y - b * x - e * y + sh.y));
   }
+  _softShadow() {
+    if (this._shadowSpr) return this._shadowSpr;
+    const c = document.createElement('canvas'); c.width = 96; c.height = 48; const g = c.getContext('2d');
+    const gr = g.createRadialGradient(48, 24, 2, 48, 24, 46); gr.addColorStop(0, 'rgba(10,25,10,0.9)'); gr.addColorStop(0.55, 'rgba(10,25,10,0.45)'); gr.addColorStop(1, 'rgba(10,25,10,0)');
+    g.setTransform(1, 0, 0, 0.5, 0, 12); g.fillStyle = gr; g.fillRect(0, 0, 96, 96);
+    return (this._shadowSpr = c);
+  }
   // 두 점을 잇는 것(번개·빔): 양 끝이 정확히 맞는 아핀
   _xfSeg(ctx, x1, y1, x2, y2) {
     const W3 = this.w3, ux = x2 - x1, uy = y2 - y1, L = Math.hypot(ux, uy) || 1, vx = -uy / L * 20, vy = ux / L * 20;
@@ -203,6 +210,10 @@ class GameEngine {
     for (const o of L) {
       ctx.save();
       try {
+        // 햇빛(왼쪽 위 뒤) 반대쪽으로 길게 드리운 부드러운 그림자 → 서 있는 입체감
+        const r = Math.max(13, Math.min(30, (o.size || 15) * 1.15));
+        this._xfGround(ctx, o.x, o.y); ctx.translate(o.x, o.y); ctx.rotate(0.62); ctx.globalAlpha = 0.32;
+        ctx.drawImage(this._softShadow(), -r * 0.35, -r * 0.42, r * 2.3, r * 0.84); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1;
         if (o._gachaId !== undefined && o.def) { this._xfGround(ctx, o.x, o.y); ctx.drawImage(towerBaseSprite(o.def.grade), o.x - 30, o.y - 30, 60, 60); } // 받침 링은 바닥에
         const p = this._xfBill(ctx, o.x, o.y, P);
         if (W3.occluded(o.x, o.y, p)) ctx.globalAlpha = 0.38;           // 나무·언덕 뒤 = 반투명
