@@ -321,7 +321,7 @@ Object.assign(App.prototype, {
         // v3.8: 재료 레전드를 직접 고름 (자동 선택은 아끼던 레전드가 들어가는 문제)
         const legs = all.filter(m => m.def.grade === 'legend');
         const need = r.id === 'mew' ? 3 : 2, distinct = r.id === 'mew';
-        if (legs.length > need && !(r.id === 'mew' && this.engine._miracle && new Set(legs.map(m => m.def.id)).size < 3)) {
+        if (legs.length >= need && !(r.id === 'mew' && this.engine._miracle && new Set(legs.map(m => m.def.id)).size < 3)) { // v3.15: 딱 맞는 수여도 직접 고르기(자동 소모 금지)
           this._pickRecipeLegends(r, legs, need, distinct, picked => {
             if (!this.engine.spendGold(r.cost)) { this.showWaveAnnounce('골드가 부족해요', '#ff5c7a'); return; }
             const used = r.id === 'mewtwo' ? [all.find(m => m.def.id === 'mew'), ...picked] : picked;
@@ -399,7 +399,7 @@ Object.assign(App.prototype, {
   // ---------- 합성 연출: 슬롯머신 → 공개 (탭하면 스킵) ----------
   _playMergeReveal(def, opts, done) {
     const G = window.GRADES[def.grade];
-    const pool = (window.GRADE_POOLS[def.grade] || [def.id]).map(id => window.GachaTowerDefs[id]).filter(Boolean);
+    const pool = opts.recipe ? [def] : (window.GRADE_POOLS[def.grade] || [def.id]).map(id => window.GachaTowerDefs[id]).filter(Boolean); // 레시피는 결과가 정해져 있어 다른 포켓몬(뮤츠 등)을 굴리지 않음
     const big = def.grade === 'legend' || def.grade === 'unique';
     const ov = document.createElement('div');
     ov.className = 'merge-reveal';

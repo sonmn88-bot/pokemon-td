@@ -148,7 +148,7 @@ class GameEngine {
     if (!this.w3 || !this.paths[0]) return;
     const map = this.currentMap, theme = (map.deco && map.deco.theme) || 'forest';
     this.w3.build({ W: this.worldWidth, H: this.worldHeight, path: this.paths[0], slots: this.towerSlots, pw: map.pathWidth || 30, theme })
-      .then(() => this.w3.markDirty());
+      .then(() => { this.w3.setSlots(this.towerSlots); this.w3.markDirty(); }); // 확장 부지로 늘어난 자리까지
     const host = this.canvas.parentElement; if (host) host.style.background = '#000';
     setTimeout(() => this.resetCamera(), 0);
   }

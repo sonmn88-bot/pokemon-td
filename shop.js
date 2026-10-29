@@ -46,45 +46,26 @@ const ShopItems = [
     key: 'revive', icon:'build', name: '확장 부지', emoji: '🏗️', cost: 450, scaling: true,
     desc: '트랙 안쪽에 빈 배치슬롯 1개 즉시 추가 (살수록 비싸짐)',
     buy(engine) {
-      const w = engine.worldWidth, h = engine.worldHeight; // v27-47: 카메라 시스템 도입으로 월드 크기 기준
-      // v27-36: 5단 지그재그 맵 좌표에 맞춰 탐색범위 재조정
-      const mx = w*0.15, my = h*0.20, innerGap = w*0.30;
-      const top = my + h*0.03, bot = h - my - h*0.03;
-      const xMin = mx+innerGap+w*0.03, xMax = w-mx-w*0.05;
-      let best = null, bestMinDist = -1;
-      for (let tries=0; tries<60; tries++) {
-        const x = xMin + Math.random()*(xMax-xMin);
-        const y = top + Math.random()*(bot-top);
-        let minDist = Infinity;
-        for (const s of engine.towerSlots) minDist = Math.min(minDist, Math.hypot(s.x-x, s.y-y));
-        if (minDist > bestMinDist) { bestMinDist = minDist; best = {x,y}; }
+      // v3.15: 길 위·화면 밖·기존 자리와 겹치는 곳을 빼고, 길에서 사거리 안(30~110)인 빈 땅 중 가장 여유 있는 곳을 격자로 전수 탐색
+      const w = engine.worldWidth, h = engine.worldHeight, path = engine.paths[0] || [], pw = (engine.currentMap && engine.currentMap.pathWidth) || 30;
+      const pS = path.filter((_, i) => i % 2 === 0), MIN_DIST = 52;
+      let best = null, bestScore = -1;
+      for (let y = h * 0.05; y <= h * 0.95; y += 8) for (let x = w * 0.07; x <= w * 0.93; x += 8) {
+        const dp = window._distToPath ? _distToPath(x, y, pS) : 999;
+        if (dp < pw / 2 + 24 || dp > 110) continue;                          // 길 위 X, 길에서 너무 멀어도 X
+        let md = Infinity; for (const s2 of engine.towerSlots) md = Math.min(md, Math.hypot(s2.x - x, s2.y - y));
+        if (md < MIN_DIST) continue;
+        const score = Math.min(md, 90) - Math.abs(dp - 60) * 0.3;           // 다른 자리와 넉넉히 + 길에서 적당한 거리
+        if (score > bestScore) { bestScore = score; best = { x: Math.round(x), y: Math.round(y) }; }
       }
-      // v27-42 버그수정: 순수 랜덤 60번 시도가 가끔 전부 나쁜 자리만 뽑혀서 실패하고 있었음
-      // (요청1 - "공간 없다고 뜨는데 나중엔 또 된다"는 게 바로 이 랜덤운 문제였음). 랜덤이 실패하면
-      // 격자를 촘촘히 훑는 체계적 탐색으로 한 번 더 확인해서, 진짜 공간이 없을 때만 실패하도록 함.
-      // v27-43 버그수정: 최소거리 임계값이 고정 55px이었는데, 좁은 모바일 화면(탐색범위 자체가 몇백px밖에
-      // 안 됨)에서는 슬롯 1~2개만 추가해도 이 조건을 만족하는 자리가 금방 없어져서 "1~2개밖에 안했는데
-      // 벌써 안된다"는 문제가 있었음 (요청1). 화면폭에 비례하는 값으로 변경 (탭 안전거리 38px는 유지).
-      const MIN_DIST = Math.max(38, Math.min(55, w * 0.09));
-      if (!best || bestMinDist <= MIN_DIST) {
-        const GRID = 14;
-        for (let gx = 0; gx <= GRID; gx++) {
-          for (let gy = 0; gy <= GRID; gy++) {
-            const x = xMin + (xMax-xMin) * (gx/GRID);
-            const y = top + (bot-top) * (gy/GRID);
-            let minDist = Infinity;
-            for (const s of engine.towerSlots) minDist = Math.min(minDist, Math.hypot(s.x-x, s.y-y));
-            if (minDist > bestMinDist) { bestMinDist = minDist; best = {x,y}; }
-          }
-        }
+      if (!best) {
+        engine.spawnFloatingText('공간이 부족합니다', engine.camera.x, engine.camera.y, '#ff5c7a');
+        return false; // 실패 시 골드 환불
       }
-      if (best && bestMinDist > MIN_DIST) {
-        engine.towerSlots.push({ x: best.x, y: best.y, occupied: false, tower: null });
-        engine.spawnFloatingText('새 슬롯 확보!', best.x, best.y, '#34d399');
-      } else {
-        engine.spawnFloatingText('공간이 부족합니다', engine.camera.x, engine.camera.y - (engine.height/2 - 80)/engine.camera.zoom, '#ff5c7a');
-        return false; // v27-8 버그수정: 실패해도 return false가 없어서 골드가 환불 안 되고 그냥 나갔던 문제
-      }
+      engine.towerSlots.push({ x: best.x, y: best.y, occupied: false, tower: null });
+      if (engine.w3 && engine.w3.setSlots) engine.w3.setSlots(engine.towerSlots); // 3D 바닥 자국도 갱신
+      engine.spawnFloatingText('새 슬롯 확보!', best.x, best.y, '#34d399');
+      engine.camera.x += (best.x - engine.camera.x) * 0.5; engine.camera.y += (best.y - engine.camera.y) * 0.5; engine.clampCamera(); // 새 자리 쪽으로 화면 이동
     }
   },
   {

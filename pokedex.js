@@ -6,7 +6,7 @@
 
 // ---- 템플릿 수치 ----
 const DEX_TEMPLATE = {
-  gradeDmg:   { normal:8, rare:20, epic:50, legend:120, unique:280 },   // 표준형 1타 데미지 (단계당 ≈2.5배)
+  gradeDmg:   { normal:8, rare:22, epic:62, legend:120, unique:280 },   // 표준형 1타 데미지 (v3.15: 에픽·레어 상향 — 레전드와의 격차 완화)
   gradeRange: { normal:130, rare:145, epic:165, legend:190, unique:210 },
   profile: { H:{ name:'중장형', fr:0.6, dmg:1.67 }, N:{ name:'표준형', fr:1.0, dmg:1.0 }, F:{ name:'속공형', fr:1.6, dmg:0.625 } },
   // 역할 배율은 '공속'에 적용 → 1타 데미지는 그대로라 방어력에 안 죽음
@@ -235,6 +235,10 @@ const DEX_KEEP_FIRE = ['articuno','zapdos','moltres','dragonite','gengar','mewtw
     else if (!window.TowerSpriteImages[r.id] && ['pikachu','raichu','eevee','vaporeon','jolteon','flareon'].includes(r.id)) window.TowerSpriteImages[r.id] = `assets/heroes/${r.id}.png`; // 영웅 이미지 재사용
   }
   for (const k in old) if (old[k].hidden) GachaTowerDefs[k] = old[k]; // 히든(도감 행 없음, 등급 풀 제외)
+  // v3.15 데미지 밸런스 (30웨이브·같은 자리 단독 DPS 측정 기준): 같은 등급끼리는 비슷하게, 등급마다 약 3배.
+  //   뮤츠 1185→~470(전설의 ~3배), 후딘 96→~40(에픽 평균 ~30), 파이어↑·썬더↓, 히든 3종 ~520으로 맞춤
+  const DEX_TUNE = { mewtwo:0.4, mew:0.87, alakazam:0.42, kadabra:0.55, moltres:1.4, zapdos:0.49, dragonite:0.75, charizard:1.3, shiny_charizard:1.75, shiny_dragonite:0.28 };
+  for (const id in DEX_TUNE) if (GachaTowerDefs[id] && !GachaTowerDefs[id]._tuned) { GachaTowerDefs[id].damage = Math.round(GachaTowerDefs[id].damage * DEX_TUNE[id] * 10) / 10; GachaTowerDefs[id]._tuned = true; }
 
   // 확정 진화: 같은 라인의 다음 단계 (이브이는 3갈래 중 랜덤)
   const byLine = {};

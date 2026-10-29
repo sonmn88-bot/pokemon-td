@@ -14,7 +14,7 @@ let Wpx = 1, Hpx = 1, dirty = true, hf = null, built = null;
 let fullPR = 1, lowRes = false, lastMove = 0;
 const E = new Float32Array(16);
 const camPos = new THREE.Vector3();
-let occluders = [];
+let occluders = [], slotGroup = null;
 
 // 카메라: 살짝 오른쪽 위로 멀어지는 시점 (판이 화면을 꽉 채우도록 위에서 비스듬히)
 const VIEW = { fov: 45, el: 55 * Math.PI / 180, yaw: 8 * Math.PI / 180 };
@@ -290,7 +290,8 @@ W3.build = async function ({ W, H, path, slots, pw, theme: tk }) {
   sun.color.set(th.sunC); sun.intensity = th.sunI;
   sun.position.set(W * 0.5 - 480, 820, H * 0.5 - 560); sun.target.position.set(W * 0.5, 0, H * 0.5);   // 왼쪽 위 뒤에서 → 그림자는 오른쪽 아래
   const sc = sun.shadow.camera; sc.left = -800; sc.right = 800; sc.top = 800; sc.bottom = -800; sc.near = 100; sc.far = 2600; sc.updateProjectionMatrix();
-  root.add(buildTerrain(th), buildPath(path, pw, th), buildSlotMarks(slots));
+  slotGroup = buildSlotMarks(slots);
+  root.add(buildTerrain(th), buildPath(path, pw, th), slotGroup);
   const { out, trees } = placeProps(W, H, path, slots, pw, th);
   W3._trees = trees;
   await Promise.all(Object.entries(out).map(([name, list]) => addInstances(root, name, list, th, /tree|tall|bush|rock_large|stone_large/.test(name))));
@@ -366,4 +367,10 @@ W3.fit = function (slots, top, bottom, path) {
   return { x, y, zoom };
 };
 W3.markDirty = () => { dirty = true; };
+// 확장 부지 등으로 자리가 바뀌면 바닥 자국만 다시
+W3.setSlots = function (slots) {
+  if (!root) return;
+  if (slotGroup) root.remove(slotGroup);
+  slotGroup = buildSlotMarks(slots); root.add(slotGroup); dirty = true;
+};
 W3.info = () => R && R.info;

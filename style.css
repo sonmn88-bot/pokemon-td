@@ -1601,3 +1601,9 @@ img.title-pkm.lead { width:88px; height:88px; }
 #game-canvas { transform:perspective(850px) rotateY(12deg) rotateX(36deg) scale(1.42); transform-origin:60% 60%; } /* engine.js TILT.css()가 덮어씀 */
 /* 먼 쪽(위) 안개로 원근감 */
 /* v3.13 먼 쪽 안개는 engine.js _drawHaze로 (대각 원근) */
+
+/* v3.15 하단 바를 화면 맨 아래 가장자리(홈 제스처·음성비서 호출 영역)에서 띄움 — 버튼 누를 때 OS 제스처가 걸리지 않게 */
+:root { --bar-gap: max(14px, env(safe-area-inset-bottom, 0px)); --bar-h: calc(82px + var(--bar-gap)); }
+@media (max-height: 430px) { :root { --bar-h: calc(66px + var(--bar-gap)); } }
+#tower-bar { padding-bottom: var(--bar-gap); }
+html, body { overscroll-behavior: none; }

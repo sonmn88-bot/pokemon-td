@@ -191,7 +191,8 @@ Object.assign(App.prototype, {
 
   _offerCards(wave) {
     const e = this.engine;
-    const guarantee = wave % 20 === 0 || e._cardCommonStreak >= 3;
+    const guarantee = wave % 20 === 0 || e._cardCommonStreak >= 3 || e._cardSkipBank; // v3.15: 건너뛰면 다음 카드 희귀 이상 확정
+    e._cardSkipBank = false;
     const cards = this._rollCards(guarantee);
     if (!cards.length) return false;
     this._cardOpen = true;
@@ -206,7 +207,7 @@ Object.assign(App.prototype, {
     const ov = document.createElement('div');
     ov.className = 'card-overlay';
     const rerollCost = e._cardRerolls === 0 ? 0 : Math.round((80 + e.currentWave * 6) * e._cardRerolls);
-    const skipGold = 100 + e.currentWave * 5;
+    const skipGold = 150 + e.currentWave * 12; // v3.15: 건너뛰기 = 골드 + 몬스터 적응 없음 + 다음 카드 희귀 이상 확정
     const adapt = Math.round((Math.pow(1 + ADAPT_PER_CARD, e._cardCount) - 1) * 100);
     ov.innerHTML = `<div class="co-head"><span class="co-kicker">웨이브 ${e.currentWave} 보상</span><b>${e._cardDoppel ? '도플갱어 — 3장 모두 획득' : '강화 카드 1장 선택'}</b>
         <small>카드를 고를수록 몬스터 체력이 적응해요 <em>+${adapt}%</em> → <em>+${Math.round((Math.pow(1 + ADAPT_PER_CARD, e._cardCount + 1) - 1) * 100)}%</em></small></div>
@@ -221,7 +222,7 @@ Object.assign(App.prototype, {
         </button>`; }).join('')}</div>
       <div class="co-actions">
         <button class="co-btn reroll" ${e.gold < rerollCost ? 'disabled' : ''}>${ICON('refresh', 16)}다시 뽑기 <span class="co-cost">${rerollCost ? ICON('coin', 14) + rerollCost : '무료'}</span></button>
-        <button class="co-btn skip">건너뛰기 <span class="co-cost">+${ICON('coin', 14)}${skipGold}</span></button>
+        <button class="co-btn skip" title="몬스터 체력 적응이 오르지 않고, 다음 카드에 희귀 이상이 확정으로 나와요">건너뛰기 <span class="co-cost">+${ICON('coin', 14)}${skipGold} · 적응 없음 · 다음 희귀↑</span></button>
       </div>`;
     document.getElementById('game-screen').appendChild(ov);
     const close = () => { ov.remove(); this._cardOpen = false; this.engine.start(); if (this._pendingAutoWave) { this._pendingAutoWave = false; this.sendWave(); } };
@@ -235,7 +236,7 @@ Object.assign(App.prototype, {
       e._cardRerolls++;
       this._showCardOverlay(this._rollCards(false));
     };
-    ov.querySelector('.skip').onclick = () => { e.addGold(skipGold); close(); };
+    ov.querySelector('.skip').onclick = () => { e.addGold(skipGold); e._cardSkipBank = true; close(); this.showWaveAnnounce(`카드 건너뛰기 +${skipGold}g · 다음 카드 희귀 이상 확정`, '#ffc24b'); };
   },
 
   _takeCard(c) {

@@ -880,35 +880,16 @@ class App {
   }
 
   _showTenPullResult(results, slotIdx) {
-    // v28 버그수정: 예전엔 결과를 보관함에 넣고, 카드 선택/닫기 때 또 넣어서 같은 포켓몬이 2배로 쌓였음.
-    // 이제 보관함에 1번만 넣고, 카드를 탭하면 (빈 슬롯이 선택돼 있을 때) 보관함에서 꺼내 배치.
+    // v3.15: 결과 창(확인 버튼) 대신 알림만 — 전부 보관함, 빈 자리를 골라뒀으면 가장 좋은 1마리를 바로 배치
     this._addToStorage(results);
+    const order = window.MERGE_ORDER, sorted = results.slice().sort((a, b) => order.indexOf(b.grade) - order.indexOf(a.grade)), best = sorted[0];
     const canPlace = slotIdx !== null && slotIdx !== undefined && !this.engine.towerSlots[slotIdx]?.occupied;
-    const overlay = document.createElement('div');
-    overlay.className = 'tenpull-overlay';
-    const title = document.createElement('div');
-    title.className = 'skilltree-title';
-    title.innerHTML = `<small>10연 뽑기 결과</small>${canPlace ? '하나를 누르면 선택한 자리에 배치 · 나머지는 보관함' : '모두 보관함에 넣었어요'}`;
-    overlay.appendChild(title);
-    const grid = document.createElement('div');
-    grid.className = 'tenpull-grid';
-    const order = window.MERGE_ORDER;
-    for (const def of results.slice().sort((a, b) => order.indexOf(b.grade) - order.indexOf(a.grade))) {
-      const grade = window.GRADES[def.grade];
-      const card = document.createElement('div');
-      card.className = `tenpull-card grade-${def.grade}`;
-      card.style.setProperty('--gc', grade.color);
-      card.innerHTML = `<div class="tp-emoji">${PKM(def, 40)}</div><div class="tp-name">${def.name}</div><div class="tp-grade">${'★'.repeat(grade.stars)} ${grade.name}</div>`;
-      if (canPlace) card.addEventListener('click', () => { overlay.remove(); this._placeFromStorage(def.id, slotIdx); });
-      grid.appendChild(card);
-    }
-    overlay.appendChild(grid);
-    const closeBtn = document.createElement('button');
-    closeBtn.className = 'skin-picker-close';
-    closeBtn.textContent = '확인';
-    closeBtn.addEventListener('click', () => overlay.remove());
-    overlay.appendChild(closeBtn);
-    document.getElementById('game-screen').appendChild(overlay);
+    if (canPlace && best) this._placeFromStorage(best.id, slotIdx);
+    const cnt = {}; results.forEach(d => { cnt[d.grade] = (cnt[d.grade] || 0) + 1; });
+    const summary = order.slice().reverse().filter(g => cnt[g]).map(g => `${window.GRADES[g].name} ${cnt[g]}`).join(' · ');
+    const top = best && order.indexOf(best.grade) >= order.indexOf('epic') ? `${PKM(best, 22)} <b>${best.name}</b>! ` : '';
+    this.showWaveAnnounce(`10연 ${top}${summary}${canPlace ? ' · 최고 등급 배치' : ' → 보관함'}`, best ? window.GRADES[best.grade].color : '#b18cff');
+    this.renderStorageStrip && this.renderStorageStrip();
   }
 
   // v28: 예전 보관함 버튼/목록은 하단 보관함 스트립(storage.js)으로 대체 - 기존 호출 호환용
