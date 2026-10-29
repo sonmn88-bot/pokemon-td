@@ -77,6 +77,8 @@ function generateWave(n) {
   if (window.app?.engine?._runTrait?.key === 'swarm') enemyCount = Math.round(enemyCount * 1.25);
   const baseInterval = Math.max(0.30, 0.85 - n * 0.014); // v28: 최소 간격 0.30초
   const streams = 1 + Math.min(4, Math.floor(n / 6));
+  // v3.10: 40마리가 처음 20초에 몰려 들어와 필드 수가 계단식으로 튀던 문제 → 약 50초에 고르게 분산 (웨이브당 마릿수는 그대로)
+  const spread = Math.max(baseInterval, 50 / Math.max(1, enemyCount));
 
   const arr = [];
   for (let s = 0; s < streams; s++) {
@@ -85,7 +87,7 @@ function generateWave(n) {
     for (let i = 0; i < countThisStream; i++) {
       const type = pool[Math.floor(Math.random() * pool.length)];
       arr.push({ type, delay });
-      delay += baseInterval * streams * (0.75 + Math.random() * 0.5);
+      delay += spread * streams * (0.75 + Math.random() * 0.5);
     }
   }
   arr.sort((a, b) => a.delay - b.delay);
@@ -1140,6 +1142,11 @@ class App {
       if (!timedOut) this.SFX.play('wave_clear');
       // v27: 엔드리스 - 클리어 개념 없이 항상 자동으로 다음 웨이브 카운트다운
       this._startAutoWaveCountdown(wave + 1);
+      // v3.10 위험 예고: 지금 필드 + 다음 웨이브 마릿수가 200에 닿으면 시작 전에 경고
+      try {
+        const nextN = generateWave(wave + 1).length, now = this.engine.enemies.length;
+        if (now + nextN >= 185) setTimeout(() => this.showWaveAnnounce(`위험: 다음 웨이브 +${nextN}마리 → 필드 ${now + nextN}/200 예상`, '#ff3b3b'), 400);
+      } catch (_) {}
       if (!timedOut) {
         // v27-17: 웨이브 클리어 문구 다양화 (요청2) - 필드에 남은 적이 없으면 "완벽 클리어"
         const remaining = this.engine.enemies.length;

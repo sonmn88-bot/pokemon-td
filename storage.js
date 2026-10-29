@@ -237,9 +237,18 @@ Object.assign(App.prototype, {
         const grade = ui.grade;
         if (!window.NEXT_GRADE[grade]) return;
         const results = [];
+        // v3.10: 메가 원본은 '필드의 같은 종(원본·메가)을 ★5까지 먹일 만큼'만 남기고 나머지는 합성에 포함
+        //   (메가는 종마다 1마리라 메가를 만든 뒤 남는 원본은 먹이 말고 쓸 데가 없음). 필드에 그 종이 없으면 전부 보관
+        const megaNeed = id => { const ts = this.engine.towers.filter(t => t.def && (t.def.id === id || t.def.megaOf === id));
+          return ts.length ? ts.reduce((a, t) => a + Math.max(0, 5 - ((t.def._stack) || 1)), 0) : Infinity; };
         for (;;) {
-          // 💎 메가 원본(리자몽 등)은 먹이기용으로 남겨둠
-          const pool = this._allMaterials(false).filter(m => m.def.grade === grade && !window.MEGA_OF?.[m.def.id]);
+          const all = this._allMaterials(false).filter(m => m.def.grade === grade), taken = {};
+          const pool = all.filter(m => {
+            if (!window.MEGA_OF?.[m.def.id]) return true;
+            const spare = all.filter(x => x.def.id === m.def.id).length - megaNeed(m.def.id); // 먹이로 필요한 수를 뺀 여분만 재료로
+            taken[m.def.id] = (taken[m.def.id] || 0) + 1;
+            return taken[m.def.id] <= spare;
+          });
           if (pool.length < 3) break;
           const byId = {}; pool.forEach(m => (byId[m.def.id] = byId[m.def.id] || []).push(m));
           const triple = Object.values(byId).find(a => a.length >= 3 && window.MERGE_EVOLUTION[a[0].def.id]);
@@ -256,13 +265,13 @@ Object.assign(App.prototype, {
         }
         const keptMega = this._allMaterials(false).filter(m => m.def.grade === grade && window.MEGA_OF?.[m.def.id]).length;
         const onField = this._allMaterials(true).filter(m => m.kind === 'field' && m.def.grade === grade).length;
-        const note = [keptMega ? `메가 원본 ${keptMega}마리는 남겨뒀어요` : '', onField ? `배치된 ${onField}마리는 그대로예요` : ''].filter(Boolean).join(' · ');
+        const note = [keptMega ? `메가 먹이용 원본 ${keptMega}마리는 남겨뒀어요` : '', onField ? `배치된 ${onField}마리는 그대로예요` : ''].filter(Boolean).join(' · ');
         if (!results.length) { this.showWaveAnnounce('합성할 보관함 포켓몬이 3마리 미만이에요' + (note ? `<br><span style="font-size:0.7em">${note}</span>` : ''), '#ff5c7a'); return; }
         this.SFX.play(results.some(d => d.grade === 'legend') ? 'pull_epic' : 'merge');
         overlay.remove(); this.openMergePanel();
         const ov = document.createElement('div');
         ov.className = 'merge-bulk';
-        ov.innerHTML = `<div class="mb-card"><b>⚡ ${results.length}번 합성 완료</b><div class="mb-row">${results.map(d =>
+        ov.innerHTML = `<div class="mb-card"><b>${results.length}번 합성 완료</b><div class="mb-row">${results.map(d =>
           `<span style="--gc:${window.GRADES[d.grade].color}">${PKM(d, 40)}<i>${d.name}</i></span>`).join('')}</div>${note ? `<small>${note}</small>` : ''}<small>탭해서 닫기</small></div>`;
         ov.onclick = () => ov.remove();
         document.getElementById('game-screen').appendChild(ov);
