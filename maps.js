@@ -129,56 +129,92 @@ const NaturalLayout = {
   getSlots(w, h) { return this.build(w, h).slots.map(s => ({ ...s })); },
 };
 
-// ---- 높낮이 음영 + 자연 장식 (배경 캐시에 1회만 그림) ----
-function drawNaturalTerrain(ctx, w, h, map) {
+// ---- 값 노이즈 + fBm (지형 높낮이·색 얼룩용, 고정 시드) ----
+function _vnoise(seed) {
+  const rnd = _mapRng(seed), val = new Float32Array(256), perm = new Uint8Array(512);
+  for (let i = 0; i < 256; i++) { val[i] = rnd(); perm[i] = i; }
+  for (let i = 255; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)), t = perm[i]; perm[i] = perm[j]; perm[j] = t; }
+  for (let i = 0; i < 256; i++) perm[256 + i] = perm[i];
+  const hv = (i, j) => val[perm[(perm[i & 255] + j) & 255]], sm = t => t * t * (3 - 2 * t);
+  return (x, y) => {
+    const xi = Math.floor(x), yi = Math.floor(y), u = sm(x - xi), v = sm(y - yi);
+    const a = hv(xi, yi), b = hv(xi + 1, yi), c = hv(xi, yi + 1), d = hv(xi + 1, yi + 1);
+    return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+  };
+}
+function _fbm(n, x, y, oct) { let a = 0, amp = 0.5, f = 1, sum = 0; for (let o = 0; o < oct; o++) { a += amp * n(x * f + o * 17.3, y * f - o * 9.1); sum += amp; f *= 2.03; amp *= 0.5; } return a / sum; }
+const _sstep = (e0, e1, x) => { const t = Math.max(0, Math.min(1, (x - e0) / (e1 - e0))); return t * t * (3 - 2 * t); };
+
+// ---- v3.13 지형 명암 (배경 캐시에 1회): 높이맵 → 햇빛(왼쪽 위) 음영 + 골짜기 그늘 + 색 얼룩 + 바깥 비네트 ----
+// 길은 바닥이 평평한 골짜기(둑이 있는 길), 타워 자리는 살짝 볼록 → 빛 방향에 따라 둑의 한쪽은 밝고 한쪽은 그늘.
+// M: 맵 바깥 여백(원근으로 보이는 가장자리까지 땅이 이어지게)
+function drawNaturalTerrain(ctx, w, h, map, M = 0) {
   const L = NaturalLayout.build(w, h), path = L.path, slots = L.slots;
-  const rnd = _mapRng(777);
-  // 1) 높이맵 (저해상도) - 노이즈 언덕 + 타워 자리 둔덕 + 길 골짜기
-  const S = 8, gw = Math.ceil(w / S) + 1, gh = Math.ceil(h / S) + 1;
-  const H = new Float32Array(gw * gh);
-  const blobs = [];
-  for (let i = 0; i < 26; i++) blobs.push({ x: rnd() * w, y: rnd() * h, r: 90 + rnd() * 220, a: (rnd() - 0.35) * 1.1 });
-  const pathS = path.filter((_, i) => i % 2 === 0);
+  const pw = map.pathWidth || 30, pathS = path.filter((_, i) => i % 2 === 0);
+  const nz = _vnoise(1234), nz2 = _vnoise(4321);
+  const x0 = -M, y0 = -M, S = 6, gw = Math.ceil((w + 2 * M) / S) + 1, gh = Math.ceil((h + 2 * M) / S) + 1;
+  const Hm = new Float32Array(gw * gh), r0 = pw * 0.5 + 1, r1 = r0 + 24;
   for (let gy = 0; gy < gh; gy++) for (let gx = 0; gx < gw; gx++) {
-    const x = gx * S, y = gy * S;
-    let v = 0;
-    for (const b of blobs) { const d2 = (x - b.x)**2 + (y - b.y)**2; v += b.a * Math.exp(-d2 / (2 * b.r * b.r)); }
-    for (const s of slots) { const d2 = (x - s.x)**2 + (y - s.y)**2; if (d2 < 3600) v += 0.32 * Math.exp(-d2 / 900); }
-    const dp = _distToPath(x, y, pathS);
-    v -= 0.9 * Math.exp(-(dp * dp) / (2 * 38 * 38));
-    H[gy * gw + gx] = v;
+    const x = x0 + gx * S, y = y0 + gy * S;
+    let v = (_fbm(nz, x / 210, y / 210, 4) - 0.5) * 2.0;                 // 완만한 언덕
+    const d = _distToPath(x, y, pathS);
+    v -= 0.62 * (1 - _sstep(r0, r1, d));                                   // 길 골짜기(평평한 바닥 + 둑)
+    for (const s of slots) { const d2 = (x - s.x) ** 2 + (y - s.y) ** 2; if (d2 < 2500) v += 0.16 * Math.exp(-d2 / 700); }
+    Hm[gy * gw + gx] = v;
   }
-  // 2) 힐셰이드: 왼쪽 위에서 빛 → 밝은 면/그늘, 낮은 곳은 살짝 더 어둡게
-  const sc = document.createElement('canvas'); sc.width = gw; sc.height = gh;
-  const sctx = sc.getContext('2d'), img = sctx.createImageData(gw, gh), D = img.data;
+  // 햇빛: 왼쪽 위에서 비스듬히 (x 오른쪽, y 아래, z 위)
+  const lx = -0.55, ly = -0.62, lz = 0.56, ll = Math.hypot(lx, ly, lz), Lx = lx / ll, Ly = ly / ll, Lz = lz / ll, Z = 34 / (2 * S);
+  const shadeC = document.createElement('canvas'), aoC = document.createElement('canvas'), colC = document.createElement('canvas');
+  for (const c of [shadeC, aoC, colC]) { c.width = gw; c.height = gh; }
+  const sI = shadeC.getContext('2d').createImageData(gw, gh), aI = aoC.getContext('2d').createImageData(gw, gh), cI = colC.getContext('2d').createImageData(gw, gh);
   for (let gy = 0; gy < gh; gy++) for (let gx = 0; gx < gw; gx++) {
-    const i = gy * gw + gx;
-    const dx = H[gy * gw + Math.min(gw - 1, gx + 1)] - H[gy * gw + Math.max(0, gx - 1)];
-    const dy = H[Math.min(gh - 1, gy + 1) * gw + gx] - H[Math.max(0, gy - 1) * gw + gx];
-    const shade = (-dx - dy) * 3.2;               // 빛 방향 (-1,-1)
-    const low = Math.max(0, -H[i]) * 0.22;        // 골짜기 그늘
-    const lit = shade > 0;
-    const a = Math.min(0.42, Math.abs(shade) * 0.5 + (lit ? 0 : low));
-    D[i*4] = lit ? 255 : 10; D[i*4+1] = lit ? 244 : 12; D[i*4+2] = lit ? 214 : 20;
-    D[i*4+3] = Math.round((lit ? a * 0.16 : Math.min(0.5, a + low)) * 255);
+    const i = gy * gw + gx, k = i * 4, v = Hm[i];
+    const dx = (Hm[gy * gw + Math.min(gw - 1, gx + 1)] - Hm[gy * gw + Math.max(0, gx - 1)]) * Z;
+    const dy = (Hm[Math.min(gh - 1, gy + 1) * gw + gx] - Hm[Math.max(0, gy - 1) * gw + gx]) * Z;
+    const nl = Math.hypot(dx, dy, 1), lam = (-dx * Lx - dy * Ly + Lz) / nl - Lz;   // 평지 대비 밝기 차
+    const g = Math.max(0, Math.min(255, 128 + lam * 170));
+    sI.data[k] = g; sI.data[k + 1] = g; sI.data[k + 2] = g; sI.data[k + 3] = 255;
+    const ao = Math.max(0, Math.min(1, -v * 0.55));                                  // 낮은 곳일수록 어둡게(습하고 그늘진 골짜기)
+    const m = 255 - ao * 45; aI.data[k] = m; aI.data[k + 1] = m; aI.data[k + 2] = m + ao * 12; aI.data[k + 3] = 255;
+    // 색 얼룩: 마른 풀(노란 연두) / 짙은 풀 / 높은 곳은 햇빛에 바랜 밝은 풀
+    const n = _fbm(nz2, (x0 + gx * S) / 300, (y0 + gy * S) / 300, 3);
+    const dry = _sstep(0.56, 0.74, n), lush = _sstep(0.44, 0.27, n), hi = Math.max(0, Math.min(1, v * 0.8));
+    const aDry = dry * 0.26 + hi * 0.10, aLush = lush * 0.30;
+    if (aDry >= aLush) { cI.data[k] = 196; cI.data[k + 1] = 182; cI.data[k + 2] = 92; cI.data[k + 3] = aDry * 255; }
+    else { cI.data[k] = 22; cI.data[k + 1] = 58; cI.data[k + 2] = 26; cI.data[k + 3] = aLush * 255; }
   }
-  sctx.putImageData(img, 0, 0);
+  shadeC.getContext('2d').putImageData(sI, 0, 0); aoC.getContext('2d').putImageData(aI, 0, 0); colC.getContext('2d').putImageData(cI, 0, 0);
+  const W2 = gw * S, H2 = gh * S;
   ctx.save(); ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(sc, 0, 0, gw * S, gh * S);
-  // 등고선 느낌의 아주 옅은 높은 지대 하이라이트
-  for (const b of blobs) if (b.a > 0.45) {
-    const g = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, b.r * 0.8);
-    g.addColorStop(0, 'rgba(255,240,200,0.06)'); g.addColorStop(1, 'rgba(255,240,200,0)');
-    ctx.fillStyle = g; ctx.fillRect(b.x - b.r, b.y - b.r, b.r * 2, b.r * 2);
-  }
+  ctx.drawImage(colC, x0, y0, W2, H2);
+  ctx.globalCompositeOperation = 'soft-light'; ctx.drawImage(shadeC, x0, y0, W2, H2);
+  ctx.globalCompositeOperation = 'multiply'; ctx.drawImage(aoC, x0, y0, W2, H2);
+  // 햇빛 쪽(왼쪽 위) 따뜻한 빛 + 반대쪽은 차분하게
+  ctx.globalCompositeOperation = 'soft-light';
+  const sun = ctx.createRadialGradient(w * 0.05, -h * 0.05, 0, w * 0.05, -h * 0.05, Math.hypot(w, h) * 1.1);
+  sun.addColorStop(0, 'rgba(255,226,160,0.9)'); sun.addColorStop(0.5, 'rgba(255,226,160,0.25)'); sun.addColorStop(1, 'rgba(40,60,90,0.5)');
+  ctx.fillStyle = sun; ctx.fillRect(x0, y0, w + 2 * M, h + 2 * M);
+  // 맵 바깥 여백은 점점 어둡게(시선이 판 안으로)
+  ctx.globalCompositeOperation = 'source-over';
+  const vg = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.55, w / 2, h / 2, Math.hypot(w, h) * 0.62 + M);
+  vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(6,14,4,0.55)');
+  ctx.fillStyle = vg; ctx.fillRect(x0, y0, w + 2 * M, h + 2 * M);
   ctx.restore();
 
-  // 3) v3.13 소품 그림자·바닥 데칼은 평평하니 배경 캐시에 구움 (서 있는 소품 본체는 엔진이 유닛과 함께 앞뒤 정렬해서 그림)
+  // 소품 그림자·바닥 데칼은 평평하니 여기서 구움 (서 있는 본체는 엔진이 그림)
   const P = buildMapProps(w, h, map);
   ctx.save();
   for (const d of P.decals) { const im = _propCanvas(d.key, d.w, d.h, d.filter); if (!im) continue; ctx.globalAlpha = d.a; ctx.drawImage(im, d.x - d.w / 2, d.y - d.h / 2, d.w, d.h); }
-  ctx.globalAlpha = 1; ctx.fillStyle = 'rgba(0,0,0,0.2)';
-  for (const o of P.props) { ctx.beginPath(); ctx.ellipse(o.x + o.w * 0.06, o.y - 1, o.w * 0.44, Math.max(3, o.w * 0.11), 0, 0, Math.PI * 2); ctx.fill(); }
+  ctx.globalAlpha = 1;
+  const soft = (cx, cy, rx, ry, a) => { // 가장자리가 부드러운 타원 그림자 (filter 없이 — 사파리 호환)
+    ctx.save(); ctx.translate(cx, cy); ctx.scale(1, ry / rx);
+    const g = ctx.createRadialGradient(0, 0, 0, 0, 0, rx); g.addColorStop(0, `rgba(8,16,4,${a})`); g.addColorStop(0.6, `rgba(8,16,4,${a * 0.6})`); g.addColorStop(1, 'rgba(8,16,4,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, rx, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+  };
+  for (const o of P.props) {
+    if (o.h > 60) soft(o.x + o.w * 0.38, o.y + o.w * 0.08, o.w * 0.62, o.w * 0.26, 0.34); // 나무: 햇빛 반대쪽(오른쪽 아래)으로 드리운 그림자
+    soft(o.x + o.w * 0.06, o.y + 1, o.w * 0.5, Math.max(3, o.w * 0.14), 0.42);             // 밑동 접지 그림자
+  }
   ctx.restore();
 }
 
@@ -186,11 +222,14 @@ function drawNaturalTerrain(ctx, w, h, map) {
 // h: 월드 기준 높이(px). 큰 나무는 가장자리·빈터, 덤불/바위는 길 앞쪽에 붙여 길이 살짝 가려지게(깊이감)
 const PROP_SETS = {
   forest: {
-    big: [['tree_oak', 118], ['tree_pine', 128], ['tree_oak', 100], ['tree_pine', 110], ['tree_oak', 132], ['tree_acacia', 74]],
-    mid: [['bush_a', 30], ['bush_b', 27], ['bush_tall', 32], ['flower_bush', 38], ['flower_bush2', 28], ['pampas', 42], ['pampas2', 44], ['rock_mound', 26], ['bush_a', 26], ['bush_tall', 28]],
-    edge: [['bush_a', 26], ['bush_b', 24], ['bush_wide', 20], ['flower_bush2', 24], ['rock_mound', 22, 'brightness(0.85)'], ['pampas', 34], ['bush_tall', 26]],
-    small: [['mush_red', 16], ['flowers', 22], ['rock_dull', 12, 'brightness(0.62) sepia(0.3)'], ['flowers', 18]],
-    decal: [['decal_flowers', 9]],
+    tree: [['tree_oak', 112], ['tree_oak', 124], ['tree_pine', 126], ['tree_pine', 112], ['tree_oak', 100]],
+    farTree: [['tree_oak', 96], ['tree_oak', 84], ['tree_pine', 110], ['tree_oak', 104], ['bush_tall', 34]],
+    bush: [['bush_a', 26], ['bush_b', 24], ['bush_tall', 28], ['bush_a', 22], ['bush_b', 20]],
+    under: [['mush_red', 14], ['mush_hood', 15], ['flowers', 18]],
+    flower: [['flowers', 20], ['flower_bush2', 24], ['flower_bush', 30], ['flowers', 16]],
+    rock: [['rock_mound', 22, 'dark:0.18'], ['rock_mound', 17, 'dark:0.2'], ['rock_dull', 11, 'dark:0.4,30,26,14']],
+    grass: [['pampas', 30], ['pampas2', 32]],
+    decal: [['decal_flowers', 8]],
   },
   volcano: {
     filter: 'brightness(0.45) sepia(0.6) saturate(1.6) hue-rotate(-15deg)',
@@ -226,68 +265,120 @@ function _propCanvas(key, w, h, filter) {
   const R = 2.4, c = document.createElement('canvas');
   c.width = Math.max(2, Math.round(w * R)); c.height = Math.max(2, Math.round(h * R));
   const g = c.getContext('2d'); g.imageSmoothingQuality = 'high';
-  if (filter) g.filter = filter;
+  const dk = filter && filter.startsWith('dark:') ? filter.slice(5).split(',') : null; // 'dark:알파,r,g,b' = 원본 모양 그대로 어둡게(사파리 호환)
+  if (filter && !dk) g.filter = filter;
   g.drawImage(im, 0, 0, c.width, c.height);
+  if (dk) { g.globalCompositeOperation = 'source-atop'; g.fillStyle = `rgba(${dk[1] || 20},${dk[2] || 26},${dk[3] || 12},${dk[0]})`; g.fillRect(0, 0, c.width, c.height); }
   return (_propCache[ck] = c);
 }
-window.propCanvas = _propCanvas;
+window.propCanvas = _propCanvas; window.propImg = _propImg;
 const PROP_ASPECT = { bush_a:2.8, bush_b:2.59, bush_tall:1.7, bush_wide:4.27, crystal_a:1.69, crystal_b:1.13, crystal_c:0.93, decal_flowers:10.2, decal_grass:5.08, dirt_mound:1.33, flower_bush:0.78, flower_bush2:1.94, flowers:0.6, mush_hood:0.72, mush_purple:0.44, mush_red:0.74, pampas:0.69, pampas2:0.65, rock_dull:2.05, rock_dull2:4, rock_mound:2.52, rock_sparkly:3.02, stalagmite:0.63, stones:1.56, stump:1.67, tree_acacia:1.6, tree_acacia2:2.19, tree_bare:0.88, tree_oak:0.74, tree_pine:0.41 };
 
 let _propsCache = null;
+// v3.13 자연 배치: 아무 데나 뿌리지 않고 '숲이 생길 만한 곳'에만 —
+//   ① 빈터(길·타워에서 먼 곳)에 나무 군락 + 밑에 덤불·버섯  ② 맵 테두리(특히 먼 쪽 위·오른쪽)는 숲 경계
+//   ③ 길 굽이 바깥쪽엔 밀려난 바위·풀  ④ 곧은 길 앞 가장자리에 낮은 덤불(길이 살짝 가려지는 깊이감)  ⑤ 꽃밭 몇 군데
 function buildMapProps(w, h, map) {
-  const theme = (map.deco && map.deco.theme) || 'forest', set = PROP_SETS[theme] || PROP_SETS.forest;
+  const theme = (map.deco && map.deco.theme) || 'forest', set = PROP_SETS[theme];
   const key = theme + '|' + w + 'x' + h;
   if (_propsCache && _propsCache.key === key) return _propsCache;
+  if (theme !== 'forest' || !set) return (_propsCache = { key, props: [], decals: [] }); // 숲 맵 확정 후 다른 맵 적용
   const L = NaturalLayout.build(w, h), slots = L.slots, path = L.path, pathS = path.filter((_, i) => i % 2 === 0);
-  const rnd = _mapRng(theme === 'forest' ? 4242 : theme === 'cave' ? 9191 : 6161);
-  const pw = map.pathWidth || 30, props = [], decals = [];
+  const rnd = _mapRng(4242), pw = map.pathWidth || 30, K = window.STAND_K || 1.24, props = [], decals = [];
   const pick = (arr) => arr[Math.floor(rnd() * arr.length)];
-  const mk = (def, sc) => { const ph = def[1] * sc, w2 = ph * (PROP_ASPECT[def[0]] || 1); return { key: def[0], w: w2, h: ph, f: def[2] }; };
-  // 타워(자리 위로 ~45px 솟음)를 가리지 않게: 소품이 서 있는 박스와 슬롯이 겹치면 탈락
-  const slotFree = (x, y, o) => !slots.some(s => Math.abs(s.x - x) < o.w / 2 + 20 && s.y > y - o.h * (window.STAND_K || 1.13) - 26 && s.y < y + 30);
-  const pathClear = (x, y, o, pad) => !pathS.some(p => Math.abs(p.x - x) < o.w / 2 + pad && p.y > y - o.h * 1.13 - pad && p.y < y + pad);
-  const spaced = (x, y, o, k) => !props.some(q => Math.abs(q.x - x) < (q.w + o.w) * k && Math.abs(q.y - y) < Math.max(10, (q.h + o.h) * 0.18));
-  const add = (o, x, y) => { o.x = x; o.y = y; o.flip = rnd() < 0.5; o.filter = o.f || (PROP_NOFILTER[o.key] ? '' : (set.filter || '')); props.push(o); _propImg(o.key); };
-
-  // ① 큰 나무/바위: 빈터와 맵 가장자리(좌우 끝은 슬롯이 없어 숲 경계처럼)
-  const nBig = Math.round(w * h / 20000);
-  for (let n = 0, t = 0; n < nBig && t < nBig * 40; t++) {
-    const edge = rnd() < 0.55, x = edge ? (rnd() < 0.5 ? -10 + rnd() * w * 0.12 : w * 0.9 + rnd() * w * 0.12) : rnd() * w;
-    const y = 30 + rnd() * (h - 34), o = mk(pick(set.big), 0.85 + rnd() * 0.35);
-    if (x < o.w * 0.3 || x > w - o.w * 0.3) continue; // 배경 캐시 밖으로 잘리지 않게
-    if (!slotFree(x, y, o) || !pathClear(x, y, o, 10) || !spaced(x, y, o, 0.32)) continue;
-    add(o, x, y); n++;
-  }
-  // ② 길 앞쪽 가림막: 길 아래 가장자리에 덤불/바위를 붙여 길과 지나가는 적의 발밑이 살짝 가려지게 (먼 쪽=위쪽에 더 많이)
-  for (let i = 6; i < path.length - 6; i += 3) {
-    const p = path[i], q = path[i + 2] || p, dx = q.x - p.x, dy = q.y - p.y, len = Math.hypot(dx, dy) || 1;
-    if (Math.abs(dy) > len * 0.6) continue;                 // 세로로 꺾이는 구간은 제외 (가로 구간만)
-    const prob = 0.12 + 0.30 * (1 - p.y / h);
-    if (rnd() > prob) continue;
-    const o = mk(pick(set.edge), 0.85 + rnd() * 0.3), x = p.x + (rnd() - 0.5) * 10, y = p.y + pw * 0.5 + 3 + rnd() * 6;
-    if (x < 8 || x > w - 8 || !slotFree(x, y, o) || !spaced(x, y, o, 0.45)) continue;
-    add(o, x, y);
-  }
-  // ③ 중간 덤불·바위 ④ 작은 버섯·꽃·돌 (길·슬롯을 피해 무리 지어)
-  const scatter = (arr, n0, sc0, scR, pad, k) => {
-    for (let n = 0, t = 0; n < n0 && t < n0 * 30; t++) {
-      let x = rnd() * w, y = 10 + rnd() * h;
-      if (props.length && rnd() < 0.45) { const a = pick(props); x = a.x + (rnd() - 0.5) * (a.w + 40); y = a.y + (rnd() - 0.3) * 30; } // 군락
-      const o = mk(pick(arr), sc0 + rnd() * scR);
-      if (x < o.w * 0.3 || x > w - o.w * 0.3 || y > h - 3 || !slotFree(x, y, o) || !pathClear(x, y, o, pad) || !spaced(x, y, o, k)) continue;
-      add(o, x, y); n++;
-    }
+  const mk = (def, sc) => { const ph = def[1] * sc; return { key: def[0], w: ph * (PROP_ASPECT[def[0]] || 1), h: ph, filter: def[2] || '' }; };
+  // 타워(자리 위로 ~50px 솟음)·빈 자리를 가리지 않게
+  const slotFree = (x, y, o) => !slots.some(s => Math.abs(s.x - x) < o.w * 0.45 + 22 && s.y > y - o.h * K - 30 && s.y < y + 26);
+  const pathClear = (x, y, o, pad) => !pathS.some(p => Math.abs(p.x - x) < o.w * 0.42 + pad && p.y > y - o.h * K * 0.9 - pad && p.y < y + pad);
+  const spaced = (x, y, o) => !props.some(q => Math.abs(q.x - x) < (q.w + o.w) * 0.3 && Math.abs(q.y - y) < 14);
+  const add = (o, x, y, pad = 4) => { if (!slotFree(x, y, o) || !pathClear(x, y, o, pad) || !spaced(x, y, o)) return null; o.x = x; o.y = y; o.flip = rnd() < 0.5; props.push(o); _propImg(o.key); return o; };
+  // 나무 크기를 자리에 맞춤: 뒤(위)쪽 타워 자리를 가리지 않는 최대 높이, 폭은 빈터 여유 이내. 좁으면 소나무
+  const fitTree = (x, y, c) => {
+    let maxH = 150;
+    for (const s of slots) if (s.y < y + 26 && Math.abs(s.x - x) < 60) { if (s.y > y - 40) return null; maxH = Math.min(maxH, (y - s.y - 30) / K); }
+    const def = c < 46 || rnd() < 0.4 ? ['tree_pine', 130] : ['tree_oak', 124];
+    const hh = Math.min(maxH, def[1] * (0.8 + rnd() * 0.3), (c * 2.5) / (PROP_ASPECT[def[0]] || 1));
+    if (hh < 58) return null;
+    const t = mk(def, hh / def[1]); t._x = x; t._y = y; return t;
   };
-  scatter(set.mid, Math.round(w * h / 11000), 0.8, 0.45, 8, 0.4);
-  scatter(set.small, Math.round(w * h / 16000), 0.8, 0.5, 4, 0.5);
-  // ⑤ 바닥 데칼(평면, 배경에 구움)
-  for (let n = 0, t = 0, n0 = set.decal.length ? Math.round(w * h / 20000) : 0; n < n0 && t < n0 * 20; t++) {
-    const x = rnd() * w, y = rnd() * h, o = mk(pick(set.decal), 0.8 + rnd() * 0.6);
-    if (_distToPath(x, y, pathS) < pw * 0.5 + 10 || slots.some(s => (s.x - x) ** 2 + (s.y - y) ** 2 < 900)) continue;
-    o.x = x; o.y = y; o.a = 0.55 + rnd() * 0.35; o.filter = set.filter || ''; decals.push(o); _propImg(o.key); n++;
+  const clr = (x, y) => Math.min(_distToPath(x, y, pathS) - pw / 2, ...slots.map(s => Math.hypot(s.x - x, s.y - y) - 30));
+
+  // ① 빈터 찾기: 12px 격자에서 길·타워와의 여유가 큰 곳 (국소 최대)
+  const cand = [];
+  for (let y = 24; y < h - 6; y += 12) for (let x = 16; x < w - 16; x += 12) { const c = clr(x, y); if (c > 22) cand.push({ x, y, c }); }
+  cand.sort((a, b) => b.c - a.c);
+  const groves = [];
+  for (const c of cand) { if (groves.length >= 15) break; if (groves.every(g => Math.hypot(g.x - c.x, g.y - c.y) > 92)) groves.push(c); }
+  const used = [];
+  for (const g of groves) {
+    if (g.c >= 30) {
+      const t = fitTree(g.x + (rnd() - 0.5) * 10, g.y + 8, g.c);
+      if (t && add(t, t._x, t._y, 6)) {
+        if (g.c >= 58 && rnd() < 0.75) { const t2 = mk(pick(set.tree), 0.7 + rnd() * 0.2); add(t2, g.x + (rnd() < 0.5 ? -1 : 1) * t.w * (0.38 + rnd() * 0.15), g.y - 6 + rnd() * 10, 6); }
+        for (let i = 0, n = 2 + Math.floor(rnd() * 2); i < n; i++) add(mk(pick(set.bush), 0.85 + rnd() * 0.3), g.x + (rnd() - 0.5) * t.w * 0.9, g.y + 12 + rnd() * 10);
+        if (rnd() < 0.6) add(mk(pick(set.under), 0.9 + rnd() * 0.3), g.x + (rnd() - 0.5) * t.w * 0.6, g.y + 18 + rnd() * 6);
+        used.push(g); continue;
+      }
+    }
+    // 작은 빈터: 덤불 무리 + 풀
+    for (let i = 0, n = 2 + Math.floor(rnd() * 2); i < n; i++) add(mk(pick(set.bush), 0.8 + rnd() * 0.3), g.x + (rnd() - 0.5) * 34, g.y + (rnd() - 0.5) * 14);
+    if (rnd() < 0.5) add(mk(pick(set.grass), 0.8 + rnd() * 0.3), g.x + (rnd() - 0.5) * 30, g.y + 6);
+    used.push(g);
   }
-  // 길(적이 지나는 곳)이 소품 뒤에 있을 때만 매 프레임 깊이 정렬 대상(dyn), 나머지는 정적 레이어에 1회 구움 (발열)
-  const K = window.STAND_K || 1.13;
+  // ② 숲 경계: 먼 쪽(위·오른쪽)은 키 큰 나무 줄, 가까운 쪽(왼쪽·아래)은 낮은 덤불만 드문드문
+  // 맵 위 바깥 = 숲 가장자리: 낮은 덤불·어린 소나무만(큰 숲은 판 뒤 지평선 레이어가 그림 — 캔버스 끝에서 잘리지 않게)
+  for (const y0 of [-70, -44, -18, 4]) for (let x = -40; x < w + 100; x += 16 + rnd() * 20) {
+    const r = rnd(), def = r < 0.2 ? ['tree_pine', 58] : r < 0.45 ? ['bush_tall', 30] : pick(set.bush);
+    add(mk(def, 0.95 + rnd() * 0.45), x, y0 + rnd() * 12, 6);
+  }
+  for (let y = 30; y < h * 0.85; y += 26 + rnd() * 30) add(mk(pick(set.farTree), 0.8 + rnd() * 0.35), w + 8 + rnd() * 90, y, 8);
+  for (let y = 60; y < h; y += 70 + rnd() * 60) add(mk(pick(set.bush), 0.9 + rnd() * 0.3), -6 - rnd() * 30, y);
+  for (let x = 0; x < w; x += 80 + rnd() * 70) add(mk(rnd() < 0.6 ? pick(set.bush) : pick(set.grass), 0.9 + rnd() * 0.3), x, h - 2 - rnd() * 8);
+  // ②-b 작은 수풀 무리: 노이즈가 높은 곳에만 몰려 나게(균일하게 뿌리지 않음) — 낮아서 뒤 타워를 안 가림
+  const nzP = _vnoise(77);
+  for (let t = 0, n = 0; t < 1400 && n < 24; t++) {
+    const x = 20 + rnd() * (w - 40), y = 20 + rnd() * (h - 30);
+    if (_fbm(nzP, x / 140, y / 140, 2) < 0.54 || clr(x, y) < 12) continue;
+    let k = 0;
+    for (let i = 0, m = 2 + Math.floor(rnd() * 3); i < m; i++) {
+      const r = rnd(), def = r < 0.45 ? pick(set.bush) : r < 0.65 ? pick(set.grass) : r < 0.85 ? pick(set.flower) : set.rock[1];
+      if (add(mk(def, 0.7 + rnd() * 0.3), x + (rnd() - 0.5) * 40, y + (rnd() - 0.5) * 16)) k++;
+    }
+    if (k) n++;
+  }
+  // ③ 길 굽이 바깥: 밀려난 바위 무리 / ④ 곧은 구간 앞 가장자리: 낮은 덤불·풀
+  let skip = 0, nextEdge = 90;
+  for (let i = 8, acc = 0; i < path.length - 8; i++) {
+    const a = path[i - 8], p = path[i], b = path[i + 8];
+    const a1 = Math.atan2(p.y - a.y, p.x - a.x), a2 = Math.atan2(b.y - p.y, b.x - p.x);
+    let turn = a2 - a1; while (turn > Math.PI) turn -= 2 * Math.PI; while (turn < -Math.PI) turn += 2 * Math.PI;
+    acc += Math.hypot(p.x - path[i - 1].x, p.y - path[i - 1].y);
+    if (skip > 0) { skip--; continue; }
+    if (Math.abs(turn) > 0.9) {                                   // 굽이: 바깥쪽 법선
+      const tx = b.x - a.x, ty = b.y - a.y, tl = Math.hypot(tx, ty) || 1, sgn = turn > 0 ? 1 : -1;
+      const nx = (ty / tl) * sgn, ny = (-tx / tl) * sgn, d = pw / 2 + 12;
+      const cx = p.x + nx * d, cy = p.y + ny * d;
+      if (add(mk(set.rock[0], 0.9 + rnd() * 0.3), cx, cy, 2)) {
+        add(mk(set.rock[2], 0.9 + rnd() * 0.4), cx + 14 + rnd() * 6, cy + 4, 2);
+        if (rnd() < 0.6) add(mk(pick(set.grass), 0.75 + rnd() * 0.2), cx - 16 - rnd() * 6, cy - 2, 2);
+      }
+      skip = 40; continue;
+    }
+    if (acc > nextEdge && Math.abs(b.y - a.y) < Math.abs(b.x - a.x) * 0.5) {   // 가로 구간 앞(아래) 가장자리
+      nextEdge = acc + 120 + rnd() * 140;
+      if (rnd() < 0.7) add(mk(rnd() < 0.7 ? pick(set.bush) : pick(set.grass), 0.75 + rnd() * 0.25), p.x + (rnd() - 0.5) * 12, p.y + pw / 2 + 4 + rnd() * 4, 0);
+    }
+  }
+  // ⑤ 꽃밭: 나무 군락과 떨어진 중간 빈터 3곳
+  let meadows = 0;
+  for (const c of cand) {
+    if (meadows >= 3) break;
+    if (c.c > 40 || used.some(g => Math.hypot(g.x - c.x, g.y - c.y) < 90)) continue;
+    used.push(c); meadows++;
+    for (let i = 0, n = 3 + Math.floor(rnd() * 3); i < n; i++) add(mk(pick(set.flower), 0.8 + rnd() * 0.3), c.x + (rnd() - 0.5) * 44, c.y + (rnd() - 0.5) * 20, 2);
+    for (let i = 0; i < 2; i++) { const o = mk(set.decal[0], 0.9 + rnd() * 0.4); o.x = c.x + (rnd() - 0.5) * 40; o.y = c.y + (rnd() - 0.5) * 18; o.a = 0.8; decals.push(o); _propImg(o.key); }
+  }
+  // 길(적이 지나는 곳)이 소품 뒤에 있을 때만 매 프레임 깊이 정렬 대상(dyn), 나머지는 배경에 1회 구움 (발열)
   for (const o of props) o.dyn = pathS.some(p => Math.abs(p.x - o.x) < o.w / 2 + 12 && p.y < o.y && p.y > o.y - o.h * K - 8);
   props.sort((a, b) => a.y - b.y);
   return (_propsCache = { key, props, decals });
@@ -303,13 +394,14 @@ const MapDefs = {
     bgTextures:['assets/terrain/grass_a.jpg','assets/terrain/grass_b.jpg'], // v3.13 CC0 손그림 잔디
     bgTileSize:300,
     pathTextures:['assets/terrain/cobble.jpg'], // CC0 손그림 자갈 돌바닥
-    pathTileSize:96, trees:true,
+    pathTileSize:96, trees:true, haze:'150,178,172',
+    horizon:[['tree_oak', 120], ['tree_pine', 150], ['tree_oak', 104], ['tree_pine', 128], ['tree_acacia', 80]], // 판 뒤 지평선 숲
     pathColor:'#c8a44a', pathColorDark:'#5a4320',
     pathArrow:'rgba(255,225,150,0.20)', pathWidth:30, rim:'#6b5a3e', rimLight:'#a8916a',
     deco:{ big:['pine','tree','rock'], small:['bush','flower','grass'], theme:'forest' },
     getPaths:(w,h)=>NaturalLayout.getPaths(w,h),
     getSlots:(w,h)=>NaturalLayout.getSlots(w,h),
-    drawBg(ctx,w,h){ drawNaturalTerrain(ctx,w,h,this); },
+    drawBg(ctx,w,h,M){ drawNaturalTerrain(ctx,w,h,this,M); },
   },
 
   // ===== 2. 홍련체육관 도시 (화산 지대) =====
@@ -319,13 +411,13 @@ const MapDefs = {
     bgTextures:['assets/textures/lava_01.jpg','assets/textures/lava_02.jpg'],
     bgTileSize:420,
     pathTextures:['assets/terrain/rock.jpg'],
-    pathTileSize:90, pathTint:'rgba(40,12,0,0.30)', bgDim:0.5, soilColor:a=>`rgba(24,10,6,${a*1.6})`,
+    pathTileSize:90, pathTint:'rgba(40,12,0,0.30)', bgDim:0.5, haze:'64,30,22', soilColor:a=>`rgba(24,10,6,${a*1.6})`,
     pathColor:'#6b4428', pathColorDark:'#2a1206',
     pathArrow:'rgba(255,160,90,0.22)', pathWidth:30, rim:'#3a2618', rimLight:'#7a5232', cliffTop:'rgba(40,18,8,0.9)', cliffLight:'rgba(255,140,60,0.35)', rockDark:'#2e1d16', rockLight:'#6e4a36',
     deco:{ big:['rock','spire'], small:['ember','pebble','crack'], theme:'volcano' },
     getPaths:(w,h)=>NaturalLayout.getPaths(w,h),
     getSlots:(w,h)=>NaturalLayout.getSlots(w,h),
-    drawBg(ctx,w,h){ drawNaturalTerrain(ctx,w,h,this); },
+    drawBg(ctx,w,h,M){ drawNaturalTerrain(ctx,w,h,this,M); },
   },
 
   // ===== 3. 라벤더 동굴 =====
@@ -334,13 +426,13 @@ const MapDefs = {
     bgColor:'#050210',
     bgImage:'assets/textures/cave_bg.jpg',
     pathTextures:['assets/terrain/slate.jpg'],
-    pathTileSize:110, pathTint:'rgba(28,18,60,0.50)', soilColor:a=>`rgba(14,8,30,${a*1.6})`,
+    pathTileSize:110, pathTint:'rgba(28,18,60,0.50)', haze:'30,26,52', soilColor:a=>`rgba(14,8,30,${a*1.6})`,
     pathColor:'#3e2860', pathColorDark:'#160b26',
     pathArrow:'rgba(190,160,255,0.20)', pathWidth:30, rim:'#2b2040', rimLight:'#5e4a86', cliffTop:'rgba(20,10,40,0.9)', cliffLight:'rgba(190,160,255,0.35)', rockDark:'#26203a', rockLight:'#5a4f7a',
     ghostBonus:0.30,
     deco:{ big:['crystal','rock'], small:['crystal_s','pebble','glow'], theme:'cave' },
     getPaths:(w,h)=>NaturalLayout.getPaths(w,h),
     getSlots:(w,h)=>NaturalLayout.getSlots(w,h),
-    drawBg(ctx,w,h){ drawNaturalTerrain(ctx,w,h,this); },
+    drawBg(ctx,w,h,M){ drawNaturalTerrain(ctx,w,h,this,M); },
   },
 };

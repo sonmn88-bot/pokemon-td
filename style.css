@@ -1598,7 +1598,6 @@ img.title-pkm.lead { width:88px; height:88px; }
 
 /* v3.13 3D 기울기: 게임 판을 살짝 눕혀 깊이감 (engine.js TILT 값과 같게 유지) */
 #game-screen { background:#1f3a14; perspective-origin:50% 60%; }
-#game-canvas { transform:perspective(1000px) rotateX(28deg) scale(1.35); transform-origin:50% 60%; }
+#game-canvas { transform:perspective(850px) rotateY(12deg) rotateX(36deg) scale(1.42); transform-origin:60% 60%; } /* engine.js TILT.css()가 덮어씀 */
 /* 먼 쪽(위) 안개로 원근감 */
-#game-screen::before { content:''; position:absolute; left:0; right:0; top:0; height:34%; z-index:1; pointer-events:none;
-  background:linear-gradient(180deg, rgba(150,180,200,.28) 0%, rgba(40,60,70,.18) 35%, rgba(12,18,10,0) 100%); } /* 먼 쪽 대기 원근(옅은 하늘빛 안개) */
+/* v3.13 먼 쪽 안개는 engine.js _drawHaze로 (대각 원근) */

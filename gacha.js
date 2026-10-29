@@ -857,31 +857,19 @@ function _shade(hex, amt) { // amt -1..1 : 어둡게/밝게
   const c = sh => Math.round(((n >> sh) & 255) * (1 - t) + f * t);
   return `rgb(${c(16)},${c(8)},${c(0)})`;
 }
+// v3.13 받침: 어두운 원판을 없애고 땅 위 링만 (포켓몬이 배경에 자연스럽게 서 있게, 영웅처럼). 3D 기울기가 링을 납작하게 보여줌
 function towerBaseSprite(gradeKey) {
   const k = 'base_' + gradeKey;
   if (_towerSpriteCache[k]) return _towerSpriteCache[k];
   const G = GRADES[gradeKey] || GRADES.normal, S = 3, c = document.createElement('canvas');
   c.width = c.height = 60 * S;
   const x = c.getContext('2d'); x.scale(S, S); x.translate(30, 30);
-  // 바닥 그림자
-  x.fillStyle = 'rgba(0,0,0,0.38)'; x.beginPath(); x.ellipse(0, 15, 20, 6.5, 0, 0, Math.PI * 2); x.fill();
-  // 등급 오라 (노말 제외)
-  if (gradeKey !== 'normal') {
-    const a = x.createRadialGradient(0, 0, 14, 0, 0, 29);
-    a.addColorStop(0, G.color + '40'); a.addColorStop(1, G.color + '00');
-    x.fillStyle = a; x.beginPath(); x.arc(0, 0, 29, 0, Math.PI * 2); x.fill();
-  }
-  // 테두리 (위 밝고 아래 어두운 금속 링)
-  const rim = x.createLinearGradient(0, -23, 0, 23);
-  rim.addColorStop(0, _shade(G.color, 0.45)); rim.addColorStop(0.5, G.color); rim.addColorStop(1, _shade(G.color, -0.45));
-  x.fillStyle = rim; x.beginPath(); x.arc(0, 0, 22.5, 0, Math.PI * 2); x.fill();
-  // 안쪽 면 (위쪽 빛)
-  const face = x.createRadialGradient(0, -8, 2, 0, 0, 20);
-  face.addColorStop(0, _shade(G.bg, 0.16)); face.addColorStop(1, _shade(G.bg, -0.35));
-  x.fillStyle = face; x.beginPath(); x.arc(0, 0, 19.5, 0, Math.PI * 2); x.fill();
-  // 안쪽 그림자 링 + 상단 하이라이트
-  x.strokeStyle = 'rgba(0,0,0,0.45)'; x.lineWidth = 1.2; x.beginPath(); x.arc(0, 0, 19.3, 0, Math.PI * 2); x.stroke();
-  x.strokeStyle = 'rgba(255,255,255,0.35)'; x.lineWidth = 1; x.beginPath(); x.arc(0, 0, 22, Math.PI * 1.15, Math.PI * 1.85); x.stroke();
+  const sh = x.createRadialGradient(1, 2, 4, 1, 2, 20); sh.addColorStop(0, 'rgba(0,0,0,0.30)'); sh.addColorStop(1, 'rgba(0,0,0,0)'); // 접지 그림자
+  x.fillStyle = sh; x.beginPath(); x.arc(1, 2, 20, 0, Math.PI * 2); x.fill();
+  const col = gradeKey === 'normal' ? '#e8eef5' : G.color;
+  if (gradeKey !== 'normal') { x.strokeStyle = col; x.globalAlpha = 0.22; x.lineWidth = 6; x.beginPath(); x.arc(0, 0, 20, 0, Math.PI * 2); x.stroke(); } // 은은한 등급 빛
+  x.globalAlpha = gradeKey === 'normal' ? 0.5 : 0.9; x.strokeStyle = col; x.lineWidth = 1.8; x.beginPath(); x.arc(0, 0, 20, 0, Math.PI * 2); x.stroke();
+  x.globalAlpha = 0.45; x.strokeStyle = '#fff'; x.lineWidth = 0.8; x.beginPath(); x.arc(0, 0, 20, Math.PI * 1.1, Math.PI * 1.7); x.stroke();
   return (_towerSpriteCache[k] = c);
 }
 function towerStarSprite(gradeKey) {

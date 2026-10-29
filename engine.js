@@ -12,6 +12,8 @@ class GameEngine {
   constructor(canvas) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
+    this._topPad = 90; // v3.13 맵 위쪽 바깥(숲 경계) 보이는 폭
+    if (window.TILT) { canvas.style.transform = TILT.css(); canvas.style.transformOrigin = `${TILT.ox * 100}% ${TILT.oy * 100}%`; } // v3.13 3D 시점 (입력 역변환과 같은 값)
     this.width = 0; this.height = 0;
     this.running = false; this.lastTime = 0; this.dt = 0;
 
@@ -165,10 +167,13 @@ class GameEngine {
       if (!hud || !bar || !window.untiltPoint) return;
       const y1 = hud.getBoundingClientRect().bottom + 4, y2 = bar.getBoundingClientRect().top - 4;
       if (!(y2 > y1)) return;
-      const c1 = window.untiltPoint(this.canvas, 0, y1).y, c2 = window.untiltPoint(this.canvas, 0, y2).y;
-      const yw = Math.abs(window.CAM_YAW || 0), fit = (c2 - c1) / (this.worldHeight * Math.cos(yw) + this.worldWidth * 0.55 * Math.sin(yw)); // 회전한 맵의 세로 폭
-      this.minZoom = Math.min(0.8, fit);
-      this._bandOffset = (c1 + c2) / 2 - this.height / 2; // 맵 중심을 화면 보이는 구간 중심에 맞추기 위한 캔버스 y 보정
+      // 화면에 실제로 보이는 캔버스 구간(원근 사다리꼴을 가운데 줄 기준 사각형으로 근사)
+      const box = (this.canvas.parentElement || this.canvas).getBoundingClientRect();
+      const mx = (box.left + box.right) / 2, my = (y1 + y2) / 2;
+      const c1 = Math.max(0, window.untiltPoint(this.canvas, mx, y1).y), c2 = Math.min(this.height, window.untiltPoint(this.canvas, mx, y2).y);
+      const x1 = Math.max(0, window.untiltPoint(this.canvas, box.left + 2, my).x), x2 = Math.min(this.width, window.untiltPoint(this.canvas, box.right - 2, my).x);
+      this._vis = { x1, x2, y1: c1, y2: c2 };
+      this.minZoom = Math.min(0.8, (c2 - c1) / (this.worldHeight + this._topPad)); // 맵 세로 전체 + 먼 쪽 숲 경계가 보이는 줌
     } catch (_) {}
   }
   resetCamera() {
@@ -179,12 +184,15 @@ class GameEngine {
     this.clampCamera();
   }
   clampCamera() {
-    const viewW = this.width / this.camera.zoom, viewH = this.height / this.camera.zoom;
-    const halfW = viewW / 2, halfH = viewH / 2;
-    if (viewW >= this.worldWidth) this.camera.x = this.worldWidth / 2;
-    else this.camera.x = Math.max(halfW, Math.min(this.worldWidth - halfW, this.camera.x));
-    if (viewH >= this.worldHeight) this.camera.y = this.worldHeight / 2 - (this._bandOffset || 0) / this.camera.zoom;
-    else this.camera.y = Math.max(halfH, Math.min(this.worldHeight - halfH, this.camera.y));
+    // v3.13: 화면에 실제로 보이는 창(_vis)이 맵 밖으로 나가지 않게 (원근으로 보이는 구간이 캔버스 가운데가 아님)
+    const z = this.camera.zoom, v = this._vis || { x1: 0, x2: this.width, y1: 0, y2: this.height };
+    const vw = (v.x2 - v.x1) / z, vh = (v.y2 - v.y1) / z;
+    const ocx = ((v.x1 + v.x2) / 2 - this.width / 2) / z, ocy = ((v.y1 + v.y2) / 2 - this.height / 2) / z;
+    let wx = this.camera.x + ocx, wy = this.camera.y + ocy;
+    wx = vw >= this.worldWidth ? this.worldWidth / 2 : Math.max(vw / 2, Math.min(this.worldWidth - vw / 2, wx));
+    const lo = -this._topPad, hi = this.worldHeight; // 위쪽은 맵 밖 숲(지평선)까지 조금 보이게
+    wy = vh >= hi - lo ? (lo + hi) / 2 : Math.max(lo + vh / 2, Math.min(hi - vh / 2, wy));
+    this.camera.x = wx - ocx; this.camera.y = wy - ocy;
   }
 
   // v27-47: 화면 좌표 → 월드 좌표 변환 (입력처리에서 사용)
@@ -744,12 +752,62 @@ class GameEngine {
     if (this.selectedSlotIdx !== null && this.selectedTowerType) this._drawPreview(ctx);
 
     ctx.restore();
+    this._drawHaze(ctx); // v3.13 먼 쪽(오른쪽 위) 대기 원근
+    if (this._backdrop) { const show = this.camera.zoom <= (this.minZoom || 0) * 1.12 ? '1' : '0'; if (this._backdrop.style.opacity !== show) this._backdrop.style.opacity = show; } // 확대하면 지평선 숲 숨김(가장자리 판을 가리지 않게)
 
     // 화면 고정 이펙트 (카메라 변환 영향 안 받음)
     for (const p of this.particles) if (p instanceof RedFlash) p.draw(ctx);
 
     // v27-47: 보스 HP바는 화면 상단 고정 UI라서 카메라 변환 밖(화면좌표)에서 그림
     if (this.activeBoss) this._drawBossBar(ctx);
+  }
+
+  // v3.13 지평선 숲: 기울어진 판의 먼 가장자리(위·오른쪽) 바로 뒤에 안개 낀 큰 나무들을 화면 좌표로 1회 그림
+  //   (판 위에 세우면 캔버스 끝에서 잘리므로 판 뒤 별도 캔버스에). 맵 바뀔 때·이미지 로드 때만 다시 그림.
+  _drawBackdrop() {
+    const host = this.canvas.parentElement; if (!host || !window.tiltForward || !window.propImg) return;
+    let bd = this._backdrop;
+    if (!bd) { bd = this._backdrop = document.createElement('canvas'); bd.id = 'game-backdrop'; bd.style.cssText = 'position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;transition:opacity .35s;'; this.canvas.after(bd); } // 판 앞: 나무 밑동이 판 가장자리 안개를 덮어 땅에 서 있게
+    const map = this.currentMap || {}, c = map.haze || '150,178,172', box = host.getBoundingClientRect(), dpr = Math.min(2, window.devicePixelRatio || 1);
+    bd.width = Math.round(box.width * dpr); bd.height = Math.round(box.height * dpr);
+    const g = bd.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, box.width, box.height);
+    if (!map.horizon) return;
+    let seed = 99; const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
+    const trees = map.horizon, K = window.STAND_K || 1, z = this.minZoom || 0.6, pts = [];
+    for (let x = -30; x <= this.width + 10; x += 9 + rnd() * 9) pts.push([x, 0]);                 // 위 가장자리
+    for (let y = 0; y <= this.height * 0.6; y += 9 + rnd() * 9) pts.push([this.width, y]);         // 오른쪽 가장자리
+    const list = [];
+    for (const [cx, cy] of pts) for (const row of [0, 1]) {
+      const p = tiltForward(this.canvas, cx, cy), key = trees[Math.floor(rnd() * trees.length)];
+      const im = propImg(key[0]); if (!im.complete || !im.naturalWidth) continue;
+      const hgt = key[1] * (0.85 + rnd() * 0.45) * K * z * TILT.k * p.s * (row ? 0.82 : 1.05), wd = hgt * im.naturalWidth / im.naturalHeight;
+      list.push({ im, x: p.x - box.left + (rnd() - 0.5) * 8, y: p.y - box.top + (row ? -4 : 10) * p.s + rnd() * 4, w: wd, h: hgt, row, flip: rnd() < 0.5 });
+    }
+    list.sort((a, b) => b.row - a.row || a.y - b.y);
+    for (const t of list) {
+      g.save(); g.translate(t.x, t.y); if (t.flip) g.scale(-1, 1);
+      g.globalAlpha = t.row ? 0.75 : 1; g.drawImage(t.im, -t.w / 2, -t.h, t.w, t.h); g.restore();
+    }
+    g.globalCompositeOperation = 'source-atop'; g.fillStyle = `rgba(${c},0.5)`; g.fillRect(0, 0, box.width, box.height); // 대기 원근(멀수록 안개색)
+    g.globalCompositeOperation = 'source-over';
+  }
+
+  // v3.13 대기 원근: 먼 쪽(오른쪽 위)일수록 옅은 안개색으로 → 캔버스 밖(지평선) 배경색과 이어지게. 그라디언트는 1회 생성
+  _drawHaze(ctx) {
+    const map = this.currentMap || {}, key = this.width + 'x' + this.height + (map.name || '');
+    if (this._hazeKey !== key) {
+      const c = map.haze || '150,178,172', g = ctx.createLinearGradient(this.width, 0, this.width * 0.3, this.height * 0.62);
+      g.addColorStop(0, `rgba(${c},0.6)`); g.addColorStop(0.2, `rgba(${c},0.26)`); g.addColorStop(0.5, `rgba(${c},0.05)`); g.addColorStop(1, `rgba(${c},0)`);
+      // 판 가장자리(위·오른쪽)는 안개색으로 완전히 녹여 지평선처럼 → 캔버스 경계선이 안 보이게
+      const gt = ctx.createLinearGradient(0, 0, 0, 30); gt.addColorStop(0, `rgba(${c},1)`); gt.addColorStop(1, `rgba(${c},0)`);
+      const gr = ctx.createLinearGradient(this.width, 0, this.width - 40, 0); gr.addColorStop(0, `rgba(${c},1)`); gr.addColorStop(1, `rgba(${c},0)`);
+      this._haze = g; this._hazeT = gt; this._hazeR = gr; this._hazeKey = key;
+      const host = this.canvas.parentElement; // 캔버스가 닿지 않는 오른쪽 위(지평선)도 같은 안개색
+      if (host) host.style.background = `rgb(${c})`;
+    }
+    ctx.fillStyle = this._haze; ctx.fillRect(0, 0, this.width, this.height);
+    ctx.fillStyle = this._hazeT; ctx.fillRect(0, 0, this.width, 30);
+    ctx.fillStyle = this._hazeR; ctx.fillRect(this.width - 40, 0, 40, this.height);
   }
 
   // v3.13 서 있는 소품: 발끝 기준으로 화면에 수직(카메라 회전 상쇄) + 세로 STAND_K배, 앞에 적이 겹치면 살짝 투명
@@ -806,13 +864,13 @@ class GameEngine {
   }
 
   // v3.6: 다른 텍스처를 가장자리가 흐린 큰 얼룩으로 섞고, 명암 얼룩으로 단조로움 제거 (맵 이름 시드라 매번 같은 모양)
-  _blendBgPatches(bctx, pats, seedStr) {
+  _blendBgPatches(bctx, pats, seedStr, M = 0) {
     let seed = 0; for (const ch of seedStr) seed = (seed * 31 + ch.charCodeAt(0)) >>> 0;
     const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
-    const W = this.worldWidth, H = this.worldHeight;
+    const W = this.worldWidth + 2 * M, H = this.worldHeight + 2 * M;
     const n = Math.round(W * H / 70000);
     for (let i = 0; i < n; i++) {
-      const r = 90 + rnd() * 170, x = rnd() * W, y = rnd() * H;
+      const r = 90 + rnd() * 170, x = rnd() * W - M, y = rnd() * H - M;
       const useTex = pats.length > 1 && rnd() < 0.7;
       const oc = document.createElement('canvas'); oc.width = oc.height = Math.ceil(r * 2);
       const o = oc.getContext('2d');
@@ -832,26 +890,28 @@ class GameEngine {
     // v27-36: 배경이 까매지는 문제 방어 (요청3) - width/height가 비정상(0 이하 등)이면 배경 재생성을
     // 건너뛰고 기존 캐시를 그대로 사용 (레이아웃 과도기에 순간적으로 크기가 이상해지는 경우 대비)
     if (this.worldWidth <= 0 || this.worldHeight <= 0) {
-      if (this._bgCanvas) ctx.drawImage(this._bgCanvas, 0, 0, this._bgW, this._bgH);
+      if (this._bgCanvas) ctx.drawImage(this._bgCanvas, -this._bgM, -this._bgM, this._bgW + 2 * this._bgM, this._bgH + 2 * this._bgM);
       return;
     }
     if (this._bgDirty || !this._bgCanvas ||
         this._bgW !== this.worldWidth || this._bgH !== this.worldHeight) {
       const bc = document.createElement('canvas');
-      const BR = 1.6; // v3.13 배경 캐시 1.6배 해상도 (기울여 확대해도 텍스처·소품이 선명하게)
-      bc.width = Math.round(this.worldWidth * BR); bc.height = Math.round(this.worldHeight * BR); // v27-47: 배경도 월드 크기 전체로
-      const bctx = bc.getContext('2d'); bctx.scale(BR, BR); this._bgW = this.worldWidth; this._bgH = this.worldHeight;
+      // v3.13 배경 캐시: 1.5배 해상도(기울여 확대해도 선명) + 맵 바깥 여백 M(원근으로 보이는 가장자리까지 땅이 이어지게)
+      const BR = 2, M = 160;
+      bc.width = Math.round((this.worldWidth + 2 * M) * BR); bc.height = Math.round((this.worldHeight + 2 * M) * BR);
+      const bctx = bc.getContext('2d'); bctx.scale(BR, BR); bctx.translate(M, M); this._bgW = this.worldWidth; this._bgH = this.worldHeight; this._bgM = M;
       const map = this.currentMap;
+      bctx.fillStyle = map.bgColor; bctx.fillRect(-M, -M, this.worldWidth + 2 * M, this.worldHeight + 2 * M);
 
       // v28: 반복 타일 텍스처(잔디/용암) 우선 - 모자이크 패턴 (v27-58 복구)
       if (map.bgTextures) {
         const pat = this._getMosaicPattern(bctx, map.name + '_bg', map.bgTextures, map.bgTileSize || 300);
         bctx.fillStyle = pat || map.bgColor;
-        bctx.fillRect(0, 0, this.worldWidth, this.worldHeight);
+        bctx.fillRect(-M, -M, this.worldWidth + 2 * M, this.worldHeight + 2 * M);
         const ent = this._texCache[map.name + '_bg_' + (map.bgTileSize || 300)];
-        if (pat && ent && ent.patterns) this._blendBgPatches(bctx, ent.patterns, map.name);
+        if (pat && ent && ent.patterns) this._blendBgPatches(bctx, ent.patterns, map.name, M);
         bctx.fillStyle = `rgba(0,0,0,${map.bgDim ?? 0.30})`; // 게임 톤(어두운)과 어우러지게 (맵별 조절)
-        bctx.fillRect(0, 0, this.worldWidth, this.worldHeight);
+        bctx.fillRect(-M, -M, this.worldWidth + 2 * M, this.worldHeight + 2 * M);
       } else if (map.bgImage) {
         if (!this._bgImg || this._bgImg._src !== map.bgImage) {
           const im = new Image();
@@ -869,26 +929,27 @@ class GameEngine {
           bctx.drawImage(this._bgImg, sx,sy,sw,sh, 0,0,this.worldWidth,this.worldHeight);
           // 어두운 오버레이로 게임과 어우러지게
           bctx.fillStyle='rgba(0,0,0,0.22)';
-          bctx.fillRect(0,0,this.worldWidth,this.worldHeight);
+          bctx.fillRect(-M, -M, this.worldWidth + 2 * M, this.worldHeight + 2 * M);
         } else {
           // 로드 전: 단색 폴백, 로드 완료 후 캐시 무효화
           bctx.fillStyle = map.bgColor;
-          bctx.fillRect(0,0,this.worldWidth,this.worldHeight);
+          bctx.fillRect(-M, -M, this.worldWidth + 2 * M, this.worldHeight + 2 * M);
           this._bgImg.onload = () => { this._bgDirty = true; };
         }
       } else {
         bctx.fillStyle = map.bgColor;
-        bctx.fillRect(0,0,this.worldWidth,this.worldHeight);
+        bctx.fillRect(-M, -M, this.worldWidth + 2 * M, this.worldHeight + 2 * M);
       }
 
       // 맵별 이모지/장식 오버레이
-      if (map.drawBg) map.drawBg(bctx, this.worldWidth, this.worldHeight);
+      if (map.drawBg) map.drawBg(bctx, this.worldWidth, this.worldHeight, M);
       this.drawPaths(bctx); // v28: 정적인 경로를 캐시에 1회만 그림
       // v3.13 유닛이 뒤로 지나갈 일 없는 나무·덤불은 배경에 함께 구움 (매 프레임 비용 0)
       for (const o of (this._staticProps || [])) this._drawProp(bctx, o);
       this._bgCanvas = bc; this._bgDirty = false;
+      this._drawBackdrop();
     }
-    ctx.drawImage(this._bgCanvas, 0, 0, this.worldWidth, this.worldHeight);
+    ctx.drawImage(this._bgCanvas, -this._bgM, -this._bgM, this._bgW + 2 * this._bgM, this._bgH + 2 * this._bgM);
   }
 
   drawPaths(ctx) {
@@ -965,10 +1026,10 @@ class GameEngine {
 
       ctx.save();
       // v28 세션E: 빈 슬롯 = '돌 받침대' (미리 구워둔 스프라이트 1장을 drawImage - 매 프레임 그라디언트 생성 없음)
-      ctx.globalAlpha = (isHov || isMouseHover || isHL) ? 0.9 : 0.5; // v3.0: 평소엔 반투명 - 지형에 녹아들게
-      ctx.drawImage(this._getPedestal(), s.x - 26, s.y - 22, 52, 52);
+      ctx.globalAlpha = (isHov || isMouseHover || isHL) ? 0.9 : 0.6; // v3.0: 평소엔 반투명 - 지형에 녹아들게
+      ctx.drawImage(this._getPedestal(), s.x - 26, s.y - 24, 52, 52);
       ctx.globalAlpha = 1;
-      ctx.beginPath(); ctx.ellipse(s.x, s.y, 20, 15, 0, 0, Math.PI*2);
+      ctx.beginPath(); ctx.arc(s.x, s.y, 20, 0, Math.PI*2);
       if (isHov) {
         ctx.fillStyle='rgba(106,168,255,0.35)'; ctx.strokeStyle='#6aa8ff'; ctx.lineWidth=2.5;
         ctx.fill(); ctx.stroke();
@@ -992,21 +1053,23 @@ class GameEngine {
   }
 
   // 돌 받침대 스프라이트 (한 번만 생성, 3배 해상도로 구워 줌해도 선명)
+  // 빈 자리 = 땅에 박힌 둥근 돌판 (v3.13: 3D 기울기가 알아서 납작하게 보이므로 원으로 그림, 약간의 두께·햇빛 방향 음영)
   _getPedestal() {
     if (this._pedestal) return this._pedestal;
     const S = 3, c = document.createElement('canvas'); c.width = c.height = 52 * S;
     const g = c.getContext('2d'); g.scale(S, S);
-    const cx = 26, cy = 22;
-    g.fillStyle = 'rgba(0,0,0,0.38)'; g.beginPath(); g.ellipse(cx, cy + 9, 23, 13, 0, 0, Math.PI*2); g.fill(); // 그림자
-    g.fillStyle = '#5b5348'; g.beginPath(); g.ellipse(cx, cy + 5, 22, 15, 0, 0, Math.PI*2); g.fill();          // 옆면
-    const top = g.createLinearGradient(0, cy - 16, 0, cy + 14);
-    top.addColorStop(0, '#b9b0a2'); top.addColorStop(1, '#857b6d');
-    g.fillStyle = top; g.beginPath(); g.ellipse(cx, cy, 22, 15, 0, 0, Math.PI*2); g.fill();                    // 윗면
-    g.strokeStyle = 'rgba(255,255,255,0.25)'; g.lineWidth = 1; g.stroke();
-    g.fillStyle = 'rgba(0,0,0,0.12)'; g.beginPath(); g.ellipse(cx, cy, 15, 9.5, 0, 0, Math.PI*2); g.fill();     // 안쪽 오목
-    g.strokeStyle = 'rgba(60,50,40,0.35)'; g.lineWidth = 0.8;                                                  // 돌 금
-    g.beginPath(); g.moveTo(cx - 17, cy - 4); g.lineTo(cx - 11, cy - 1); g.lineTo(cx - 13, cy + 5); g.stroke();
-    g.beginPath(); g.moveTo(cx + 12, cy - 9); g.lineTo(cx + 16, cy - 3); g.stroke();
+    const cx = 26, cy = 24;
+    const sh = g.createRadialGradient(cx + 2, cy + 4, 12, cx + 2, cy + 4, 25); sh.addColorStop(0, 'rgba(0,0,0,0.35)'); sh.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = sh; g.beginPath(); g.arc(cx + 2, cy + 4, 25, 0, Math.PI * 2); g.fill();                  // 접지 그림자
+    g.fillStyle = '#4a443b'; g.beginPath(); g.arc(cx, cy + 3, 20, 0, Math.PI * 2); g.fill();              // 두께(옆면)
+    const top = g.createRadialGradient(cx - 7, cy - 8, 2, cx, cy, 21);
+    top.addColorStop(0, '#aaa192'); top.addColorStop(1, '#6c6458');
+    g.fillStyle = top; g.beginPath(); g.arc(cx, cy, 20, 0, Math.PI * 2); g.fill();                        // 윗면
+    g.strokeStyle = 'rgba(255,248,230,0.3)'; g.lineWidth = 1; g.beginPath(); g.arc(cx, cy, 19.5, Math.PI * 1.05, Math.PI * 1.75); g.stroke();
+    g.strokeStyle = 'rgba(0,0,0,0.16)'; g.lineWidth = 1; g.beginPath(); g.arc(cx, cy, 14, 0, Math.PI * 2); g.stroke();
+    g.strokeStyle = 'rgba(50,42,32,0.35)'; g.lineWidth = 0.8;                                                // 돌 금
+    g.beginPath(); g.moveTo(cx - 16, cy - 5); g.lineTo(cx - 10, cy - 1); g.lineTo(cx - 12, cy + 6); g.stroke();
+    g.beginPath(); g.moveTo(cx + 11, cy - 12); g.lineTo(cx + 15, cy - 5); g.stroke();
     return (this._pedestal = c);
   }
 
@@ -1150,27 +1213,39 @@ class GameEngine {
   }
 }
 
-// ===== v3.13 3D 기울기 (CSS perspective + rotateX) =====
+// ===== v3.13 3D 시점 (CSS perspective + rotateY + rotateX) =====
 // 캔버스만 CSS로 눕히고(GPU 합성이라 그리기 비용 0), 입력은 아래 역변환으로 원래 캔버스 좌표로 되돌림.
-// style.css의 #game-canvas transform 값과 반드시 같게 유지할 것.
-const TILT = { p: 1000, deg: 28, k: 1.35, ox: 0.5, oy: 0.6 };
-window.STAND_K = 1 / Math.cos(TILT.deg * Math.PI / 180); // 캐릭터를 세울 때 세로로 늘리는 배율(기울기로 눌린 만큼 되돌림)
-// v3.13 3/4 시점: 맵은 카메라 안에서 YAW만큼 돌리고(확대 없이), 세워 그리는 것들은 반대로 돌려 화면에서 똑바로 서게
-window.CAM_YAW = -9 * Math.PI / 180;
-// 세워 그리기 공통: 발끝(cx, feetY) 기준으로 화면 수직이 되게 돌리고 세로 STAND_K배 → fn은 (0,0)=발끝, 위쪽이 음수 y
+// pitch: 위쪽이 멀어지게 눕힘, turn: 오른쪽이 멀어지게 돌림 → 오른쪽 위가 가장 먼 대각 원근(줄이 오른쪽으로 가면 작아지고 돌아오면 커짐)
+// CSS 값은 아래 TILT.css()로 엔진이 직접 넣음 (style.css 값은 첫 그리기 전 기본값)
+const TILT = { p: 850, pitch: 36, turn: 12, k: 1.42, ox: 0.6, oy: 0.6 };
+TILT.css = () => `perspective(${TILT.p}px) rotateY(${TILT.turn}deg) rotateX(${TILT.pitch}deg) scale(${TILT.k})`;
+window.STAND_K = 1 / Math.cos(TILT.pitch * Math.PI / 180); // 캐릭터를 세울 때 세로로 늘리는 배율(눕힌 만큼 되돌림)
+window.CAM_YAW = 0; // 캔버스 안 회전(평면 회전)은 쓰지 않음 — 대각 원근은 CSS turn으로
+// 세워 그리기 공통: 발끝(cx, feetY) 기준으로 세로 STAND_K배 → fn은 (0,0)=발끝, 위쪽이 음수 y
 window.billboard = function (ctx, cx, feetY, fn) {
   ctx.save(); ctx.translate(cx, feetY); ctx.rotate(-window.CAM_YAW); ctx.scale(1, window.STAND_K); fn(ctx); ctx.restore();
 };
 window.TILT = TILT;
+// 캔버스 평면의 두 축이 화면 3D 공간에서 향하는 방향 (scale → rotateX → rotateY 순서로 적용됨)
+function _tiltBasis() {
+  const a = TILT.pitch * Math.PI / 180, b = TILT.turn * Math.PI / 180, k = TILT.k;
+  return { e1: [k * Math.cos(b), 0, -k * Math.sin(b)], e2: [k * Math.sin(a) * Math.sin(b), k * Math.cos(a), k * Math.sin(a) * Math.cos(b)] };
+}
+// 캔버스 좌표 → 화면(client) 좌표
+window.tiltForward = function (canvas, X, Y) {
+  const box = (canvas.parentElement || canvas).getBoundingClientRect();
+  const W = canvas.clientWidth, H = canvas.clientHeight, ox = W * TILT.ox, oy = H * TILT.oy, { e1, e2 } = _tiltBasis();
+  const u = X - ox, v = Y - oy, x = u * e1[0] + v * e2[0], y = u * e1[1] + v * e2[1], z = u * e1[2] + v * e2[2], s = TILT.p / (TILT.p - z);
+  return { x: box.left + ox + x * s, y: box.top + oy + y * s, s };
+};
+// 화면(client) 좌표 → 캔버스 좌표 (시선과 캔버스 평면의 교점: 2x2 연립방정식)
 window.untiltPoint = function (canvas, clientX, clientY) {
   const box = (canvas.parentElement || canvas).getBoundingClientRect(); // 변형 전 레이아웃 박스(캔버스는 부모를 꽉 채움)
   const W = canvas.clientWidth, H = canvas.clientHeight, ox = W * TILT.ox, oy = H * TILT.oy;
-  const X = clientX - box.left - ox, Y = clientY - box.top - oy;
-  if (!TILT.deg) return { x: X + ox, y: Y + oy };
-  const a = TILT.deg * Math.PI / 180, p = TILT.p, tn = Math.tan(a);
-  const yr = Y * p / (p + Y * tn);          // 회전 후 y (투영 전)
-  const s = p / (p - yr * tn);              // 그 깊이의 원근 배율
-  return { x: (X / s) / TILT.k + ox, y: (yr / Math.cos(a)) / TILT.k + oy };
+  const sx = clientX - box.left - ox, sy = clientY - box.top - oy, p = TILT.p, { e1, e2 } = _tiltBasis();
+  const a11 = e1[0] + sx * e1[2] / p, a12 = e2[0] + sx * e2[2] / p, a21 = e1[1] + sy * e1[2] / p, a22 = e2[1] + sy * e2[2] / p;
+  const det = a11 * a22 - a12 * a21 || 1e-9;
+  return { x: ox + (sx * a22 - a12 * sy) / det, y: oy + (a11 * sy - a21 * sx) / det };
 };
 
 // ===== 파티클 클래스들 =====
