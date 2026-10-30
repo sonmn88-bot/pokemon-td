@@ -14,7 +14,7 @@
   //   처치 골드 = 2.5 × 체력배율^0.7 → 강해지는 만큼 골드도 늘지만 조금 덜 늘어서, 꾸준히 강화해야 버팀 (결국 실력 차이로 승부)
   const ENDLESS_HP = T => Math.pow(1.06, T / 10), ENDLESS_GAP = T => Math.max(0.3, 1.1 - T / 500), ENDLESS_CARD = 120;
   const ENDLESS_GOLD = T => 2.5 * Math.pow(ENDLESS_HP(T), 0.7);
-  const LIMIT = { small: 3, elite: 2, boss: 1 }, LIMIT_WIN = 30;  // 견제 연타 제한: 웨이브당(결전은 30초마다) 횟수
+  const COOLDOWN = { small: 60, elite: 120, boss: 180 };       // 견제 쿨타임(게임초): 한 번 쓰면 이 시간 동안 같은 아이템 못 씀
   const inc = w => 95 + 4 * w + 0.15 * w * w;                  // 웨이브당 골드 수입 추정치(처치+클리어+이자 측정값에 맞춘 식)
   const sudden = w => w >= SUDDEN;
 
@@ -214,15 +214,14 @@
         this.ended = true; this._resultShown = true; this._cleanup(false);
         app.showWaveAnnounce('패배… 상대가 더 오래 버텼어요', '#ff5c7a'); over && over();
       };
-      const win = () => this._endOn ? 'E' + Math.floor((this._endT || 0) / LIMIT_WIN) : 'W' + (e.currentWave || 0);   // 제한 구간: 웨이브 / 결전 30초
-      this._uses = {};
-      const usedN = it => (this._uses[it.vs] && this._uses[it.vs].win === win()) ? this._uses[it.vs].n : 0;
-      window.ShopItems.push(...VS_ITEMS.map(it => ({ ...it, costFn: () => Math.round(itemCost(it, Math.max(1, e.currentWave || 1)) * (this._endOn ? 0.5 * ENDLESS_GOLD(this._endT || 0) / 2.5 : 1)), // 결전: 반값이지만 늘어나는 골드만큼 같이 오름
-        limitFn: () => { const n = usedN(it), max = LIMIT[it.vs]; return { used: n >= max, left: `${max - n}/${max}회${this._endOn ? ' (30초)' : ''}` }; },
+      this._cdUntil = {};
+      const left = it => Math.max(0, Math.ceil(((this._cdUntil[it.vs] || 0) - (this._el || 0)) / this.speed)); // 남은 실제 초
+      window.ShopItems.push(...VS_ITEMS.map(it => ({ ...it, costFn: () => itemCost(it, Math.max(1, e.currentWave || 1)),
+        limitFn: () => { const l = left(it); return { used: l > 0, left: l > 0 ? `${l}초 후` : `쿨타임 ${COOLDOWN[it.vs] / 60}분` }; },
         buy: () => {
-          if (usedN(it) >= LIMIT[it.vs]) return false;
-          this._uses[it.vs] = { win: win(), n: usedN(it) + 1 };
-          this._send(it.vs, it.n * (this._endOn ? 2 : 1));
+          if (left(it) > 0) return false;
+          this._cdUntil[it.vs] = (this._el || 0) + COOLDOWN[it.vs];
+          this._send(it.vs, it.n * (this._endOn ? 2 : 1));                               // 결전은 2배 수량
         } })));
       this._panel = document.createElement('div'); this._panel.id = 'vs-panel';
       document.getElementById('game-screen').appendChild(this._panel);
@@ -232,7 +231,8 @@
     // 공용 웨이브 시계: 시작 시각 기준 WAVE_SEC(게임초)마다 다음 웨이브 — 못 다 잡았으면 남은 몹은 필드에 둔 채 다음 웨이브
     _clock() {
       const app = window.app, e = app && app.engine; if (!e || !this.active || this.ended) return;
-      const el = (Date.now() - this.startAt) / 1000 * this.speed, target = Math.min(FINAL_WAVE, Math.floor(el / WAVE_SEC) + 1);
+      const el = (Date.now() - this.startAt) / 1000 * this.speed; this._el = el;
+      const target = Math.min(FINAL_WAVE, Math.floor(el / WAVE_SEC) + 1);
       this._nextIn = Math.max(0, Math.ceil((WAVE_SEC - el % WAVE_SEC) / this.speed));
       if (target > (e.currentWave || 0)) {
         if (e.state === 'wave') e.timeoutWave(); if (e.state === 'idle') app.sendWave();
