@@ -1638,3 +1638,11 @@ html, body { overscroll-behavior: none; }
 #vs-panel .vs-head { align-self:flex-start; padding:3px 9px; border-radius:8px; background:rgba(8,11,22,.72); font:800 11px var(--font-ui); color:#ffd34d; }
 #vs-panel .vs-head.sd { background:rgba(255,92,122,.85); color:#fff; }
 .vs-mode #hud-speed, .vs-mode #btn-wave { display:none !important; }
+.vs-pick { display:flex; align-items:center; gap:6px; justify-content:center; }
+.vs-pick span { font-size:12px; color:#9aa3b2; width:64px; text-align:left; }
+.vs-pick button { width:48px; height:48px; border-radius:12px; border:1.5px solid rgba(255,255,255,.12); background:#0d111d; padding:4px; display:flex; align-items:center; justify-content:center; }
+.vs-pick button img { width:100%; height:100%; object-fit:contain; }
+.vs-pick button.on { border-color:#ffb35c; background:rgba(255,179,92,.16); }
+.vs-pick button:disabled:not(.on) { opacity:.35; }
+.vs-pk { display:flex; align-items:center; gap:2px; font-style:normal; }
+.vs-pk img { width:26px; height:26px; object-fit:contain; }

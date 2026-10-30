@@ -1220,6 +1220,8 @@ class App {
       grid.appendChild(card);
     }
     overlay.appendChild(grid);
+    // v3.16 대전: 대기실에서 고른 시작 몬스터로 바로 시작 (선택 창 없이)
+    if (this._vsStarter) { const i = picks.indexOf(this._vsStarter); this._vsStarter = null; if (i >= 0 && grid.children[i]) { grid.children[i].click(); return; } }
     document.body.appendChild(overlay);
   }
 

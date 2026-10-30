@@ -55,6 +55,10 @@
   const itemCost = (it, w) => Math.round(it.mul * inc(w) * (sudden(w) ? 0.5 : 1) / 5) * 5;
   const AUTO = w => (3 + Math.floor(w / 5)) * (sudden(w) ? 2 : 1); // 웨이브를 시간 안에 다 잡으면 자동으로 보내는 수
 
+  const HEROES = [['pikachu', '피카츄'], ['togepi', '토게피'], ['eevee', '이브이']], STARTERS = [['bulbasaur', '이상해씨'], ['charmander', '파이리'], ['squirtle', '꼬부기']];
+  const heroImg = id => `<img src="assets/heroes/${id}.png" alt="">`;
+  const starterImg = id => (window.GachaTowerDefs && GachaTowerDefs[id] && window.PKM) ? PKM(GachaTowerDefs[id], 26) : '';
+
   const VS = window.Versus = {
     net: null, code: null, me: null, opp: null, room: null, unsub: null, active: false,
     kills: 0, sentAuto: 0, recv: { small: 0, elite: 0, boss: 0 }, pending: [], timer: null, spawnTimer: null, ended: false,
@@ -80,7 +84,7 @@
         const code = String(1000 + Math.floor(Math.random() * 9000));
         try {
           await this.net.create(code, { code, state: 'lobby', startAt: 0, winner: null, created: Date.now(), seed: (Math.random() * 1e9) >>> 0, speed: 1,
-            p1: { name: myName(), ready: false, hb: Date.now() }, p2: null,
+            p1: { name: myName(), ready: false, hb: Date.now(), hero: app.starterHero || 'pikachu', starter: 'charmander' }, p2: null,
             st: {}, send: { p1: { small: 0, elite: 0, boss: 0 }, p2: { small: 0, elite: 0, boss: 0 } } });
           ov.remove(); this._enter(code, 'p1');
         } catch (e) { msg(this._errText(e)); }
@@ -93,7 +97,7 @@
           if (!d) return msg('없는 방이에요');
           if (d.state !== 'lobby') return msg('이미 시작한 방이에요');
           if (d.p2 && d.p2.hb && Date.now() - d.p2.hb < LOST_MS) return msg('방이 꽉 찼어요');
-          await this.net.update(code, { p2: { name: myName(), ready: false, hb: Date.now() } });
+          await this.net.update(code, { p2: { name: myName(), ready: false, hb: Date.now(), hero: app.starterHero || 'pikachu', starter: 'charmander' } });
           ov.remove(); this._enter(code, 'p2');
         } catch (e) { msg(this._errText(e)); }
       };
@@ -106,13 +110,18 @@
       if (this.unsub) { this.unsub(); this.unsub = null; } clearInterval(this.timer); clearInterval(this.spawnTimer);
       const ov = document.createElement('div'); ov.className = 'vs-overlay vs-lobby';
       ov.innerHTML = `<div class="vs-box"><div class="vs-title">대기실</div><div class="vs-code-big">${code}</div><small class="vs-sub">상대에게 이 코드를 알려주세요</small>
-        <div class="vs-players"></div><div class="vs-speed"><span>배속 (방장이 선택 · 둘 다 고정)</span><button data-sp="1">1×</button><button data-sp="2">2×</button></div>
+        <div class="vs-players"></div>
+        <div class="vs-pick"><span>내 영웅</span>${HEROES.map(([id, n]) => `<button data-hero="${id}" title="${n}">${heroImg(id)}</button>`).join('')}</div>
+        <div class="vs-pick"><span>시작 몬스터</span>${STARTERS.map(([id, n]) => `<button data-st="${id}" title="${n}">${starterImg(id)}</button>`).join('')}</div>
+        <div class="vs-speed"><span>배속 (방장이 선택 · 둘 다 고정)</span><button data-sp="1">1×</button><button data-sp="2">2×</button></div>
         <small class="vs-sub">웨이브는 둘에게 같은 시각에 와요 · ${FINAL_WAVE}웨이브 결승 · ${SUDDEN}웨이브부터 서든데스</small>
         <button class="vs-btn primary" data-a="ready">준비</button><button class="vs-btn ghost" data-a="leave">나가기</button><div class="vs-msg"></div></div>`;
       document.body.appendChild(ov);
       this._lobby = ov;
       ov.querySelector('[data-a="leave"]').onclick = () => this.leave();
       ov.querySelector('[data-a="ready"]').onclick = () => { const r = !(this.room && this.room[this.me] && this.room[this.me].ready); this.net.update(code, { [`${this.me}.ready`]: r, [`${this.me}.hb`]: Date.now() }).catch(e => this._lobbyMsg(this._errText(e))); };
+      ov.querySelectorAll('[data-hero]').forEach(b => b.onclick = () => { if (this.room && this.room[this.me] && this.room[this.me].ready) return; this.net.update(code, { [`${this.me}.hero`]: b.dataset.hero }).catch(() => {}); });
+      ov.querySelectorAll('[data-st]').forEach(b => b.onclick = () => { if (this.room && this.room[this.me] && this.room[this.me].ready) return; this.net.update(code, { [`${this.me}.starter`]: b.dataset.st }).catch(() => {}); });
       ov.querySelectorAll('[data-sp]').forEach(b => b.onclick = () => { if (this.me === 'p1') this.net.update(code, { speed: Number(b.dataset.sp) }).catch(() => {}); });
       this.unsub = this.net.listen(code, (d, err) => { if (err) return this._lobbyMsg(this._errText(err)); this._onRoom(d); });
       this.timer = setInterval(() => this._tick(), SYNC_MS);
@@ -123,9 +132,12 @@
       if (!d) return;
       this.room = d;
       if (this._lobby && d.state === 'lobby') {
-        const row = (p, k) => `<div class="vs-p ${p && p.ready ? 'ready' : ''}"><b>${k === this.me ? '나' : '상대'}</b><span>${p ? p.name : '기다리는 중…'}</span><i>${p ? (p.ready ? '준비 완료' : '대기') : ''}</i></div>`;
+        const row = (p, k) => `<div class="vs-p ${p && p.ready ? 'ready' : ''}"><b>${k === this.me ? '나' : '상대'}</b><span>${p ? p.name : '기다리는 중…'}</span>${p ? `<em class="vs-pk">${heroImg(p.hero || 'pikachu')}${starterImg(p.starter || 'charmander')}</em>` : ''}<i>${p ? (p.ready ? '준비 완료' : '대기') : ''}</i></div>`;
         this._lobby.querySelector('.vs-players').innerHTML = row(d.p1, 'p1') + row(d.p2, 'p2');
         this._lobby.querySelector('[data-a="ready"]').textContent = d[this.me] && d[this.me].ready ? '준비 취소' : '준비';
+        const mine = d[this.me] || {}, locked = !!mine.ready;                             // 준비 누르면 선택 잠금
+        this._lobby.querySelectorAll('[data-hero]').forEach(b => { b.classList.toggle('on', b.dataset.hero === (mine.hero || 'pikachu')); b.disabled = locked; });
+        this._lobby.querySelectorAll('[data-st]').forEach(b => { b.classList.toggle('on', b.dataset.st === (mine.starter || 'charmander')); b.disabled = locked; });
         this._lobby.querySelectorAll('[data-sp]').forEach(b => { b.classList.toggle('on', Number(b.dataset.sp) === (d.speed || 1)); b.disabled = this.me !== 'p1'; });
         if (d.p1 && d.p2 && d.p1.ready && d.p2.ready) this.net.update(this.code, { state: 'countdown', startAt: Date.now() + 3500 }).catch(() => {}); // 둘 중 누구든 (방장 화면이 꺼져 있어도 시작)
       }
@@ -164,6 +176,8 @@
       const app = window.app, room = this.room || {};
       this.active = true;
       // 같은 시드로 시작 → 두 사람의 판 특성·강조 몬스터·웨이브 구성이 똑같음 (뽑기 운만 다름)
+      const mine = room[this.me] || {};
+      app.starterHero = mine.hero || 'pikachu'; app._vsStarter = mine.starter || 'charmander';   // 대기실에서 고른 영웅·시작 몬스터
       app._vsRng = _mapRng(room.seed || 1);                                             // 판 특성·강조 몬스터를 시드로 (이전 판 기록과 무관)
       try { app.startGame(); } finally { app._vsRng = null; }
       const e = app.engine;
