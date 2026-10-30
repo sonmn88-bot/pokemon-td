@@ -457,7 +457,7 @@ class App {
       { key:'headStart',  name:'빠른 출발',   desc:'시작 골드 +200' },
       { key:'luckyStart', name:'행운의 시작', desc:'행운의 동전 1개 지급 (랜덤 합성 2택)' },
     ];
-    const trait = traits[Math.floor(Math.random() * traits.length)];
+    const trait = traits[Math.floor((this._vsRng ? this._vsRng() : Math.random()) * traits.length)]; // 대전: 방 시드로 둘이 같게
     this.engine._runTrait = trait;
     if (trait.key === 'headStart') this.engine.addGold(200);
     if (trait.key === 'luckyStart') this.engine._luckyCoins = (this.engine._luckyCoins || 0) + 1;

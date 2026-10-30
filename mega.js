@@ -172,7 +172,9 @@ Object.assign(App.prototype, {
     const e = this.engine;
     e._megaStones = 0;
     e._heroItemGot = false;
-    const pick = RUN_EMPHASIS.slice().sort(() => Math.random() - 0.5).slice(0, 2);
+    const R = this._vsRng || Math.random, arr = RUN_EMPHASIS.slice();                 // 대전: 방 시드로 둘이 같게 (순서 고정 셔플)
+    for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(R() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; }
+    const pick = arr.slice(0, 2);
     e._runEmphasis = pick.map(p => p.key);
     e._runSeed = (Math.random() * 1e9) >>> 0; window.__wavePlan = {}; // v3.14 웨이브 편성 시드(판마다 다름)
     e._runEmphasisInfo = pick;

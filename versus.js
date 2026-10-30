@@ -102,7 +102,8 @@
 
     _enter(code, me) {
       this.code = code; this.me = me; this.opp = me === 'p1' ? 'p2' : 'p1'; this.ended = false;
-      this.kills = 0; this.sentAuto = 0; this.recv = { small: 0, elite: 0, boss: 0 }; this.pending = [];
+      this.kills = 0; this.sentAuto = 0; this.recv = { small: 0, elite: 0, boss: 0 }; this.pending = []; this._resultShown = false; this._done = false; this._counting = false; this.active = false;
+      if (this.unsub) { this.unsub(); this.unsub = null; } clearInterval(this.timer); clearInterval(this.spawnTimer);
       const ov = document.createElement('div'); ov.className = 'vs-overlay vs-lobby';
       ov.innerHTML = `<div class="vs-box"><div class="vs-title">대기실</div><div class="vs-code-big">${code}</div><small class="vs-sub">상대에게 이 코드를 알려주세요</small>
         <div class="vs-players"></div><div class="vs-speed"><span>배속 (방장이 선택 · 둘 다 고정)</span><button data-sp="1">1×</button><button data-sp="2">2×</button></div>
@@ -126,9 +127,9 @@
         this._lobby.querySelector('.vs-players').innerHTML = row(d.p1, 'p1') + row(d.p2, 'p2');
         this._lobby.querySelector('[data-a="ready"]').textContent = d[this.me] && d[this.me].ready ? '준비 취소' : '준비';
         this._lobby.querySelectorAll('[data-sp]').forEach(b => { b.classList.toggle('on', Number(b.dataset.sp) === (d.speed || 1)); b.disabled = this.me !== 'p1'; });
-        if (this.me === 'p1' && d.p1 && d.p2 && d.p1.ready && d.p2.ready) this.net.update(this.code, { state: 'countdown', startAt: Date.now() + 3500 });
+        if (d.p1 && d.p2 && d.p1.ready && d.p2.ready) this.net.update(this.code, { state: 'countdown', startAt: Date.now() + 3500 }).catch(() => {}); // 둘 중 누구든 (방장 화면이 꺼져 있어도 시작)
       }
-      if (d.state === 'countdown' && !this.active && !this._counting) this._countdown(d.startAt);
+      if ((d.state === 'countdown' || d.state === 'playing') && !this.active && !this._counting && this._lobby) this._countdown(Date.now() + (d.state === 'playing' ? 300 : 3500)); // 받은 순간 기준 → 폰 시계 차이 무관
       if (this.active) {
         this._renderPanel();
         const s = d.send && d.send[this.opp];                                           // 상대가 보낸 누적 수 → 새로 온 만큼 소환 대기열에
@@ -149,7 +150,11 @@
       const step = () => {
         const left = Math.ceil((at - Date.now()) / 1000);
         if (left > 0) { const c = ov && ov.querySelector('.vs-count'); if (c) c.textContent = left; setTimeout(step, 200); return; }
-        ov && ov.remove(); this._lobby = null; this._counting = false; this._start();
+        ov && ov.remove(); this._lobby = null; this._counting = false; this._startAt = at;
+        try { this._start(); } catch (err) {                                              // 시작 실패를 조용히 멈추지 않게 알림 + 기록
+          window.Leaderboard && Leaderboard.log && Leaderboard.log('vs_start', String(err && err.stack || err));
+          alert('대전 시작 중 오류가 났어요. 다시 시도해 주세요.\n' + (err && err.message || err)); this.leave();
+        }
       };
       step();
     },
@@ -159,11 +164,11 @@
       const app = window.app, room = this.room || {};
       this.active = true;
       // 같은 시드로 시작 → 두 사람의 판 특성·강조 몬스터·웨이브 구성이 똑같음 (뽑기 운만 다름)
-      const orig = Math.random; Math.random = _mapRng(room.seed || 1);
-      try { app.startGame(); } finally { Math.random = orig; }
+      app._vsRng = _mapRng(room.seed || 1);                                             // 판 특성·강조 몬스터를 시드로 (이전 판 기록과 무관)
+      try { app.startGame(); } finally { app._vsRng = null; }
       const e = app.engine;
       e._runSeed = room.seed || 1; window.__wavePlan = {};
-      this.speed = room.speed || 1; this.startAt = room.startAt || Date.now(); e.speedMul = this.speed;
+      this.speed = room.speed || 1; this.startAt = this._startAt || Date.now(); e.speedMul = this.speed; // 공용 시계 기준 = 각자 카운트다운이 끝난 순간
       document.getElementById('game-screen').classList.add('vs-mode');          // 배속·웨이브 버튼 숨김 (공용 시계)
       if (this.me === 'p1') this.net.update(this.code, { state: 'playing' }).catch(() => {});
       const die = e._onEnemyDie.bind(e);                                                // 처치 집계 + 받은 몹 현상금

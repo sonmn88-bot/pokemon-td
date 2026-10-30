@@ -50,6 +50,8 @@ const THEMES = {
 };
 
 W3.init = function (host, gameCanvas) {
+  // v3.16 버그수정: 한 판 끝나고 다시 시작하면 렌더러가 하나 더 생기는데 지형은 '이미 만듦'으로 기억돼 새 화면이 비어(까만 배경) 있었음 → 하나를 계속 재사용
+  if (R && cvs) { if (cvs.parentNode !== host || cvs.nextSibling !== gameCanvas) host.insertBefore(cvs, gameCanvas); W3.ok = true; dirty = true; return true; }
   try {
     cvs = document.createElement('canvas'); cvs.id = 'world3d';
     cvs.style.cssText = 'position:absolute;left:0;top:0;width:100%;height:100%;';
