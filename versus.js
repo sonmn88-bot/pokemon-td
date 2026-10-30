@@ -14,7 +14,7 @@
   //   처치 골드 = 2.5 × 체력배율^0.7 → 강해지는 만큼 골드도 늘지만 조금 덜 늘어서, 꾸준히 강화해야 버팀 (결국 실력 차이로 승부)
   const ENDLESS_HP = T => Math.pow(1.06, T / 10), ENDLESS_GAP = T => Math.max(0.3, 1.1 - T / 500), ENDLESS_CARD = 120;
   const ENDLESS_GOLD = T => 2.5 * Math.pow(ENDLESS_HP(T), 0.7);
-  const COOLDOWN = { small: 60, elite: 120, boss: 180 };       // 견제 쿨타임(게임초): 한 번 쓰면 이 시간 동안 같은 아이템 못 씀
+  const COOLDOWN = { small: 120, elite: 240, boss: 360 };      // 견제 쿨타임(게임초): 2배속 기준 실제 1·2·3분
   const inc = w => 95 + 4 * w + 0.15 * w * w;                  // 웨이브당 골드 수입 추정치(처치+클리어+이자 측정값에 맞춘 식)
   const sudden = w => w >= SUDDEN;
 
@@ -59,7 +59,7 @@
     { key: 'vs_boss', icon: 'crown', name: '미니보스 보내기', mul: 3, bounty: 0.4, desc: '상대에게 미니보스 1마리', vs: 'boss', n: 1 },
   ];
   const itemCost = (it, w) => Math.round(it.mul * inc(w) * 1.4 / 5) * 5; // ×1.4 = 대전 수입 배율(1.6)에 맞춤 (결전 할인은 따로)
-  const AUTO = w => (3 + Math.floor(w / 5)) * (sudden(w) ? 2 : 1); // 웨이브를 시간 안에 다 잡으면 자동으로 보내는 수
+  const AUTO = w => 3 + Math.floor(w / 5);                     // 웨이브를 시간 안에 다 잡으면 자동으로 보내는 수
 
   const HEROES = [['pikachu', '피카츄'], ['togepi', '토게피'], ['eevee', '이브이']], STARTERS = [['bulbasaur', '이상해씨'], ['charmander', '파이리'], ['squirtle', '꼬부기']];
   const heroImg = id => `<img src="assets/heroes/${id}.png" alt="">`;
@@ -221,7 +221,7 @@
         buy: () => {
           if (left(it) > 0) return false;
           this._cdUntil[it.vs] = (this._el || 0) + COOLDOWN[it.vs];
-          this._send(it.vs, it.n * (this._endOn ? 2 : 1));                               // 결전은 2배 수량
+          this._send(it.vs, it.n);
         } })));
       this._panel = document.createElement('div'); this._panel.id = 'vs-panel';
       document.getElementById('game-screen').appendChild(this._panel);
@@ -247,7 +247,7 @@
       const app = window.app, e = app.engine;
       if (!this._endOn) {
         this._endOn = true; this._endNext = 0; this._endCard = ENDLESS_CARD;
-        app.showWaveAnnounce('결전 시작! 몬스터가 끊임없이 강해져요 · 골드도 같이 늘어요 · 견제 반값 2배', '#ff5c7a');
+        app.showWaveAnnounce('결전 시작! 몬스터가 끊임없이 강해져요 · 골드도 같이 늘어요', '#ff5c7a');
         try { navigator.vibrate && navigator.vibrate([80, 40, 160]); } catch (_) {}
       }
       let n = 0;
