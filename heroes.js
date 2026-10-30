@@ -163,19 +163,19 @@ const HeroDefs = {
   togepi: {
     id:'togepi', name:'토게피', baseColor:'#fff9c4',
     role:'서포터 / 행운',
-    passive:'골드 획득 +20% · 이자 상한 +5 · 토게틱: 노말·레어 합성 10% 확률 2등급 상승',
+    passive:'골드 획득 +10% · 이자 상한 +5 · 토게틱: 노말·레어 합성 10% 확률 2등급 상승',
     evolution:{ level:10, options:[
       // v27-60: 서포터 역할에 맞게 한 스탯 몰빵 대신 고르게 - 대신 패시브/스킬(행복의알) 쪽이 진짜 힘
       { id:'togetic', name:'토게틱', color:'#f8bbd0', dmgMul:1.15, rangeMul:1.35, fireRateMul:1.10 },
     ]},
     attack:{
-      baseRange:112, baseDamage:9, baseFireRate:1.0, // v3.17: 6→9 (초반에 너무 약했음 · 피카츄의 약 80%)
+      baseRange:112, baseDamage:6, baseFireRate:1.0, // v3.4: 토게피는 경제·행운 지원형 → 공격력은 피카츄의 약 60% (대전에선 versus.js가 9로)
       rangePerLevel:4, damagePerLevel:1.5, // v27-46: damagePerLevel 2→4 (요청5: 성장이 너무 약했음)
       projColor:'#fff59d', projEmoji:'✨', dmgType:'special',
     },
     passiveApply(engine, hero) {
       // v28 (설계서 §6): 직접 화력은 최하, 대신 경제·합성 운 담당
-      engine._togepiGoldMul = 1.20 + hero._skillVal('goldBonus', 0); // v3.17: +10%→+20%
+      engine._togepiGoldMul = 1.10 + (engine._vsGoldMul ? 0.10 : 0) + hero._skillVal('goldBonus', 0); // 대전에선 +20%
       engine._interestCapBonus = 5 + hero._skillVal('interestCap', 0);
       engine._waveBonusMul = 1 + hero._skillVal('waveBonus', 0);
       engine._mergeJumpChance = (hero.evolved === 'togetic' ? 0.10 : 0) + hero._skillVal('jump', 0);

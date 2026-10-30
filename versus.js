@@ -178,6 +178,9 @@
       // 같은 시드로 시작 → 두 사람의 판 특성·강조 몬스터·웨이브 구성이 똑같음 (뽑기 운만 다름)
       const mine = room[this.me] || {};
       app.starterHero = mine.hero || 'pikachu'; app._vsStarter = mine.starter || 'charmander';   // 대기실에서 고른 영웅·시작 몬스터
+      // 대전 전용 밸런스(혼자 하기는 그대로): 토게피 공격 6→9 (골드 +20%는 heroes.js에서 _vsGoldMul 보고 적용)
+      const tg = window.HeroDefs && HeroDefs.togepi && HeroDefs.togepi.attack;
+      if (tg && this._tgDmg === undefined) { this._tgDmg = tg.baseDamage; tg.baseDamage = 9; }
       app._vsRng = _mapRng(room.seed || 1);                                             // 판 특성·강조 몬스터를 시드로 (이전 판 기록과 무관)
       try { app.startGame(); } finally { app._vsRng = null; }
       const e = app.engine;
@@ -288,6 +291,8 @@
       if (window.ShopItems) for (let i = window.ShopItems.length - 1; i >= 0; i--) if (window.ShopItems[i].vs) window.ShopItems.splice(i, 1);
       this._panel && this._panel.remove(); this._panel = null; this._done = false;
       document.getElementById('game-screen')?.classList.remove('vs-mode');
+      const tg = window.HeroDefs && HeroDefs.togepi && HeroDefs.togepi.attack;          // 대전 끝나면 혼자 하기 수치로 되돌림
+      if (tg && this._tgDmg !== undefined) { tg.baseDamage = this._tgDmg; this._tgDmg = undefined; }
       if (removeRoom && this.code && this.net) this.net.remove(this.code);
       this.active = false;
     },
