@@ -2,6 +2,7 @@
 
 // v27: 영구 강화류는 상한(maxBuys) 대신 살수록 가격이 올라가는 방식으로 변경
 function shopItemCost(item, engine) {
+  if (item.costFn) return item.costFn(engine); // v3.16 대전 아이템: 웨이브 수입 기준 가격
   // v28 (설계서 §5): 웨이브 연동 가격 - 몹 체력은 지수로 오르는데 즉사형 아이템 가격이 고정이면 후반 정답템이 됨
   if (item.perWaveCost) return Math.round(item.cost + (engine.currentWave || 0) * item.perWaveCost);
   if (item.key === 'luckycoin') return Math.round(item.cost * (1 - (engine._coinDiscount || 0))); // 토게피 '동전 수집'

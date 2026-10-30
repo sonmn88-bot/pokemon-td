@@ -1631,3 +1631,10 @@ html, body { overscroll-behavior: none; }
 #vs-panel .vs-row { display:flex; gap:7px; align-items:center; padding:4px 9px; border-radius:9px; background:rgba(8,11,22,.72); font:700 11px var(--font-ui); color:#dfe6f3; white-space:nowrap; }
 #vs-panel .vs-row b { max-width:64px; overflow:hidden; text-overflow:ellipsis; } #vs-panel .vs-row.opp b { color:#ff9f43; } #vs-panel .vs-row.me b { color:#6aa8ff; }
 #vs-panel .vs-inc { align-self:flex-start; padding:3px 8px; border-radius:8px; background:rgba(255,92,122,.85); font:800 11px var(--font-ui); color:#fff; }
+.vs-speed { display:flex; align-items:center; gap:6px; justify-content:center; font-size:12px; color:#9aa3b2; }
+.vs-speed button { width:52px; height:34px; border-radius:10px; border:1px solid rgba(255,255,255,.15); background:#0d111d; color:#e8ecf5; font:800 14px var(--font-ui); }
+.vs-speed button.on { border-color:#ffb35c; background:rgba(255,179,92,.18); color:#ffcf8f; }
+.vs-speed button:disabled { opacity:.85; }
+#vs-panel .vs-head { align-self:flex-start; padding:3px 9px; border-radius:8px; background:rgba(8,11,22,.72); font:800 11px var(--font-ui); color:#ffd34d; }
+#vs-panel .vs-head.sd { background:rgba(255,92,122,.85); color:#fff; }
+.vs-mode #hud-speed, .vs-mode #btn-wave { display:none !important; }

@@ -6,7 +6,11 @@
 // 전송: Firestore 컬렉션 pokemontd_rooms (콘솔 규칙에서 이 컬렉션 읽기·쓰기 허용 필요)
 //   테스트용: 주소에 ?vslocal=1 이면 같은 기기 두 창끼리 BroadcastChannel로 연결
 (function () {
-  const COL = 'pokemontd_rooms', SYNC_MS = 2000, KILLS_PER_SEND = 25, AUTO_SEND = 3, LOST_MS = 20000, SPAWN_GAP = 380;
+  const COL = 'pokemontd_rooms', SYNC_MS = 2000, LOST_MS = 20000, SPAWN_GAP = 380;
+  // v3.16 공정 대전: 같은 시드(웨이브·특성 동일) + 공용 웨이브 시계(배속·스킵 잠금) + 30웨이브 결승 + 25웨이브부터 서든데스
+  const WAVE_SEC = 60, FINAL_WAVE = 30, SUDDEN = 25;
+  const inc = w => 95 + 4 * w + 0.15 * w * w;                  // 웨이브당 골드 수입 추정치(처치+클리어+이자 측정값에 맞춘 식)
+  const sudden = w => w >= SUDDEN;
 
   // ---------- 전송 계층 ----------
   const setPath = (obj, path, val) => { const ks = path.split('.'); let o = obj; for (let i = 0; i < ks.length - 1; i++) o = o[ks[i]] = o[ks[i]] && typeof o[ks[i]] === 'object' ? o[ks[i]] : {}; o[ks[ks.length - 1]] = val; };
@@ -42,11 +46,14 @@
   }
 
   // 상점에 대전 중에만 붙는 '몬스터 보내기'
+  // 가격 = 그 웨이브 수입의 몇 배 (서든데스엔 반값·2배 수량). 받은 쪽은 잡으면 현상금(가격의 일부)을 받음
   const VS_ITEMS = [
-    { key: 'vs_small', icon: 'sword', name: '몬스터 보내기 ×8', cost: 250, perWaveCost: 12, desc: '상대 필드에 이번 웨이브 몬스터 8마리', vs: 'small', n: 8 },
-    { key: 'vs_elite', icon: 'sword', name: '엘리트 보내기 ×3', cost: 700, perWaveCost: 28, desc: '상대에게 황금 엘리트 3마리 (체력 2.2배·빠름)', vs: 'elite', n: 3 },
-    { key: 'vs_boss', icon: 'crown', name: '미니보스 보내기', cost: 2000, perWaveCost: 60, perWave: 1, desc: '상대에게 미니보스 1마리 (웨이브당 1회)', vs: 'boss', n: 1 },
+    { key: 'vs_small', icon: 'sword', name: '몬스터 보내기 ×8', mul: 0.6, bounty: 0.3, desc: '상대 필드에 이번 웨이브 몬스터 8마리', vs: 'small', n: 8 },
+    { key: 'vs_elite', icon: 'sword', name: '엘리트 보내기 ×3', mul: 1.2, bounty: 0.4, desc: '상대에게 황금 엘리트 3마리 (체력 2.2배·빠름)', vs: 'elite', n: 3 },
+    { key: 'vs_boss', icon: 'crown', name: '미니보스 보내기', mul: 3, bounty: 0.4, perWave: 1, desc: '상대에게 미니보스 1마리 (웨이브당 1회)', vs: 'boss', n: 1 },
   ];
+  const itemCost = (it, w) => Math.round(it.mul * inc(w) * (sudden(w) ? 0.5 : 1) / 5) * 5;
+  const AUTO = w => (3 + Math.floor(w / 5)) * (sudden(w) ? 2 : 1); // 웨이브를 시간 안에 다 잡으면 자동으로 보내는 수
 
   const VS = window.Versus = {
     net: null, code: null, me: null, opp: null, room: null, unsub: null, active: false,
@@ -72,7 +79,7 @@
       ov.querySelector('[data-a="create"]').onclick = async () => {
         const code = String(1000 + Math.floor(Math.random() * 9000));
         try {
-          await this.net.create(code, { code, state: 'lobby', startAt: 0, winner: null, created: Date.now(),
+          await this.net.create(code, { code, state: 'lobby', startAt: 0, winner: null, created: Date.now(), seed: (Math.random() * 1e9) >>> 0, speed: 1,
             p1: { name: myName(), ready: false, hb: Date.now() }, p2: null,
             st: {}, send: { p1: { small: 0, elite: 0, boss: 0 }, p2: { small: 0, elite: 0, boss: 0 } } });
           ov.remove(); this._enter(code, 'p1');
@@ -98,11 +105,14 @@
       this.kills = 0; this.sentAuto = 0; this.recv = { small: 0, elite: 0, boss: 0 }; this.pending = [];
       const ov = document.createElement('div'); ov.className = 'vs-overlay vs-lobby';
       ov.innerHTML = `<div class="vs-box"><div class="vs-title">대기실</div><div class="vs-code-big">${code}</div><small class="vs-sub">상대에게 이 코드를 알려주세요</small>
-        <div class="vs-players"></div><button class="vs-btn primary" data-a="ready">준비</button><button class="vs-btn ghost" data-a="leave">나가기</button><div class="vs-msg"></div></div>`;
+        <div class="vs-players"></div><div class="vs-speed"><span>배속 (방장이 선택 · 둘 다 고정)</span><button data-sp="1">1×</button><button data-sp="2">2×</button></div>
+        <small class="vs-sub">웨이브는 둘에게 같은 시각에 와요 · ${FINAL_WAVE}웨이브 결승 · ${SUDDEN}웨이브부터 서든데스</small>
+        <button class="vs-btn primary" data-a="ready">준비</button><button class="vs-btn ghost" data-a="leave">나가기</button><div class="vs-msg"></div></div>`;
       document.body.appendChild(ov);
       this._lobby = ov;
       ov.querySelector('[data-a="leave"]').onclick = () => this.leave();
       ov.querySelector('[data-a="ready"]').onclick = () => { const r = !(this.room && this.room[this.me] && this.room[this.me].ready); this.net.update(code, { [`${this.me}.ready`]: r, [`${this.me}.hb`]: Date.now() }).catch(e => this._lobbyMsg(this._errText(e))); };
+      ov.querySelectorAll('[data-sp]').forEach(b => b.onclick = () => { if (this.me === 'p1') this.net.update(code, { speed: Number(b.dataset.sp) }).catch(() => {}); });
       this.unsub = this.net.listen(code, (d, err) => { if (err) return this._lobbyMsg(this._errText(err)); this._onRoom(d); });
       this.timer = setInterval(() => this._tick(), SYNC_MS);
     },
@@ -115,6 +125,7 @@
         const row = (p, k) => `<div class="vs-p ${p && p.ready ? 'ready' : ''}"><b>${k === this.me ? '나' : '상대'}</b><span>${p ? p.name : '기다리는 중…'}</span><i>${p ? (p.ready ? '준비 완료' : '대기') : ''}</i></div>`;
         this._lobby.querySelector('.vs-players').innerHTML = row(d.p1, 'p1') + row(d.p2, 'p2');
         this._lobby.querySelector('[data-a="ready"]').textContent = d[this.me] && d[this.me].ready ? '준비 취소' : '준비';
+        this._lobby.querySelectorAll('[data-sp]').forEach(b => { b.classList.toggle('on', Number(b.dataset.sp) === (d.speed || 1)); b.disabled = this.me !== 'p1'; });
         if (this.me === 'p1' && d.p1 && d.p2 && d.p1.ready && d.p2.ready) this.net.update(this.code, { state: 'countdown', startAt: Date.now() + 3500 });
       }
       if (d.state === 'countdown' && !this.active && !this._counting) this._countdown(d.startAt);
@@ -122,7 +133,13 @@
         this._renderPanel();
         const s = d.send && d.send[this.opp];                                           // 상대가 보낸 누적 수 → 새로 온 만큼 소환 대기열에
         if (s) for (const k of ['small', 'elite', 'boss']) { const n = (s[k] || 0) - this.recv[k]; if (n > 0) { this.recv[k] += n; this._incoming(k, n); } }
-        if (d.state === 'ended' && !this.ended) this._finish(d.winner === this.me);
+        if (d.state === 'ended' && !this._resultShown) this._finish(d.winner === this.me ? 'win' : d.winner === 'draw' ? 'draw' : 'lose', d.why);
+        // 결승: 둘 다 끝났으면 방장이 판정 (목숨 많은 쪽 → 필드 몹 적은 쪽 → 처치 많은 쪽)
+        const a = (d.st || {}).p1, b = (d.st || {}).p2;
+        if (this.me === 'p1' && d.state === 'playing' && a && b && a.done && b.done) {
+          const cmp = (a.l - b.l) || (b.f - a.f) || (a.k - b.k);
+          this.net.update(this.code, { state: 'ended', winner: cmp > 0 ? 'p1' : cmp < 0 ? 'p2' : 'draw', why: `${FINAL_WAVE}웨이브 결승 판정` }).catch(() => {});
+        }
       }
     },
 
@@ -139,25 +156,49 @@
 
     // ---------- 게임 연동 ----------
     _start() {
-      const app = window.app;
+      const app = window.app, room = this.room || {};
       this.active = true;
-      app.startGame();
+      // 같은 시드로 시작 → 두 사람의 판 특성·강조 몬스터·웨이브 구성이 똑같음 (뽑기 운만 다름)
+      const orig = Math.random; Math.random = _mapRng(room.seed || 1);
+      try { app.startGame(); } finally { Math.random = orig; }
       const e = app.engine;
+      e._runSeed = room.seed || 1; window.__wavePlan = {};
+      this.speed = room.speed || 1; this.startAt = room.startAt || Date.now(); e.speedMul = this.speed;
+      document.getElementById('game-screen').classList.add('vs-mode');          // 배속·웨이브 버튼 숨김 (공용 시계)
       if (this.me === 'p1') this.net.update(this.code, { state: 'playing' }).catch(() => {});
-      const die = e._onEnemyDie.bind(e);                                                // 처치 집계 + 자동 견제
+      const die = e._onEnemyDie.bind(e);                                                // 처치 집계 + 받은 몹 현상금
       e._onEnemyDie = (en) => {
         die(en);
-        if (en._vsSent) return;                                                          // 받은 몬스터는 다시 돌려보내지 않음
+        if (en._vsSent) { if (en._vsBounty) { e.addGold(en._vsBounty); e.spawnFloatingText(`막기 보상 +${en._vsBounty}g`, en.x, en.y - 26, '#34d399'); } return; }
         this.kills++;
-        if (this.kills % KILLS_PER_SEND === 0) { this.sentAuto += AUTO_SEND; this._send('small', AUTO_SEND, true); }
       };
+      const wc = e.onWaveComplete;                                                       // 시간 안에 다 잡으면 자동 견제
+      e.onWaveComplete = (w, g, x) => { wc && wc(w, g, x); if (this.active && !this.ended && w <= FINAL_WAVE) this._send('small', AUTO(w), true); };
       const over = e.onGameOver;
-      e.onGameOver = () => { if (!this.ended) this.net.update(this.code, { state: 'ended', winner: this.opp }).catch(() => {}); this.ended = true; this._resultShown = true; this._cleanup(false); window.app.showWaveAnnounce('패배… 상대가 더 오래 버텼어요', '#ff5c7a'); over && over(); };
-      window.ShopItems.push(...VS_ITEMS.map(it => ({ ...it, buy: () => { this._send(it.vs, it.n); } })));
+      e.onGameOver = () => {
+        if (!this.ended) this.net.update(this.code, { state: 'ended', winner: this.opp, why: '목숨이 다 떨어졌어요' }).catch(() => {});
+        this.ended = true; this._resultShown = true; this._cleanup(false);
+        app.showWaveAnnounce('패배… 상대가 더 오래 버텼어요', '#ff5c7a'); over && over();
+      };
+      window.ShopItems.push(...VS_ITEMS.map(it => ({ ...it, costFn: eng => itemCost(it, Math.max(1, eng.currentWave || 1)),
+        buy: eng => { const w = Math.max(1, eng.currentWave || 1); this._send(it.vs, it.n * (sudden(w) ? 2 : 1)); } })));
       this._panel = document.createElement('div'); this._panel.id = 'vs-panel';
       document.getElementById('game-screen').appendChild(this._panel);
       this._renderPanel();
-      this.spawnTimer = setInterval(() => this._spawnPending(), SPAWN_GAP);
+      this.spawnTimer = setInterval(() => { this._spawnPending(); this._clock(); }, SPAWN_GAP);
+    },
+    // 공용 웨이브 시계: 시작 시각 기준 WAVE_SEC(게임초)마다 다음 웨이브 — 못 다 잡았으면 남은 몹은 필드에 둔 채 다음 웨이브
+    _clock() {
+      const app = window.app, e = app && app.engine; if (!e || !this.active || this.ended) return;
+      const el = (Date.now() - this.startAt) / 1000 * this.speed, target = Math.min(FINAL_WAVE, Math.floor(el / WAVE_SEC) + 1);
+      this._nextIn = Math.max(0, Math.ceil((WAVE_SEC - el % WAVE_SEC) / this.speed));
+      if (target > (e.currentWave || 0)) { if (e.state === 'wave') e.timeoutWave(); if (e.state === 'idle') app.sendWave(); }
+      if (el >= FINAL_WAVE * WAVE_SEC && !this._done) {                                   // 결승 시간 끝 → 내 최종 기록 제출
+        this._done = true; e.stop();
+        this.net.update(this.code, { [`st.${this.me}`]: { w: e.currentWave, k: this.kills, l: Math.max(0, e.lives), f: e.enemies.length, done: true } }).catch(() => {});
+        app.showWaveAnnounce('결승 종료! 판정 중…', '#ffd34d');
+      }
+      if (this._panel) this._renderPanel();
     },
     _send(kind, n, auto) {
       this.net.update(this.code, {}, { [`send.${this.me}.${kind}`]: n }).catch(() => {});
@@ -179,17 +220,18 @@
       else e._spawnEnemy({ type: ids[Math.floor(Math.random() * ids.length)] });
       const en = e.enemies[e.enemies.length - 1]; if (!en) return;
       en._vsSent = true; en._bounty = false;
+      const it = VS_ITEMS.find(x => x.vs === kind); en._vsBounty = Math.round(itemCost(it, w) * it.bounty / it.n);
       if (kind === 'elite' && en._elite !== 'gold') { const wasSilver = en._elite === 'silver', base = wasSilver ? en.maxHp / 1.5 : en.maxHp; en._elite = 'gold'; en.maxHp = Math.floor(base * 2.2); en.hp = en.maxHp; en.speed *= wasSilver ? 1.13 : 1.3; } // 받은 엘리트는 항상 황금
     },
     _tick() {
       if (!this.code) return;
       const e = window.app && window.app.engine, set = { [`${this.me}.hb`]: Date.now() };
-      if (this.active && e) set[`st.${this.me}`] = { w: e.currentWave || 0, k: this.kills, l: Math.max(0, e.lives || 0), f: e.enemies.length };
+      if (this.active && e && !this._done) set[`st.${this.me}`] = { w: e.currentWave || 0, k: this.kills, l: Math.max(0, e.lives || 0), f: e.enemies.length };
       this.net.update(this.code, set).catch(() => {});
       const o = this.room && this.room[this.opp];
       if (this.active && !this.ended && o && o.hb && Date.now() - o.hb > LOST_MS) {        // 상대 연결 끊김 → 승리
         this.net.update(this.code, { state: 'ended', winner: this.me }).catch(() => {});
-        this._finish(true, '상대 연결이 끊겼어요');
+        this._finish('win', '상대 연결이 끊겼어요');
       }
     },
     _renderPanel() {
@@ -198,28 +240,29 @@
       const e = window.app.engine;
       const me = { w: e ? e.currentWave : m.w, k: this.kills, l: e ? Math.max(0, e.lives) : m.l, f: e ? e.enemies.length : m.f };
       const row = (who, s, cls) => `<div class="vs-row ${cls}"><b>${who}</b><span>W${s.w || 0}</span><span>처치 ${s.k || 0}</span><span>❤ ${s.l ?? '-'}</span><span>필드 ${s.f || 0}</span></div>`;
-      this._panel.innerHTML = row(on.name || '상대', o, 'opp') + row('나', me, 'me')
+      const w = me.w || 0, head = this._done ? '결승 판정 중' : w >= FINAL_WAVE ? `결승 웨이브 · 종료까지 ${this._nextIn ?? '-'}초` : `다음 웨이브 ${this._nextIn ?? '-'}초 · ${FINAL_WAVE}웨이브 결승`;
+      this._panel.innerHTML = `<div class="vs-head ${sudden(w) ? 'sd' : ''}">${sudden(w) ? '서든데스 · ' : ''}${head}</div>` + row(on.name || '상대', o, 'opp') + row('나', me, 'me')
         + (this.pending.length ? `<div class="vs-inc">받는 중 ${this.pending.length}</div>` : '');
     },
-    _finish(win, why) {
-      if (this.ended && this._resultShown) return;
+    _finish(res, why) {
+      if (this._resultShown) return;
       this.ended = true; this._resultShown = true;
       const app = window.app, e = app.engine;
-      if (win) {
-        e && e.stop();
-        const ov = document.createElement('div'); ov.className = 'vs-overlay';
-        ov.innerHTML = `<div class="vs-box"><div class="vs-title" style="color:#ffd34d">승리!</div><small class="vs-sub">${why || '상대의 목숨이 먼저 다 떨어졌어요'}</small>
-          <div class="vs-sub">웨이브 ${e ? e.currentWave : '-'} · 처치 ${this.kills}</div><button class="vs-btn primary" data-a="ok">나가기</button></div>`;
-        document.body.appendChild(ov);
-        ov.querySelector('[data-a="ok"]').onclick = () => { ov.remove(); this.leave(); app.backToMapSelect ? app.backToMapSelect() : location.reload(); };
-      }
+      e && e.stop();
+      const T = { win: ['승리!', '#ffd34d', '상대의 목숨이 먼저 다 떨어졌어요'], lose: ['패배', '#ff5c7a', '상대가 더 잘 버텼어요'], draw: ['무승부', '#9ecbff', '완전히 같은 기록이에요'] }[res];
+      const ov = document.createElement('div'); ov.className = 'vs-overlay';
+      ov.innerHTML = `<div class="vs-box"><div class="vs-title" style="color:${T[1]}">${T[0]}</div><small class="vs-sub">${why || T[2]}</small>
+        <div class="vs-sub">웨이브 ${e ? e.currentWave : '-'} · 처치 ${this.kills} · 목숨 ${e ? Math.max(0, e.lives) : '-'}</div><button class="vs-btn primary" data-a="ok">나가기</button></div>`;
+      document.body.appendChild(ov);
+      ov.querySelector('[data-a="ok"]').onclick = () => { ov.remove(); this.leave(); app.backToMapSelect ? app.backToMapSelect() : location.reload(); };
       this._cleanup(false);
     },
     _cleanup(removeRoom) {
       clearInterval(this.timer); clearInterval(this.spawnTimer); this.timer = this.spawnTimer = null;
       this.unsub && this.unsub(); this.unsub = null;
       if (window.ShopItems) for (let i = window.ShopItems.length - 1; i >= 0; i--) if (window.ShopItems[i].vs) window.ShopItems.splice(i, 1);
-      this._panel && this._panel.remove(); this._panel = null;
+      this._panel && this._panel.remove(); this._panel = null; this._done = false;
+      document.getElementById('game-screen')?.classList.remove('vs-mode');
       if (removeRoom && this.code && this.net) this.net.remove(this.code);
       this.active = false;
     },
