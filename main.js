@@ -1117,7 +1117,7 @@ class App {
     };
     this.engine.onWaveComplete = (wave, bonus, timedOut) => {
       this._megaWaveClear && this._megaWaveClear(wave);
-      if (wave % 10 === 0 && this._offerCards) this._offerCards(wave); // v3.5: 10웨이브마다 강화 카드
+      if (wave % 10 === 0 && this._offerCards && !(window.Versus && Versus.active)) this._offerCards(wave); // v3.5: 10웨이브마다 강화 카드 (대전은 versus.js가 시계 기준으로)
       // v28: 토게피 '황금알' - N웨이브마다 무료 프리미엄 뽑기
       const every = this.engine._freePullEvery || 0;
       if (every > 0 && wave % every === 0) {

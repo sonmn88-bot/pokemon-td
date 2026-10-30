@@ -196,7 +196,7 @@ Object.assign(App.prototype, {
     const cards = this._rollCards(guarantee);
     if (!cards.length) return false;
     this._cardOpen = true;
-    e.stop();
+    if (!(window.Versus && Versus.active)) e.stop(); // 대전은 시간이 같이 흐르므로 멈추지 않음
     this._showCardOverlay(cards);
     return true;
   },
@@ -225,7 +225,7 @@ Object.assign(App.prototype, {
         <button class="co-btn skip" title="몬스터 체력 적응이 오르지 않고, 다음 카드에 희귀 이상이 확정으로 나와요">건너뛰기 <span class="co-cost">+${ICON('coin', 14)}${skipGold} · 적응 없음 · 다음 희귀↑</span></button>
       </div>`;
     document.getElementById('game-screen').appendChild(ov);
-    const close = () => { ov.remove(); this._cardOpen = false; this.engine.start(); if (this._pendingAutoWave) { this._pendingAutoWave = false; this.sendWave(); } };
+    const close = () => { ov.remove(); this._cardOpen = false; if (!(window.Versus && Versus.active)) this.engine.start(); if (this._pendingAutoWave) { this._pendingAutoWave = false; this.sendWave(); } };
     ov.querySelectorAll('.co-card').forEach(b => b.onclick = () => {
       if (e._cardDoppel) { e._cardDoppel = false; cards.forEach(c => this._takeCard(c)); }
       else this._takeCard(cards[Number(b.dataset.i)]);

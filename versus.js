@@ -8,7 +8,9 @@
 (function () {
   const COL = 'pokemontd_rooms', SYNC_MS = 2000, LOST_MS = 20000, SPAWN_GAP = 380;
   // v3.16 공정 대전: 같은 시드(웨이브·특성 동일) + 공용 웨이브 시계(배속·스킵 잠금) + 30웨이브 결승 + 25웨이브부터 서든데스
-  const WAVE_SEC = 60, FINAL_WAVE = 30, SUDDEN = 25;
+  // v3.18: 70웨이브까지 공용 시계 → 이후 '결전': 웨이브 없이 몹이 한 마리씩 끝없이(점점 빠르고 강하게), 골드 더 — 먼저 무너지는 쪽이 패배
+  const WAVE_SEC = 60, FINAL_WAVE = 70, SUDDEN = 60;
+  const ENDLESS_HP = T => Math.pow(1.07, T / 10), ENDLESS_GAP = T => Math.max(0.3, 1.1 - T / 500), ENDLESS_CARD = 120;
   const inc = w => 95 + 4 * w + 0.15 * w * w;                  // 웨이브당 골드 수입 추정치(처치+클리어+이자 측정값에 맞춘 식)
   const sudden = w => w >= SUDDEN;
 
@@ -114,7 +116,7 @@
         <div class="vs-pick"><span>내 영웅</span>${HEROES.map(([id, n]) => `<button data-hero="${id}" title="${n}">${heroImg(id)}</button>`).join('')}</div>
         <div class="vs-pick"><span>시작 몬스터</span>${STARTERS.map(([id, n]) => `<button data-st="${id}" title="${n}">${starterImg(id)}</button>`).join('')}</div>
         <div class="vs-speed"><span>배속 (방장이 선택 · 둘 다 고정)</span><button data-sp="1">1×</button><button data-sp="2">2×</button></div>
-        <small class="vs-sub">웨이브는 둘에게 같은 시각에 와요 · ${FINAL_WAVE}웨이브 결승 · ${SUDDEN}웨이브부터 서든데스</small>
+        <small class="vs-sub">웨이브는 둘에게 같은 시각에 와요 · 10웨이브마다 카드 · ${SUDDEN}웨이브부터 서든데스 · ${FINAL_WAVE}웨이브 뒤 결전(끝없이 강해지는 몹)</small>
         <button class="vs-btn primary" data-a="ready">준비</button><button class="vs-btn ghost" data-a="leave">나가기</button><div class="vs-msg"></div></div>`;
       document.body.appendChild(ov);
       this._lobby = ov;
@@ -220,13 +222,33 @@
       const app = window.app, e = app && app.engine; if (!e || !this.active || this.ended) return;
       const el = (Date.now() - this.startAt) / 1000 * this.speed, target = Math.min(FINAL_WAVE, Math.floor(el / WAVE_SEC) + 1);
       this._nextIn = Math.max(0, Math.ceil((WAVE_SEC - el % WAVE_SEC) / this.speed));
-      if (target > (e.currentWave || 0)) { if (e.state === 'wave') e.timeoutWave(); if (e.state === 'idle') app.sendWave(); }
-      if (el >= FINAL_WAVE * WAVE_SEC && !this._done) {                                   // 결승 시간 끝 → 내 최종 기록 제출
-        this._done = true; e.stop();
-        this.net.update(this.code, { [`st.${this.me}`]: { w: e.currentWave, k: this.kills, l: Math.max(0, e.lives), f: e.enemies.length, done: true } }).catch(() => {});
-        app.showWaveAnnounce('결승 종료! 판정 중…', '#ffd34d');
+      if (target > (e.currentWave || 0)) {
+        if (e.state === 'wave') e.timeoutWave(); if (e.state === 'idle') app.sendWave();
+        const done = (e.currentWave || 0) - 1;                                            // 10웨이브 지날 때마다 카드 (멈추지 않음)
+        if (done > 0 && done % 10 === 0 && this._cardAt !== done && app._offerCards && !app._cardOpen) { this._cardAt = done; app._offerCards(done); }
       }
+      if (el >= FINAL_WAVE * WAVE_SEC) this._endless(el - FINAL_WAVE * WAVE_SEC);
       if (this._panel) this._renderPanel();
+    },
+    // 결전: 몹이 한 마리씩 끝없이 (간격 1.1초 → 0.3초, 체력 10초마다 ×1.07), 처치 골드 ×2.5, 2분마다 카드
+    _endless(T) {
+      const app = window.app, e = app.engine;
+      if (!this._endOn) {
+        this._endOn = true; this._endNext = 0; this._endCard = ENDLESS_CARD; e._vsGoldMul = 2.5;
+        app.showWaveAnnounce('결전 시작! 몬스터가 끊임없이 나와요 · 처치 골드 2.5배', '#ff5c7a');
+        try { navigator.vibrate && navigator.vibrate([80, 40, 160]); } catch (_) {}
+      }
+      let n = 0;
+      while (T >= this._endNext && n++ < 6) {                                             // 한 번에 최대 6마리 (멈췄다 돌아와도 폭주 X)
+        const plan = waveTypePlan(FINAL_WAVE + 1 + Math.floor(this._endNext / 60)), ids = plan.mainIds.concat(plan.secIds);
+        e.activeSpawns++; e._spawnEnemy({ type: ids[Math.floor(Math.random() * ids.length)] });
+        const en = e.enemies[e.enemies.length - 1];
+        if (en && !en.isBoss) { const m = ENDLESS_HP(this._endNext); en.maxHp = Math.round(en.maxHp * m); en.hp = en.maxHp; en._vsHp = 1; }
+        this._endNext += ENDLESS_GAP(this._endNext);
+      }
+      if (T >= this._endNext) this._endNext = T;                                          // 밀린 건 버림 (동시 방출 금지)
+      if (T >= this._endCard && app._offerCards && !app._cardOpen) { this._endCard += ENDLESS_CARD; app._offerCards(e.currentWave); }
+      this._endT = T;
     },
     _send(kind, n, auto) {
       this.net.update(this.code, {}, { [`send.${this.me}.${kind}`]: n }).catch(() => {});
@@ -268,7 +290,8 @@
       const e = window.app.engine;
       const me = { w: e ? e.currentWave : m.w, k: this.kills, l: e ? Math.max(0, e.lives) : m.l, f: e ? e.enemies.length : m.f };
       const row = (who, s, cls) => `<div class="vs-row ${cls}"><b>${who}</b><span>W${s.w || 0}</span><span>처치 ${s.k || 0}</span><span>❤ ${s.l ?? '-'}</span><span>필드 ${s.f || 0}</span></div>`;
-      const w = me.w || 0, head = this._done ? '결승 판정 중' : w >= FINAL_WAVE ? `결승 웨이브 · 종료까지 ${this._nextIn ?? '-'}초` : `다음 웨이브 ${this._nextIn ?? '-'}초 · ${FINAL_WAVE}웨이브 결승`;
+      const w = me.w || 0, T = this._endT || 0, mmss = `${Math.floor(T / 60)}:${String(Math.floor(T % 60)).padStart(2, '0')}`;
+      const head = this._endOn ? `결전 ${mmss} · 몹 체력 ×${ENDLESS_HP(T).toFixed(1)}` : w >= FINAL_WAVE ? `마지막 웨이브 · 결전까지 ${this._nextIn ?? '-'}초` : `다음 웨이브 ${this._nextIn ?? '-'}초 · ${FINAL_WAVE}웨이브 뒤 결전`;
       this._panel.innerHTML = `<div class="vs-head ${sudden(w) ? 'sd' : ''}">${sudden(w) ? '서든데스 · ' : ''}${head}</div>` + row(on.name || '상대', o, 'opp') + row('나', me, 'me')
         + (this.pending.length ? `<div class="vs-inc">받는 중 ${this.pending.length}</div>` : '');
     },
@@ -289,7 +312,7 @@
       clearInterval(this.timer); clearInterval(this.spawnTimer); this.timer = this.spawnTimer = null;
       this.unsub && this.unsub(); this.unsub = null;
       if (window.ShopItems) for (let i = window.ShopItems.length - 1; i >= 0; i--) if (window.ShopItems[i].vs) window.ShopItems.splice(i, 1);
-      this._panel && this._panel.remove(); this._panel = null; this._done = false;
+      this._panel && this._panel.remove(); this._panel = null; this._done = false; this._endOn = false; this._endT = 0; this._cardAt = 0;
       document.getElementById('game-screen')?.classList.remove('vs-mode');
       const tg = window.HeroDefs && HeroDefs.togepi && HeroDefs.togepi.attack;          // 대전 끝나면 혼자 하기 수치로 되돌림
       if (tg && this._tgDmg !== undefined) { tg.baseDamage = this._tgDmg; this._tgDmg = undefined; }
