@@ -547,7 +547,8 @@ class GameEngine {
     }
     if (enemy._isKing) this.onKingDefeated && this.onKingDefeated();
     // v28 (설계서 §5): 킬 골드가 웨이브에 따라 성장 (기본보상 × (1 + 웨이브/30))
-    const baseReward = Math.max(1, Math.round(enemy.reward * (1.5 + this.currentWave / 20))); // v3.0: 처치 골드 상향 (웨이브10 기준 ×1.33→×2.0)
+    let baseReward = Math.max(1, Math.round(enemy.reward * (1.5 + this.currentWave / 20))); // v3.0: 처치 골드 상향 (웨이브10 기준 ×1.33→×2.0)
+    if (this._vsGoldMul) baseReward = Math.round(baseReward * this._vsGoldMul); // v3.17 대전 배율 (반올림 뒤에 곱해야 초반 1~2골드 몹에도 적용됨)
     const traitGoldMul = this._runTrait?.key === 'goldBoom' ? 1.2 : 1;
     const effectiveGoldMul = this._globalGoldMul * (this._goldenTimeActive ? this._goldenTimeGoldMul : 1) * traitGoldMul;
     const bonus = Math.floor(baseReward * (effectiveGoldMul - 1));
@@ -735,7 +736,7 @@ class GameEngine {
     this.state = 'idle';
     // v28 (설계서 §5): 웨이브 클리어 보너스 10 + 웨이브×1.5 (최대 150). 위험보너스는 이자와 역할이
     // 겹쳐서 제거 (단순화).
-    let bonus = Math.round(Math.min(220, Math.round(25 + this.currentWave * 3)) * (this._waveBonusMul || 1) * (this._cardMods ? this._cardMods.waveGold : 1)); // v3.0: 10+1.5w→25+3w · v3.5 카드
+    let bonus = Math.round(Math.min(220, Math.round(25 + this.currentWave * 3)) * (this._waveBonusMul || 1) * (this._cardMods ? this._cardMods.waveGold : 1) * (this._vsGoldMul || 1)); // v3.0: 10+1.5w→25+3w · v3.5 카드 · v3.17 대전 배율
     if (this._nextWaveGoldMul) { bonus = Math.round(bonus * this._nextWaveGoldMul); this._nextWaveGoldMul = null; }
     this._peakFieldCount = 0;
     this.addGold(bonus);

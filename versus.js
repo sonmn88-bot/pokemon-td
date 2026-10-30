@@ -52,7 +52,7 @@
     { key: 'vs_elite', icon: 'sword', name: '엘리트 보내기 ×3', mul: 1.2, bounty: 0.4, desc: '상대에게 황금 엘리트 3마리 (체력 2.2배·빠름)', vs: 'elite', n: 3 },
     { key: 'vs_boss', icon: 'crown', name: '미니보스 보내기', mul: 3, bounty: 0.4, perWave: 1, desc: '상대에게 미니보스 1마리 (웨이브당 1회)', vs: 'boss', n: 1 },
   ];
-  const itemCost = (it, w) => Math.round(it.mul * inc(w) * (sudden(w) ? 0.5 : 1) / 5) * 5;
+  const itemCost = (it, w) => Math.round(it.mul * inc(w) * 1.4 * (sudden(w) ? 0.5 : 1) / 5) * 5; // ×1.4 = 대전 수입 배율(1.6)에 맞춤
   const AUTO = w => (3 + Math.floor(w / 5)) * (sudden(w) ? 2 : 1); // 웨이브를 시간 안에 다 잡으면 자동으로 보내는 수
 
   const HEROES = [['pikachu', '피카츄'], ['togepi', '토게피'], ['eevee', '이브이']], STARTERS = [['bulbasaur', '이상해씨'], ['charmander', '파이리'], ['squirtle', '꼬부기']];
@@ -182,6 +182,12 @@
       try { app.startGame(); } finally { app._vsRng = null; }
       const e = app.engine;
       e._runSeed = room.seed || 1; window.__wavePlan = {};
+      // v3.17 대전 경제: 웨이브가 시계대로 와서 혼자 할 때보다 준비 시간이 짧음 → 시작 골드 600, 처치·클리어 골드 ×1.6,
+      //   초반 몹 체력 낮춤(1~8웨이브 75% → 16웨이브에 100%). 판매 환급 등엔 배율 없음(무한 골드 방지)
+      e._vsGoldMul = 1.6; e.addGold(300);
+      const spawn = e._spawnEnemy.bind(e);
+      e._spawnEnemy = (item) => { spawn(item); const en = e.enemies[e.enemies.length - 1], w = e.currentWave || 1;
+        if (en && !en.isBoss && !en._vsHp) { const m = w <= 8 ? 0.75 : w < 16 ? 0.75 + (w - 8) / 8 * 0.25 : 1; en.maxHp = Math.round(en.maxHp * m); en.hp = Math.min(en.hp, en.maxHp); en._vsHp = 1; } };
       this.speed = room.speed || 1; this.startAt = this._startAt || Date.now(); e.speedMul = this.speed; // 공용 시계 기준 = 각자 카운트다운이 끝난 순간
       document.getElementById('game-screen').classList.add('vs-mode');          // 배속·웨이브 버튼 숨김 (공용 시계)
       if (this.me === 'p1') this.net.update(this.code, { state: 'playing' }).catch(() => {});
