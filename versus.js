@@ -9,8 +9,12 @@
   const COL = 'pokemontd_rooms', SYNC_MS = 2000, LOST_MS = 20000, SPAWN_GAP = 380;
   // v3.16 공정 대전: 같은 시드(웨이브·특성 동일) + 공용 웨이브 시계(배속·스킵 잠금) + 30웨이브 결승 + 25웨이브부터 서든데스
   // v3.18: 70웨이브까지 공용 시계 → 이후 '결전': 웨이브 없이 몹이 한 마리씩 끝없이(점점 빠르고 강하게), 골드 더 — 먼저 무너지는 쪽이 패배
-  const WAVE_SEC = 60, FINAL_WAVE = 70, SUDDEN = 60;
-  const ENDLESS_HP = T => Math.pow(1.07, T / 10), ENDLESS_GAP = T => Math.max(0.3, 1.1 - T / 500), ENDLESS_CARD = 120;
+  const WAVE_SEC = 60, FINAL_WAVE = 70, SUDDEN = 70;           // 서든데스(견제 반값·2배 수량)는 결전부터
+  // 결전 난이도·보상: 체력 10초마다 ×1.06(5분 ×5.7, 10분 ×33), 간격 1.1→0.3초.
+  //   처치 골드 = 2.5 × 체력배율^0.7 → 강해지는 만큼 골드도 늘지만 조금 덜 늘어서, 꾸준히 강화해야 버팀 (결국 실력 차이로 승부)
+  const ENDLESS_HP = T => Math.pow(1.06, T / 10), ENDLESS_GAP = T => Math.max(0.3, 1.1 - T / 500), ENDLESS_CARD = 120;
+  const ENDLESS_GOLD = T => 2.5 * Math.pow(ENDLESS_HP(T), 0.7);
+  const LIMIT = { small: 3, elite: 2, boss: 1 }, LIMIT_WIN = 30;  // 견제 연타 제한: 웨이브당(결전은 30초마다) 횟수
   const inc = w => 95 + 4 * w + 0.15 * w * w;                  // 웨이브당 골드 수입 추정치(처치+클리어+이자 측정값에 맞춘 식)
   const sudden = w => w >= SUDDEN;
 
@@ -52,9 +56,9 @@
   const VS_ITEMS = [
     { key: 'vs_small', icon: 'sword', name: '몬스터 보내기 ×8', mul: 0.6, bounty: 0.3, desc: '상대 필드에 이번 웨이브 몬스터 8마리', vs: 'small', n: 8 },
     { key: 'vs_elite', icon: 'sword', name: '엘리트 보내기 ×3', mul: 1.2, bounty: 0.4, desc: '상대에게 황금 엘리트 3마리 (체력 2.2배·빠름)', vs: 'elite', n: 3 },
-    { key: 'vs_boss', icon: 'crown', name: '미니보스 보내기', mul: 3, bounty: 0.4, perWave: 1, desc: '상대에게 미니보스 1마리 (웨이브당 1회)', vs: 'boss', n: 1 },
+    { key: 'vs_boss', icon: 'crown', name: '미니보스 보내기', mul: 3, bounty: 0.4, desc: '상대에게 미니보스 1마리', vs: 'boss', n: 1 },
   ];
-  const itemCost = (it, w) => Math.round(it.mul * inc(w) * 1.4 * (sudden(w) ? 0.5 : 1) / 5) * 5; // ×1.4 = 대전 수입 배율(1.6)에 맞춤
+  const itemCost = (it, w) => Math.round(it.mul * inc(w) * 1.4 / 5) * 5; // ×1.4 = 대전 수입 배율(1.6)에 맞춤 (결전 할인은 따로)
   const AUTO = w => (3 + Math.floor(w / 5)) * (sudden(w) ? 2 : 1); // 웨이브를 시간 안에 다 잡으면 자동으로 보내는 수
 
   const HEROES = [['pikachu', '피카츄'], ['togepi', '토게피'], ['eevee', '이브이']], STARTERS = [['bulbasaur', '이상해씨'], ['charmander', '파이리'], ['squirtle', '꼬부기']];
@@ -210,8 +214,16 @@
         this.ended = true; this._resultShown = true; this._cleanup(false);
         app.showWaveAnnounce('패배… 상대가 더 오래 버텼어요', '#ff5c7a'); over && over();
       };
-      window.ShopItems.push(...VS_ITEMS.map(it => ({ ...it, costFn: eng => itemCost(it, Math.max(1, eng.currentWave || 1)),
-        buy: eng => { const w = Math.max(1, eng.currentWave || 1); this._send(it.vs, it.n * (sudden(w) ? 2 : 1)); } })));
+      const win = () => this._endOn ? 'E' + Math.floor((this._endT || 0) / LIMIT_WIN) : 'W' + (e.currentWave || 0);   // 제한 구간: 웨이브 / 결전 30초
+      this._uses = {};
+      const usedN = it => (this._uses[it.vs] && this._uses[it.vs].win === win()) ? this._uses[it.vs].n : 0;
+      window.ShopItems.push(...VS_ITEMS.map(it => ({ ...it, costFn: () => Math.round(itemCost(it, Math.max(1, e.currentWave || 1)) * (this._endOn ? 0.5 * ENDLESS_GOLD(this._endT || 0) / 2.5 : 1)), // 결전: 반값이지만 늘어나는 골드만큼 같이 오름
+        limitFn: () => { const n = usedN(it), max = LIMIT[it.vs]; return { used: n >= max, left: `${max - n}/${max}회${this._endOn ? ' (30초)' : ''}` }; },
+        buy: () => {
+          if (usedN(it) >= LIMIT[it.vs]) return false;
+          this._uses[it.vs] = { win: win(), n: usedN(it) + 1 };
+          this._send(it.vs, it.n * (this._endOn ? 2 : 1));
+        } })));
       this._panel = document.createElement('div'); this._panel.id = 'vs-panel';
       document.getElementById('game-screen').appendChild(this._panel);
       this._renderPanel();
@@ -234,8 +246,8 @@
     _endless(T) {
       const app = window.app, e = app.engine;
       if (!this._endOn) {
-        this._endOn = true; this._endNext = 0; this._endCard = ENDLESS_CARD; e._vsGoldMul = 2.5;
-        app.showWaveAnnounce('결전 시작! 몬스터가 끊임없이 나와요 · 처치 골드 2.5배', '#ff5c7a');
+        this._endOn = true; this._endNext = 0; this._endCard = ENDLESS_CARD;
+        app.showWaveAnnounce('결전 시작! 몬스터가 끊임없이 강해져요 · 골드도 같이 늘어요 · 견제 반값 2배', '#ff5c7a');
         try { navigator.vibrate && navigator.vibrate([80, 40, 160]); } catch (_) {}
       }
       let n = 0;
@@ -249,6 +261,7 @@
       if (T >= this._endNext) this._endNext = T;                                          // 밀린 건 버림 (동시 방출 금지)
       if (T >= this._endCard && app._offerCards && !app._cardOpen) { this._endCard += ENDLESS_CARD; app._offerCards(e.currentWave); }
       this._endT = T;
+      e._vsGoldMul = ENDLESS_GOLD(T);                                                   // 몹이 강해지는 만큼 골드도
     },
     _send(kind, n, auto) {
       this.net.update(this.code, {}, { [`send.${this.me}.${kind}`]: n }).catch(() => {});

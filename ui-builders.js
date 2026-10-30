@@ -765,6 +765,7 @@ Object.assign(App.prototype, {
     // v3.8: 골드가 바뀔 때마다 버튼을 새로 만들면 누르는 순간 교체돼 터치가 씹혔음 → 처음 1번만 만들고 이후엔 제자리 갱신
     const state = item => {
       const cost = window.shopItemCost(item, this.engine);
+      if (item.limitFn) { const L = item.limitFn(this.engine); return { cost, used: L.used, left: L.left }; } // 대전 견제: 구간당 횟수 제한
       const waveUses = (this.engine._shopWaveUses || {})[item.key] || 0;
       const pw = item.perWave ? item.perWave + (item.key === 'monsterball' ? (this.engine._cardMods?.ballExtra || 0) : 0) : 0; // v3.5 카드 '볼 주머니'
       const used = !!((item.oneTime && this.engine._oneTimeUsed?.[item.key]) || (pw && waveUses >= pw));
