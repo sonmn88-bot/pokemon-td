@@ -153,7 +153,7 @@ const RUN_IN_PAGE = async ({ hero, maxWave, STRAT }) => {
       if (tmT) C.push({ k: 'tm', t: tmT, cost: TM_COST, v: tdps(tmT) * 0.3 });
       const ep = !(e._oneTimeUsed && e._oneTimeUsed.rarecandy) && e.towers.filter(t => t.def && t.def.grade === 'epic').sort((a, b) => tdps(a) - tdps(b))[0];
       if (ep) { const it = ShopItems.find(i => i.key === 'rarecandy'); C.push({ k: 'candy', t: ep, cost: shopItemCost(it, e), v: Math.max(0, GD.legend - tdps(ep)) }); }
-      if (!empty) { const it = ShopItems.find(i => i.key === 'revive'), best = (app._inventory || []).reduce((m, d) => Math.max(m, defDps(d)), 0); C.push({ k: 'plot', cost: shopItemCost(it, e), v: Math.max(EV('normal'), best) * 0.9 }); }
+      if (!empty) { const it = ShopItems.find(i => i.key === 'revive'), best = (app._inventory || []).filter(d => !keepD(d)).reduce((m, d) => Math.max(m, defDps(d)), 0); if (best > 0) C.push({ k: 'plot', cost: shopItemCost(it, e), v: best * 0.9 }); } // 먹이로 남긴 재료는 놓을 대상이 아님
       const ok = C.filter(c => c.cost > 0 && e.gold - c.cost >= reserve && c.v > 0).sort((a, b) => b.v / b.cost - a.v / a.cost);
       const c = ok[0]; if (!c) break;
       if (c.k === 'ten') { if (e.gold < PULL_COSTS.ten) break; const ei = emptyIdx(); e.selectedSlotIdx = ei >= 0 ? ei : null; app.doPull('ten'); e.selectedSlotIdx = null; spent('10연', c.cost); }
@@ -183,6 +183,7 @@ const RUN_IN_PAGE = async ({ hero, maxWave, STRAT }) => {
     }
     place(); // 합성으로 생긴 것 배치
   };
+  const keepD = d => e.towers.some(t => t.def && FEEDABLE(t) && (t.def.mega ? t.def.megaOf === d.id : (t.def.id === d.id && t.def.grade === d.grade))) || (MEGA_OF[d.id] && e.towers.some(t => t.def && (t.def.id === d.id || t.def.megaOf === d.id)));
   const FEEDABLE = t => t.def && (t.def.mega || ['epic', 'legend', 'unique'].includes(t.def.grade)) && ((t.def._stack || 1) < 5);
   const DT = 1 / 30; let t = 0, lastBot = 0; const trace = [];
   const t0 = performance.now();

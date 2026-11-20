@@ -169,7 +169,7 @@ const HeroDefs = {
       { id:'togetic', name:'토게틱', color:'#f8bbd0', dmgMul:1.15, rangeMul:1.35, fireRateMul:1.10 },
     ]},
     attack:{
-      baseRange:112, baseDamage:6, baseFireRate:1.0, // v3.4: 토게피는 경제·행운 지원형 → 공격력은 피카츄의 약 60% (대전에선 versus.js가 9로)
+      baseRange:112, baseDamage:8, baseFireRate:1.0, // v4: 6→8 (시뮬 3판 모두 111웨이브로 최하위, 영웅 성장 곡선 완화분 보전) // v3.4: 토게피는 경제·행운 지원형 → 공격력은 피카츄의 약 60% (대전에선 versus.js가 9로)
       rangePerLevel:4, damagePerLevel:1.5, // v27-46: damagePerLevel 2→4 (요청5: 성장이 너무 약했음)
       projColor:'#fff59d', projEmoji:'✨', dmgType:'special',
     },
@@ -358,7 +358,7 @@ class Hero {
     const base = (a.baseDamage + (this.level-1)*a.damagePerLevel) * (1 + this._skillVal('atkDmg', 0) + (this._multiTargetDmgBonus || 0)) * (this._evoDmgMul || 1) * burst;
     // v3.2: 적 체력이 웨이브마다 지수로 오르니 영웅도 같은 곡선으로 성장 (예전엔 레벨 비례 직선이라 후반에 무의미)
     const w = window.app?.engine?.currentWave || 0;
-    const waveScale = Math.pow(1.033, Math.max(0, w - 5)); // v3.8: 1.04면 141웨이브에 ×208 → 영웅이 전체 데미지 50% 독식. 1.033(×83)으로 20~25% 목표
+    const waveScale = Math.pow(1.026, Math.max(0, w - 5)); // v3.8: 1.04 → 1.033 / v4: 시뮬(이상적 플레이 9판)에서 1.033이면 영웅 비중 피카츄 39~51%·이브이 37~69% → 1.026(120웨이브 ×19)으로 20~30% 목표
     return base * this._typeUpgradeDmgMul() * waveScale * (this._formMul || 1) * gmax * (window.app?.engine?._cardMods?.heroDmg || 1);
   }
 
