@@ -44,8 +44,11 @@ function _wavePoolIds(n) {
   const progress = (((n - 1) % WAVES_PER_ZONE) + 1) / WAVES_PER_ZONE;
   let pool = [...ENEMY_TIERS.t1];
   if (progress > 0.15) pool = pool.concat(ENEMY_TIERS.t2);
-  if (progress > 0.42) pool = pool.concat(ENEMY_TIERS.t3);
-  if (progress > 0.68) pool = pool.concat(ENEMY_TIERS.t4);
+  // v4 밸런스(시뮬 36판): 첫 존에서 t4(평균 체력 920, t3의 2.4배)가 21웨이브에 들어와 판의 40%가 20~31웨이브에서 끝났음
+  //   → 첫 존(1~30)만 t3 16웨이브·t4 26웨이브부터. 이후 존은 그대로 (그땐 전력이 갖춰짐)
+  const first = n <= WAVES_PER_ZONE;
+  if (progress > (first ? 0.5 : 0.42)) pool = pool.concat(ENEMY_TIERS.t3);
+  if (progress > (first ? 0.85 : 0.68)) pool = pool.concat(ENEMY_TIERS.t4);
   return pool.filter(id => typeof EnemyTypes !== 'undefined' && EnemyTypes[id]);
 }
 function waveTypePlan(n) {
