@@ -1646,3 +1646,82 @@ html, body { overscroll-behavior: none; }
 .vs-pick button:disabled:not(.on) { opacity:.35; }
 .vs-pk { display:flex; align-items:center; gap:2px; font-style:normal; }
 .vs-pk img { width:26px; height:26px; object-fit:contain; }
+
+/* =====================================================================
+   v4 디자인 층 (DESIGN.md v4) — 게임 글꼴 3단: 제목·버튼 메이플스토리체 / 본문 Pretendard / 숫자 Lilita One
+   글꼴 파일은 직접 호스팅(assets/fonts, 서비스워커 캐시) → 외부 CDN 장애와 무관
+   굵기 범위를 100~900으로 선언: 굵은 파일 1개를 모든 굵기에 그대로 써서 가짜 굵게(번짐) 방지
+   ===================================================================== */
+@font-face { font-family:'Maple'; src:url('assets/fonts/maple-bold.woff2') format('woff2'); font-weight:100 900; font-display:swap; }
+@font-face { font-family:'Lilita One'; src:url('assets/fonts/lilita-one.woff2') format('woff2'); font-weight:100 900; font-display:swap; unicode-range:U+0000-00FF, U+2000-206F, U+2190-2193, U+2212, U+221E; }
+:root {
+  --font-display:'Maple', 'Pretendard Variable', Pretendard, -apple-system, sans-serif;
+  --font-px:'Lilita One', 'Maple', 'Pretendard Variable', Pretendard, -apple-system, sans-serif; /* 숫자·영문 강조 (한글은 Maple로 이어짐) */
+  --edge-gold:#b87407; --edge-green:#08875d; --edge-dark:rgba(0,0,0,.45);
+}
+/* 제목·주 행동 버튼·큰 알림 = 게임 글꼴 */
+.title-main, .po-title, .skin-picker-title, .end-title, .he-title, .mg-title, .mr-pick-title, .mission-popup-title, .tp-title,
+.skilltree-title, .vs-title, .wave-announce, .title-start-btn, #btn-endless-start, .wave-btn, .diff-btn b, .co-card b, .po-btn.go {
+  font-family:var(--font-display) !important; font-weight:400 !important; letter-spacing:0 !important;
+}
+/* 주 행동 버튼: 아래쪽 두께(눌리는 버튼) — 바깥 빛번짐 없음 */
+.title-start-btn, #btn-endless-start { box-shadow:0 4px 0 var(--edge-gold), 0 10px 22px rgba(0,0,0,.35) !important; transition:transform .12s var(--ease-out), box-shadow .12s var(--ease-out); }
+.wave-btn { box-shadow:0 4px 0 var(--edge-green), 0 8px 18px rgba(0,0,0,.3) !important; transition:transform .12s var(--ease-out), box-shadow .12s var(--ease-out); }
+.title-start-btn:active, #btn-endless-start:active { transform:translateY(3px) !important; box-shadow:0 1px 0 var(--edge-gold), 0 4px 10px rgba(0,0,0,.3) !important; }
+.wave-btn:active { transform:translateY(3px); box-shadow:0 1px 0 var(--edge-green), 0 4px 10px rgba(0,0,0,.3) !important; }
+.title-start-btn, #btn-endless-start, .wave-btn { text-shadow:0 1px 0 rgba(255,255,255,.35); }
+/* 타이틀 로고: 그라데이션 글자 제거 → 단색 + 두꺼운 어두운 외곽(게임 로고 문법) */
+.title-logo-td, .title-logo-def { background:none !important; -webkit-background-clip:border-box !important; background-clip:border-box !important;
+  -webkit-text-stroke:0; paint-order:stroke fill; }
+.title-logo-td { color:#fff !important; font-size:clamp(54px,15vw,96px) !important; letter-spacing:0 !important;
+  text-shadow:0 3px 0 #2a3350, 0 6px 0 #161b2b, 0 14px 24px rgba(0,0,0,.45) !important; }
+.title-logo-def { color:var(--accent-yel) !important; letter-spacing:.2em !important; text-shadow:0 2px 0 #6b4300, 0 8px 18px rgba(0,0,0,.4) !important; }
+.title-poke-label { font-family:var(--font-px) !important; font-weight:400 !important; }
+/* 숫자는 고정폭 정렬 */
+.hud-cell, .rs-num, #gold-val, #wave-val, #score-val, #field-count-val { font-variant-numeric:tabular-nums; }
+.hud-cell { font-weight:400 !important; font-size:16px !important; }
+.end-title { font-size:clamp(40px,11vw,64px) !important; text-shadow:0 3px 0 rgba(0,0,0,.45), 0 12px 26px rgba(0,0,0,.4) !important; }
+.wave-announce { text-shadow:0 2px 0 rgba(0,0,0,.55), 0 6px 16px rgba(0,0,0,.45) !important; }
+/* 좁은 화면 HUD: 무한(∞) 표기 숨김, 조작 버튼 34px → 수치가 잘리지 않게 */
+@media (max-width:560px) {
+  .wv-tot { display:none; }
+  #hud-ctrl .hud-btn, #hud-ctrl .speed-btn { min-width:36px; width:36px; padding:0; }
+  #hud-ctrl { padding-left:8px; }
+  .hud-cell { padding:4px 3px !important; font-size:15px !important; }
+}
+/* 전설·유니크 획득 플래시 (드문 순간만, opacity만 움직임) */
+.grade-flash { position:absolute; inset:0; z-index:60; pointer-events:none;
+  background:radial-gradient(circle at 50% 45%, color-mix(in srgb, var(--c) 55%, transparent) 0%, transparent 65%);
+  animation:gradeFlash .85s var(--ease-out) forwards; }
+@keyframes gradeFlash { 0% { opacity:0; } 15% { opacity:1; } 100% { opacity:0; } }
+/* 일시정지 메뉴: 소리 켜고 끄기 2칸 */
+.po-row { display:flex; gap:8px; } .po-row .po-btn { flex:1; }
+@media (prefers-reduced-motion: reduce) { .grade-flash { animation:none; opacity:0; } }
+/* v4 웨이브 미리보기: 약점 타입 + 내 보유 수 (0이면 빨강) */
+#wave-preview .wp-counter { display:inline-flex; align-items:center; gap:2px; margin-left:6px; padding-left:6px; border-left:1px solid rgba(255,255,255,.18); color:#bfe8d0; }
+#wave-preview .wp-counter b { font-family:var(--font-px); font-weight:400; font-size:12px; }
+#wave-preview .wp-counter.none { color:#ff8da1; }
+/* v4 오늘의 도전 버튼 (주 버튼 아래 · 대전 위) — 2줄: 제목(게임 글꼴) + 조건 */
+#btn-daily { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; width:100%; max-width:380px; min-height:56px; margin:10px auto 0;
+  border:1.5px solid rgba(106,168,255,.55); border-radius:14px; background:rgba(106,168,255,.1); color:#cfe2ff; cursor:pointer;
+  box-shadow:0 3px 0 rgba(30,60,120,.6); transition:transform .12s var(--ease-out), box-shadow .12s var(--ease-out); }
+#btn-daily:active { transform:translateY(2px); box-shadow:0 1px 0 rgba(30,60,120,.6); }
+#btn-daily .dl-main { font-family:var(--font-display); font-size:17px; color:#e6efff; }
+#btn-daily .dl-sub { font-size:12px; color:#8fb3e8; word-break:keep-all; }
+/* v4 판 종료 리포트 */
+.end-record { font-size:15px; color:var(--text-hi); margin:2px 0 4px; }
+.end-record em { font-style:normal; font-family:var(--font-display); color:var(--accent-yel); font-size:18px; }
+.end-tip { max-width:340px; margin:4px 16px 6px; padding:8px 12px; border-radius:10px; background:rgba(106,168,255,.1); border:1px solid rgba(106,168,255,.25);
+  font-size:13px; line-height:1.6; color:#d7e4f7; word-break:keep-all; text-align:left; }
+.end-tip b { color:#fff; } .end-tip img, .end-tip svg { vertical-align:-3px; }
+.dl-rank { width:min(340px, calc(100% - 32px)); margin:6px auto; padding:8px 12px; border-radius:10px; background:rgba(0,0,0,.3); font-size:12px; color:#c9d3e4; }
+.dl-rank b { display:block; font-family:var(--font-display); font-weight:400; color:var(--accent-yel); margin-bottom:4px; font-size:14px; }
+.dl-row { display:grid; grid-template-columns:20px 1fr auto auto; gap:8px; padding:3px 0; border-top:1px solid rgba(255,255,255,.06); font-variant-numeric:tabular-nums; }
+.dl-row .nm { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.dl-empty { color:#8899bb; }
+@media (max-width:560px) {
+  #btn-cam-reset { display:none !important; } /* 일시정지 메뉴의 '화면 원위치'로 이동 */
+  .dv-pct { display:none; }
+  .hud-cell { padding:4px 2px !important; }
+  #hud-top { gap:0 !important; }
+}

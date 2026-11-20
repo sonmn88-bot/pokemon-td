@@ -12,6 +12,8 @@
   <link rel="manifest" href="manifest.json?v=42">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preload" href="assets/fonts/maple-bold.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="assets/fonts/lilita-one.woff2" as="font" type="font/woff2" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
   <title>포켓몬 타워디펜스</title>
@@ -76,7 +78,7 @@
     <div id="hud-top">
       <div class="hud-cell" id="hud-lives" style="display:none"><i data-ic="heart"></i><span id="lives-val">20</span></div>
       <div class="hud-cell" id="hud-gold"><i data-ic="coin"></i><span id="gold-val">200</span></div>
-      <div class="hud-cell" id="hud-wave"><i data-ic="wave"></i><span id="wave-val">0</span>/<span id="wave-total">∞</span></div>
+      <div class="hud-cell" id="hud-wave"><i data-ic="wave"></i><span id="wave-val">0</span><span class="wv-tot">/<span id="wave-total">∞</span></span></div>
       <div class="hud-cell" id="hud-score"><i data-ic="medal"></i><span id="score-val">0</span></div>
       <div class="hud-cell" id="hud-field" title="필드 몬스터 (200마리가 되면 패배)"><i data-ic="monster"></i><span id="field-count-val">0</span><span class="fg-bar"><i id="field-gauge"></i></span></div>
       <div class="hud-cell" id="hud-cards" style="display:none;cursor:pointer" title="내 강화 카드 보기" onclick="app._openCardList()"><i data-ic="card"></i><span>0</span></div>
@@ -126,11 +128,13 @@
 <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script src="leaderboard.js"></script>
+<script src="audio.js"></script>
 <script src="main.js"></script>
 <script src="ui-builders.js"></script>
 <script src="storage.js"></script>
 <script src="mega.js"></script>
 <script src="cards.js"></script>
 <script src="versus.js"></script>
+<script src="daily.js"></script>
 </body>
 </html>

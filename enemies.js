@@ -620,6 +620,7 @@ class Enemy {
     if (this.dead) return;
     this.dead = true;
     if (this.engine && this.engine._recordKill) this.engine._recordKill(this.engine._dmgSrc);
+    if (this.engine && this.engine.onKillSound && !this._isSplitChild) this.engine.onKillSound(this);
 
     // 폭발 (또가스)
     if (this.def.special === 'explode') {

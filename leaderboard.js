@@ -27,7 +27,7 @@ window.Leaderboard = (function () {
   }
 
   // 점수 제출: {name, score, wave}
-  async function submitScore(name, score, wave) {
+  async function submitScore(name, score, wave, daily) {
     if (!enabled) return { ok: false, reason: 'disabled' };
     try {
       const clean = (name || '익명').toString().slice(0, 12);
@@ -35,6 +35,7 @@ window.Leaderboard = (function () {
         name: clean,
         score: Math.round(score),
         wave: Math.round(wave),
+        ...(daily ? { daily: String(daily) } : {}), // v4 일일 도전 날짜키 (YYYYMMDD) - 같은 컬렉션, 필드만 추가
         ts: firebase.firestore.FieldValue.serverTimestamp(),
       });
       return { ok: true };
@@ -57,6 +58,15 @@ window.Leaderboard = (function () {
       console.warn('[랭킹] 조회 실패:', e);
       return [];
     }
+  }
+
+  // v4 일일 도전 순위: 날짜키 일치 문서만 (단일 필드 조건이라 복합 색인 불필요) → 점수순 정렬은 여기서
+  async function fetchDaily(key, n = 20) {
+    if (!enabled) return [];
+    try {
+      const snap = await db.collection('pokemontd_leaderboard').where('daily', '==', String(key)).limit(300).get();
+      return snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => b.score - a.score).slice(0, n);
+    } catch (e) { console.warn('[랭킹] 일일 조회 실패:', e); return []; }
   }
 
   // v27-42: 관리자 기능 (요청2) - 항목 하나 삭제
@@ -102,5 +112,5 @@ window.Leaderboard = (function () {
   window.addEventListener('error', e => log('error', { where: 'window', msg: String(e.message).slice(0, 200), src: `${(e.filename || '').split('/').pop()}:${e.lineno}` }));
 
   init();
-  return { submitScore, log, fetchTop, deleteEntry, clearAll, isEnabled: () => enabled };
+  return { submitScore, log, fetchTop, fetchDaily, deleteEntry, clearAll, isEnabled: () => enabled };
 })();

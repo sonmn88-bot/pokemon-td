@@ -410,7 +410,9 @@ class GameEngine {
     this.lastTime = ts;
     // v28: 서브스텝 시뮬레이션 (3배속 끊김의 근본수정, v27-62 복구) - 배속을 dt에 한 번에 곱하면
     // 한 프레임에 이동거리가 3배가 되어 뚝뚝 끊겨보임. 최대 1/50초 단위로 잘게 쪼개서 여러 번 실행.
-    const total = raw * this.speedMul;
+    let total = raw * this.speedMul;
+    // v4 히트스톱: 보스 처치 순간 아주 짧게 시간을 늦춰 '묵직한' 손맛 (실제 시간 기준, 게임 결과엔 영향 없음)
+    if (this._hitStop > 0) { this._hitStop -= raw; total *= 0.08; }
     const MAX_STEP = this.enemies.length > 80 ? 1 / 30 : 1 / 50; // v3.3: 적이 많으면 계산 횟수 줄임
     let remaining = total;
     const _pf = this._perf, _t0 = _pf ? performance.now() : 0;
@@ -821,9 +823,12 @@ class GameEngine {
     this.spawnHitParticle(slot.x, slot.y, '#6aa8ff');
     return true;
   }
+  hitStop(sec) { this._hitStop = Math.max(this._hitStop || 0, sec); }
+
   sellTower(slotIdx) {
     const slot = this.towerSlots[slotIdx];
     if (!slot || !slot.occupied) return;
+    window.GameAudio && GameAudio.sfx.play('sell');
     const t = slot.tower;
     // v27-46 버그수정: totalSpent가 초기화만 되고 어디서도 증가하지 않아서 판매 환불이 항상 0골드였음
     // (요청8 - "1성/2성 팔았을 때 돈이 너무 적게 들어오는지 체크해봐" → 사실은 0원이었음).
@@ -1394,7 +1399,7 @@ class FloatingText {
   constructor(text, x, y, color, opts={}) {
     this.text=text; this.x=x+(Math.random()-0.5)*10; this.y=y; this.color=color; // 겹침 완화용 좌우 흔들림
     this.alpha=1; this.vy=opts.vy||-75; this.life=0;
-    this.maxLife=opts.life||1.0; this.fontSize=opts.fontSize||14; this.dead=false;
+    this.maxLife=opts.life||1.0; this.fontSize=Math.max(15,(opts.fontSize||14)*1.1); this.dead=false; // v4: 폰에서 읽히게 최소 15px
   }
   update(dt) {
     this.life+=dt; this.y+=this.vy*dt; this.vy*=0.93;
@@ -1402,9 +1407,10 @@ class FloatingText {
     if(this.life>=this.maxLife) this.dead=true;
   }
   draw(ctx) {
-    // v3.6: shadowBlur(번짐·고비용) 대신 또렷한 외곽선, 숫자는 Outfit
+    // v3.6: shadowBlur(번짐·고비용) 대신 또렷한 외곽선 / v4: 게임 글꼴 + 처음 0.12초 살짝 커졌다 줄어드는 '팝'
     ctx.save(); ctx.globalAlpha=this.alpha;
-    ctx.font=`800 ${this.fontSize}px Outfit,Pretendard,-apple-system,sans-serif`;
+    const pop=this.life<0.12?1+0.35*(1-this.life/0.12):1;
+    ctx.font=`${Math.round(this.fontSize*pop)}px 'Lilita One',Maple,Pretendard,-apple-system,sans-serif`;
     ctx.textAlign='center'; ctx.lineJoin='round';
     ctx.lineWidth=Math.max(2.5,this.fontSize*0.22); ctx.strokeStyle='rgba(8,10,16,0.85)';
     ctx.strokeText(this.text,this.x,this.y);

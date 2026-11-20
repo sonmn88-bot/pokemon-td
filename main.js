@@ -138,136 +138,9 @@ class App {
     this._autoWaveTimer = null;
     this._inventory = [];
 
-    // ===== 효과음 시스템 (Web Audio API) =====
-    this.SFX = {
-      ctx: null,
-      _get() { if (!this.ctx) this.ctx = new (window.AudioContext||window.webkitAudioContext)(); return this.ctx; },
-      play(type) {
-        try {
-          const ctx = this._get();
-          const g = ctx.createGain();
-          g.connect(ctx.destination);
-          const o = ctx.createOscillator();
-          const lpf = ctx.createBiquadFilter(); lpf.type = 'lowpass'; lpf.frequency.value = 3800; // v3.8 칩튠 사각파의 거친 고음 정리
-          o.connect(lpf); lpf.connect(g);
-          // 부드러운 사운드로 전면 교체: square/sawtooth(거친 지지직 소리) → sine/triangle
-          const configs = {
-            shoot:      { freq:[440,300],   dur:0.09, vol:0.09, type:'triangle' },
-            hit:        { freq:[260,160],   dur:0.11, vol:0.10, type:'sine' },
-            wave_clear: { freq:[784,988,1175,1568],dur:0.5, vol:0.07, type:'square' }, // v3.8 칩튠 팡파레
-            king_victory: { freq:[392,523,659,784,988],dur:0.9, vol:0.18, type:'triangle' }, // v27-18: 왕 처치 전용 징글 (요청H)
-            wave_start: { freq:[523,784],   dur:0.18, vol:0.06, type:'square' },
-            pull_normal:{ freq:[659,880],   dur:0.14, vol:0.06, type:'square' },
-            pull_rare:  { freq:[659,880,1175],dur:0.28, vol:0.07, type:'square' },
-            pull_epic:  { freq:[523,659,784,1047,1319],dur:0.6,vol:0.08,type:'square' },
-            merge:      { freq:[523,659,784,1047],dur:0.5,vol:0.08,type:'square' },
-            boss:       { freq:[150,120,100],dur:0.85, vol:0.09, type:'triangle' },
-            buy:        { freq:[988,1319],  dur:0.16, vol:0.06, type:'square' }, // 동전 소리 (B5→E6)
-            life_lost:  { freq:[260,210,170],dur:0.45, vol:0.13, type:'sine' },
-            skill:      { freq:[440,880,1320],dur:0.24, vol:0.07, type:'square' },
-          };
-          const cfg = configs[type] || configs.hit;
-          o.type = cfg.type;
-          // v27-44: 자주 반복되는 타격음(폭발 등)에 살짝 랜덤 피치를 줘서 계속 들어도 덜 지치게 함 (요청4)
-          const pitchVariance = (type === 'hit' || type === 'shoot') ? (0.9 + Math.random() * 0.2) : 1;
-          const freqs = cfg.freq.map(f => f * pitchVariance);
-          const stepDur = cfg.dur / freqs.length;
-          const t0 = ctx.currentTime;
-          o.frequency.setValueAtTime(freqs[0], t0);
-          freqs.forEach((f, i) => {
-            // 계단식(끊김/지지직) 대신 부드러운 선형 램프로 주파수 전환
-            if (cfg.type === 'square') o.frequency.setValueAtTime(f, t0 + i * stepDur); // 칩튠 아르페지오는 계단식
-            else o.frequency.linearRampToValueAtTime(f, t0 + i * stepDur + stepDur * 0.9);
-          });
-          // 어택 램프: 0에서 시작해 살짝 올라갔다 내려가는 자연스러운 엔벨로프 (클릭/팝 노이즈 방지)
-          g.gain.setValueAtTime(0.0001, t0);
-          g.gain.exponentialRampToValueAtTime(cfg.vol, t0 + 0.012);
-          g.gain.exponentialRampToValueAtTime(0.0008, t0 + cfg.dur);
-          o.start(t0);
-          o.stop(t0 + cfg.dur + 0.05);
-        } catch(e) {}
-      }
-    };
-
-    // ===== BGM v3.8: 게임보이풍 칩튠 (펄스 리드·삼각파 베이스·노이즈 드럼), 맵별 조성·코드 진행·템포 =====
-    // 예약 스케줄러(0.25초 앞까지만 예약) → 노드가 쌓이지 않음 (예전엔 루프마다 노드 배열이 계속 커졌음)
-    this.BGM = {
-      ctx: null, playing: false, timer: null,
-      _get() { if (!this.ctx) this.ctx = new (window.AudioContext||window.webkitAudioContext)(); return this.ctx; },
-      stop() {
-        this.playing = false; clearInterval(this.timer); this.timer = null;
-        if (this.bus) { const b = this.bus, t = this.ctx.currentTime; b.gain.setTargetAtTime(0, t, 0.15); setTimeout(() => { try { b.disconnect(); } catch (_) {} }, 800); this.bus = null; }
-      },
-      start(mapId) {
-        this.stop();
-        try {
-          const ctx = this._get();
-          const intense = (window.app?.engine?.currentWave || 0) >= 90 || mapId === 'infinite';
-          if (mapId === 'infinite') mapId = window.app?.currentMapId || 'city';
-          // 음 높이는 반음 단위 (0 = C4). 코드: [근음, 3도, 5도]
-          const T = {
-            forest: { bpm:118, key:0,  scale:[0,2,4,5,7,9,11], prog:[[0,4,7],[7,11,14],[9,12,16],[5,9,12]], drums:1, vol:0.05, lead:0.125 }, // 밝은 C장조 I-V-vi-IV
-            cave:   { bpm:92,  key:-3, scale:[0,2,3,5,7,8,10], prog:[[0,3,7],[8,12,15],[3,7,10],[10,14,17]], drums:0.4, vol:0.05, lead:0.25 }, // 신비한 A단조 i-VI-III-VII
-            city:   { bpm:136, key:2,  scale:[0,2,3,5,7,8,10], prog:[[0,3,7],[10,14,17],[8,12,15],[7,11,14]], drums:1.2, vol:0.05, lead:0.125 }, // 긴박한 D단조 i-VII-VI-V
-          };
-          const th = { ...(T[mapId] || T.forest) };
-          if (intense) { th.bpm = Math.round(th.bpm * 1.12); th.drums += 0.3; }
-          const bus = ctx.createGain(); bus.gain.value = 0;
-          bus.gain.setTargetAtTime(th.vol, ctx.currentTime, 0.4); // 페이드인
-          const comp = ctx.createDynamicsCompressor(); bus.connect(comp); comp.connect(ctx.destination);
-          this.bus = bus;
-          const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 3200; lp.connect(bus); // 펄스파 거친 고음 정리
-          // 펄스파(듀티비) 만들기
-          const pulse = duty => { const n = 32, re = new Float32Array(n), im = new Float32Array(n); for (let k = 1; k < n; k++) im[k] = (2 / (k * Math.PI)) * Math.sin(k * Math.PI * duty); return ctx.createPeriodicWave(re, im); };
-          const leadWave = pulse(th.lead), harmWave = pulse(0.5);
-          const noise = ctx.createBuffer(1, ctx.sampleRate * 0.2, ctx.sampleRate); { const d = noise.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; }
-          const hz = semi => 261.63 * Math.pow(2, (semi + th.key) / 12);
-          const note = (wave, semi, t, dur, vol, dest = lp) => {
-            const o = ctx.createOscillator(), g = ctx.createGain();
-            if (typeof wave === 'string') o.type = wave; else o.setPeriodicWave(wave);
-            o.frequency.value = hz(semi); o.connect(g); g.connect(dest);
-            g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-            o.start(t); o.stop(t + dur + 0.02);
-          };
-          const drum = (kind, t) => {
-            if (kind === 'k') { const o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.setValueAtTime(140, t); o.frequency.exponentialRampToValueAtTime(45, t + 0.12);
-              g.gain.setValueAtTime(0.9, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.15); o.connect(g); g.connect(bus); o.start(t); o.stop(t + 0.16); return; }
-            const src = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
-            src.buffer = noise; f.type = kind === 'h' ? 'highpass' : 'bandpass'; f.frequency.value = kind === 'h' ? 7000 : 1800;
-            g.gain.setValueAtTime(kind === 'h' ? 0.18 : 0.4, t); g.gain.exponentialRampToValueAtTime(0.0001, t + (kind === 'h' ? 0.04 : 0.12));
-            src.connect(f); f.connect(g); g.connect(bus); src.start(t); src.stop(t + 0.15);
-          };
-          // 멜로디: 맵 이름 시드로 마디별 리듬·음을 정해 8마디 반복 (A A' B A'') → 매번 같은 곡처럼 들림
-          let seed = 0; for (const ch of mapId) seed = (seed * 31 + ch.charCodeAt(0)) >>> 0;
-          const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
-          const rhythms = [[1,0,1,0,1,0,0,1,1,0,1,0,1,0,0,0],[1,0,0,1,0,0,1,0,1,0,1,0,1,1,0,0],[1,0,1,1,0,1,0,0,1,0,0,1,0,1,0,0],[1,0,0,0,1,0,1,0,1,0,0,0,1,1,1,0]];
-          const motif = Array.from({ length: 4 }, (_, bar) => { const r = rhythms[Math.floor(rnd() * rhythms.length)]; let deg = Math.floor(rnd() * 3) * 2;
-            return r.map(on => { if (!on) return null; deg = Math.max(0, Math.min(9, deg + [-2,-1,1,1,2,0][Math.floor(rnd() * 6)])); return deg; }); });
-          const degSemi = d => th.scale[d % 7] + 12 * Math.floor(d / 7) + 12;
-          const order = [0,1,2,3, 0,1,3,2]; // 8마디 구성
-          const step = 60 / th.bpm / 4; // 16분음표
-          let pos = 0, next = ctx.currentTime + 0.1;
-          this.playing = true;
-          const tick = () => {
-            if (!this.playing || this.bus !== bus) return;
-            while (next < ctx.currentTime + 0.25) {
-              const bar = Math.floor(pos / 16) % 8, s16 = pos % 16, chord = th.prog[bar % 4];
-              const m = motif[order[bar]][s16];
-              if (m !== null) note(leadWave, degSemi(m) + (bar >= 4 && order[bar] === 2 ? 2 : 0), next, step * 1.8, 0.22);
-              if (s16 % 2 === 0) note(harmWave, chord[(s16 / 2) % 3] + 12, next, step * 0.9, 0.06); // 아르페지오
-              if (s16 % 4 === 0) note('triangle', chord[0] - 12 + (s16 === 8 ? 7 : 0), next, step * 3.5, 0.5); // 베이스
-              if (th.drums > 0) {
-                if (s16 === 0 || (s16 === 10 && th.drums >= 1)) drum('k', next);
-                if (s16 === 4 || s16 === 12) drum('s', next);
-                if (th.drums >= 1 ? s16 % 2 === 0 : s16 % 4 === 2) drum('h', next);
-              }
-              pos++; next += step;
-            }
-          };
-          tick(); this.timer = setInterval(tick, 100);
-        } catch(e) { console.warn('BGM failed:', e); }
-      }
-    };
+    // v4: 녹음 샘플 기반 사운드 (audio.js) - 이름은 예전과 같음: SFX.play(type), BGM.start(mapId)/stop()
+    this.SFX = window.GameAudio.sfx;
+    this.BGM = window.GameAudio.bgm;
 
     this.els = {
       mapSelect: document.getElementById('map-select-screen'),
@@ -790,7 +663,7 @@ class App {
     // 단일 뽑기
     let towerDef = window.rollTower(pullKey);
     if (pullKey === 'gamble') { // v3.9 히든 3종: 도박에서만 합계 1.2% (갸라도스 0.5 · 리자몽 0.4 · 망나뇽 0.3)
-      const roll = Math.random(), hid = roll < 0.003 ? 'shiny_dragonite' : roll < 0.007 ? 'shiny_charizard' : roll < 0.012 ? 'shiny_gyarados' : null;
+      const roll = GachaRng.rand(), hid = roll < 0.003 ? 'shiny_dragonite' : roll < 0.007 ? 'shiny_charizard' : roll < 0.012 ? 'shiny_gyarados' : null;
       if (hid && window.GachaTowerDefs[hid]) {
         towerDef = { ...window.GachaTowerDefs[hid], _starLevel: 1 };
         this.engine.triggerScreenShake && this.engine.triggerScreenShake(12, 0.6);
@@ -807,7 +680,7 @@ class App {
     }
 
     // 뽑기 등급 팝업 + 효과음
-    const gradeSound = {normal:'pull_normal', rare:'pull_rare', epic:'pull_epic', legend:'pull_epic', unique:'merge'};
+    const gradeSound = {normal:'pull_normal', rare:'pull_rare', epic:'pull_epic', legend:'pull_legend', unique:'pull_legend'};
     const isRareReveal = towerDef.grade === 'epic' || towerDef.grade === 'legend' || towerDef.grade === 'unique';
     if (isRareReveal) {
       // v27-5: 에픽 이상은 짧은 서스펜스 연출 후 공개 (요청B: 가챠의 재미)
@@ -818,6 +691,7 @@ class App {
         if (flick >= 3) {
           clearInterval(flickInterval);
           this.SFX.play(gradeSound[towerDef.grade] || 'pull_normal');
+          this._gradeFlash && this._gradeFlash(towerDef.grade); // v4 전설 이상 화면 연출
           const g = window.GRADES?.[towerDef.grade];
           this.showWaveAnnounce(`${g?.name||""} ${towerDef.name}`, g?.color||"#ffc24b");
         }
@@ -869,6 +743,7 @@ class App {
       return;
     }
     const tower = window._createGachaTower(def, slot.x, slot.y, this.engine);
+    this.SFX.play('place');
     slot.occupied = true;
     slot.tower = tower;
     this.engine.towers.push(tower);
@@ -888,8 +763,20 @@ class App {
     const cnt = {}; results.forEach(d => { cnt[d.grade] = (cnt[d.grade] || 0) + 1; });
     const summary = order.slice().reverse().filter(g => cnt[g]).map(g => `${window.GRADES[g].name} ${cnt[g]}`).join(' · ');
     const top = best && order.indexOf(best.grade) >= order.indexOf('epic') ? `${PKM(best, 22)} <b>${best.name}</b>! ` : '';
+    if (best) { const gi = order.indexOf(best.grade); this.SFX.play(gi >= order.indexOf('legend') ? 'pull_legend' : gi >= order.indexOf('epic') ? 'pull_epic' : 'pull_rare'); this._gradeFlash(best.grade); }
     this.showWaveAnnounce(`10연 ${top}${summary}${canPlace ? ' · 최고 등급 배치' : ' → 보관함'}`, best ? window.GRADES[best.grade].color : '#b18cff');
     this.renderStorageStrip && this.renderStorageStrip();
+  }
+
+  // v4: 전설·유니크 획득 순간 화면 연출 (드문 순간만: 등급색 플래시 + 흔들림, transform·opacity만 사용)
+  _gradeFlash(grade) {
+    if (grade !== 'legend' && grade !== 'unique') return;
+    const col = window.GRADES?.[grade]?.color || '#ffc24b';
+    const el = document.createElement('div'); el.className = 'grade-flash'; el.style.setProperty('--c', col);
+    document.getElementById('game-screen')?.appendChild(el);
+    setTimeout(() => el.remove(), 900);
+    this.engine?.triggerScreenShake && this.engine.triggerScreenShake(6, 0.3);
+    try { navigator.vibrate && navigator.vibrate(grade === 'unique' ? [40, 30, 80] : 40); } catch (_) {}
   }
 
   // v28: 예전 보관함 버튼/목록은 하단 보관함 스트립(storage.js)으로 대체 - 기존 호출 호환용
@@ -1034,7 +921,8 @@ class App {
         this.missionTracker.check();
       }
     };
-    this.engine.onHitSound = () => { if (Math.random() < 0.18) this.SFX.play('hit'); };
+    this.engine.onHitSound = () => { if (Math.random() < 0.35) this.SFX.play('hit'); }; // v4: 샘플·간격 제한은 audio.js
+    this.engine.onKillSound = (en) => { if (en.isBoss) { this.SFX.play('king_victory', { vol: .7 }); this.engine.hitStop && this.engine.hitStop(0.12); this.engine.triggerScreenShake && this.engine.triggerScreenShake(7, 0.3); } else this.SFX.play('pop'); };
     this.engine.onLivesChange = l => {
       // v27: 라이프 HUD 숨김 (필드누적 게임오버로 대체됨, 화면 안 씀)
       if (this.els.livesVal) this.els.livesVal.textContent = l;
@@ -1077,6 +965,7 @@ class App {
     };
     this.engine.onHeroEvolutionReady = (hero) => this.openEvolutionPicker(hero);
     this.engine.onHeroEvolved = () => {
+      this.SFX.play('evolve'); // v4
       if (this.missionTracker) { this.missionTracker.stats.heroEvolved = true; this.missionTracker.check(); }
     };
     this.engine.onComboChange = (count, mul) => {
@@ -1085,7 +974,7 @@ class App {
     this.engine.onBossAppear = (boss) => {
       const ts = this.engine._cardMods && this.engine._cardMods.timestop; // v3.5 카드 '시간 정지'
       if (ts) { for (const en of this.engine.enemies) { en.stunned = ts; en._stunImmune = 0; } this.showWaveAnnounce(`시간 정지 ${ts}초!`, '#ffc24b'); }
-      this.SFX.play('boss');
+      this.SFX.play('boss'); this.BGM.start('boss'); // v4 보스전 음악
       // v27-16: 보스 약점 타입 힌트 (요청1 - 타입상성 이제 실제 작동하니 시각화)
       let weakHint = '';
       if (window.TYPE_CYCLE && boss.typeTag) {
@@ -1128,6 +1017,7 @@ class App {
       if (hudTimer) hudTimer.style.display = 'none';
       this.els.btnWave.disabled = false;
       if (!timedOut) this.SFX.play('wave_clear');
+      if (!this.engine._kingDefeated) this.BGM.start(this.currentMapId); // v4 보스곡 → 맵 곡 복귀 (같은 곡이면 그대로)
       // v27: 엔드리스 - 클리어 개념 없이 항상 자동으로 다음 웨이브 카운트다운
       this._startAutoWaveCountdown(wave + 1);
       // v3.10 위험 예고: 지금 필드 + 다음 웨이브 마릿수가 200에 닿으면 시작 전에 경고
@@ -1407,7 +1297,14 @@ class App {
     // v3.14: 주력 70% · 보조 30% (실제 등장과 같음)
     const pct = types.length > 1 ? [Math.round(WAVE_MAIN_SHARE * 100), Math.round((1 - WAVE_MAIN_SHARE) * 100)] : [100];
     const icons = types.map((t, i) => `${ICON(t, i ? 14 : 18)}<b style="font-size:${i ? 10 : 12}px;margin:0 4px 0 1px">${pct[i]}%</b>`).join('');
-    el.innerHTML = `<span>다음 웨이브</span>${icons || '?'}`;
+    // v4: 주력 타입의 약점(이기는 타입)과 내 필드에 그 타입이 몇 마리인지 → 다음 뽑기·배치 판단거리
+    let counter = '';
+    if (types[0] && window.TYPE_CYCLE) {
+      const C = TYPE_CYCLE, ct = C[(C.indexOf(types[0]) - 1 + C.length) % C.length];
+      const mine = this.engine ? this.engine.towers.filter(t => t.def && t.def.type === ct).length : 0;
+      counter = `<span class="wp-counter${mine ? '' : ' none'}">약점 ${ICON(ct, 14)}<b>${mine}</b></span>`;
+    }
+    el.innerHTML = `<span>다음 웨이브</span>${icons || '?'}${counter}`;
   }
 
   // v27: 상시노출 상점바 (기존 5웨이브마다 뜨던 팝업 대신, 게임 멈추지 않음)
@@ -1782,6 +1679,7 @@ class App {
     const isBossOrKingWave = nextWave === KING_WAVE || nextWave % 10 === 0;
     const timeLimit = isBossOrKingWave ? 22 : waveTimeLimit(wave, this.difficulty, this.engine);
     if (e.startWave(wave, timeLimit)) {
+      this.SFX.play('wave_start');
       this.els.btnWave.disabled = false;
       this.els.btnWave.textContent = '다음 웨이브';
       setTimeout(() => this.showWaveAnnounce(`웨이브 ${e.currentWave}`, '#ffc24b'), 100);
@@ -1826,6 +1724,7 @@ class App {
 
   showEndScreen(victory, stars, best) {
     this.engine.stop();
+    this.BGM.stop(); this.SFX.play(victory ? 'king_victory' : 'gameover');
     try { // v3.6 판 요약 기록 (밸런스 조정용)
       const e = this.engine, ds = e._dmgStats || {};
       const top = Object.entries(ds).filter(([k]) => k !== 'other').sort((a, b) => b[1].dmg - a[1].dmg).slice(0, 3).map(([k, r]) => `${k}:${Math.round(r.dmg)}`);
@@ -1905,7 +1804,7 @@ class App {
         submitBtn.addEventListener('click', async () => {
           submitBtn.disabled = true; submitBtn.textContent = '등록 중...';
           window.addEventListener('beforeunload', blockUnload); // v27-26: 등록 중 새로고침/닫기 방지 (요청1)
-          const res = await window.Leaderboard.submitScore(nameInput.value, this.engine.score || 0, reached);
+          const res = await window.Leaderboard.submitScore(nameInput.value, this.engine.score || 0, reached, this._daily && this._daily.key);
           window.removeEventListener('beforeunload', blockUnload);
           if (!submitBtn.isConnected) return; // v27-26: 등록 대기 중 화면이 닫혔으면 안전하게 중단
           // 실패 원인을 화면에 표시 (permission-denied = Firestore 보안 규칙 만료/차단)
@@ -2014,13 +1913,15 @@ class App {
       const ov = document.createElement('div');
       ov.className = 'pause-overlay';
       ov.innerHTML = `<div class="po-card"><div class="po-title">일시정지</div>
-        <button class="po-btn go">계속하기</button><button class="po-btn ps">${this.engine.powerSave ? '절전 모드 켜짐 · 30fps' : '부드럽게 · 60fps'}</button><button class="po-btn pf">${this.engine._perf ? "성능 측정 끄기" : "성능 측정 켜기"}</button><button class="po-btn quit">타이틀로</button>${(this.engine._errLog || []).length ? `<div class="po-err">오류 기록 ${this.engine._errCount}건 (스크린샷 보내주세요)<br>${this.engine._errLog.map(m => m.replace(/</g, '&lt;')).join('<br>')}</div>` : ''}</div>`;
+        <button class="po-btn go">계속하기</button><button class="po-btn ps">${this.engine.powerSave ? '절전 모드 켜짐 · 30fps' : '부드럽게 · 60fps'}</button><div class="po-row"><button class="po-btn snd" data-k="sfx">효과음 ${window.GameAudio?.settings.sfx ? '켜짐' : '꺼짐'}</button><button class="po-btn snd" data-k="bgm">배경음 ${window.GameAudio?.settings.bgm ? '켜짐' : '꺼짐'}</button></div><button class="po-btn cam">화면 원위치</button><button class="po-btn pf">${this.engine._perf ? "성능 측정 끄기" : "성능 측정 켜기"}</button><button class="po-btn quit">타이틀로</button>${(this.engine._errLog || []).length ? `<div class="po-err">오류 기록 ${this.engine._errCount}건 (스크린샷 보내주세요)<br>${this.engine._errLog.map(m => m.replace(/</g, '&lt;')).join('<br>')}</div>` : ''}</div>`;
       ov.querySelector('.go').onclick = () => this.togglePause();
       ov.querySelector('.ps').onclick = (ev) => {
         this.engine.powerSave = !this.engine.powerSave;
         try { localStorage.setItem('pokemontd_powersave', this.engine.powerSave ? '1' : '0'); } catch (_) {}
         ev.target.textContent = this.engine.powerSave ? '절전 모드 켜짐 · 30fps' : '부드럽게 · 60fps';
       };
+      ov.querySelector('.cam').onclick = () => { this.engine.resetCamera(); this.togglePause(); };
+      ov.querySelectorAll('.snd').forEach(b => b.onclick = () => { const k = b.dataset.k, on = !GameAudio.settings[k]; GameAudio.set(k, on); b.textContent = (k === 'sfx' ? '효과음 ' : '배경음 ') + (on ? '켜짐' : '꺼짐'); });
       ov.querySelector('.pf').onclick = (ev) => { const on = !this.engine._perf; this.engine.setPerf(on); ev.target.textContent = on ? '성능 측정 끄기' : '성능 측정 켜기'; };
       ov.querySelector('.quit').onclick = () => { if (confirm('타이틀로 돌아가시겠습니까? 진행 중인 게임은 저장되지 않습니다.')) { ov.remove(); this.backToMapSelect(); } };
       document.getElementById('game-screen').appendChild(ov);

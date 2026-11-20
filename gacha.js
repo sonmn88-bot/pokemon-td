@@ -564,21 +564,23 @@ const MERGE_EVOLUTION = {
 const NEXT_GRADE = { normal:'rare', rare:'epic', epic:'legend' };
 const MERGE_ORDER = ['normal','rare','epic','legend','unique'];
 // 숨은 천장: 같은 계열(역할군, 없으면 타입)이 3연속 나오면 다른 계열 가중치 ×1.5 (겉보기엔 완전 랜덤)
+// v4 일일 도전: 뽑기·합성·카드 운을 날짜 시드로 고정 (r이 null이면 평소처럼 Math.random)
+const GachaRng = window.GachaRng = window.GachaRng || { r: null, rand() { return this.r ? this.r() : Math.random(); } };
 function _pityKey(def) { return def.role || def.type; }
 // v3.8 메가 원본 끌림: 필드에 메가 원본(★5 미만)이 있으면 그 등급 결과의 25%가 그 종으로 → 먹이(같은 종) 확보
 //   쁘사이저·프테라·캥카처럼 진화 단계가 없는 종은 같은 종을 모을 방법이 우연뿐이라 먹이 버튼이 사실상 안 떴음
 function _megaPull(grade) {
-  const e = window.app && app.engine; if (!e || !window.MEGA_OF || Math.random() >= 0.25) return null;
+  const e = window.app && app.engine; if (!e || !window.MEGA_OF || GachaRng.rand() >= 0.25) return null;
   const ids = [...new Set(e.towers.filter(t => t.def && ((t.def._stack || 1) < 5)).map(t => // 메가 원본·레전드, 그리고 ★5 미만 메가는 그 원본 종
     t.def.mega ? t.def.megaOf : (MEGA_OF[t.def.id] || t.def.grade === 'legend') ? t.def.id : null)
     .filter(id => id && GachaTowerDefs[id] && GachaTowerDefs[id].grade === grade))];
-  return ids.length ? ids[Math.floor(Math.random() * ids.length)] : null;
+  return ids.length ? ids[Math.floor(GachaRng.rand() * ids.length)] : null;
 }
 function rollRandomMerge(grade, state = {}) {
   let target = NEXT_GRADE[grade];
   if (!target) return null;
   // 토게틱 등 '2등급 상승' 훅 (노말·레어 합성에만, 결과 상한 레전드)
-  if (state.jumpChance && (grade === 'normal' || grade === 'rare') && Math.random() < state.jumpChance) {
+  if (state.jumpChance && (grade === 'normal' || grade === 'rare') && GachaRng.rand() < state.jumpChance) {
     target = NEXT_GRADE[target] || target;
     state.jumped = true;
   }
@@ -588,7 +590,7 @@ function rollRandomMerge(grade, state = {}) {
   const pw = state.pityWeight || 1.5; // 토게피 '직감' 노드면 2.5
   const tw = (window.DEX_TYPE_W && window.DEX_TYPE_W[target]) || {};
   const weights = pool.map(id => ((locked && _pityKey(GachaTowerDefs[id]) !== locked) ? pw : 1) * (tw[id] || 1));
-  let r = Math.random() * weights.reduce((a, b) => a + b, 0), id = pool[pool.length - 1];
+  let r = GachaRng.rand() * weights.reduce((a, b) => a + b, 0), id = pool[pool.length - 1];
   for (let k = 0; k < pool.length; k++) { r -= weights[k]; if (r <= 0) { id = pool[k]; break; } }
   id = _megaPull(target) || id;
   const def = GachaTowerDefs[id];
@@ -624,7 +626,7 @@ const RECIPES = [
 function rollGrade(tableKey) {
   const table = PULL_TABLES[tableKey] || PULL_TABLES.normal;
   const total = table.reduce((s,t)=>s+t.weight,0);
-  let r = Math.random()*total;
+  let r = GachaRng.rand()*total;
   for(const entry of table){ r-=entry.weight; if(r<=0) return entry.grade; }
   return table[table.length-1].grade;
 }
@@ -633,7 +635,7 @@ function rollTower(tableKey) {
   const pool = GRADE_POOLS[grade];
   // v28 세션D: 타입 균등 (pokedex.js의 DEX_TYPE_W) - 타입을 먼저 고르고 그 안에서 종 선택
   const tw = (window.DEX_TYPE_W && window.DEX_TYPE_W[grade]) || {};
-  let r = Math.random() * pool.reduce((a, id) => a + (tw[id] || 1), 0), id = pool[pool.length - 1];
+  let r = GachaRng.rand() * pool.reduce((a, id) => a + (tw[id] || 1), 0), id = pool[pool.length - 1];
   for (const k of pool) { r -= (tw[k] || 1); if (r <= 0) { id = k; break; } }
   id = _megaPull(grade) || id;
   return {...GachaTowerDefs[id], _starLevel:1};
@@ -808,7 +810,7 @@ function _createGachaTower(def, x, y, engine) {
         || window.EnemySpriteImages?.[def.id] || window.EnemySpriteImages?.[def.pokemonId];
       const img=imgPath?window.loadSpriteImage?.(imgPath):null;
       const gradeBonus={normal:0,rare:2,epic:5,legend:7,unique:10};
-      const sz=34+(gradeBonus[def.grade]||0);
+      const sz=40+(gradeBonus[def.grade]||0); // v4: 34→40 (폰에서 구분되게)
       if(img&&img.complete&&img.naturalWidth>0){
         // v27-10: 이미지 여백 자동크롭 적용 - 스프라이트마다 다른 여백 비율을 통일해서 원 안에 고르게 꽉 차 보이게
         const b = window.SpriteBoundsCache?.[imgPath];

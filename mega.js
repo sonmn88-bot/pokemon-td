@@ -176,7 +176,7 @@ Object.assign(App.prototype, {
     for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(R() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; }
     const pick = arr.slice(0, 2);
     e._runEmphasis = pick.map(p => p.key);
-    e._runSeed = (Math.random() * 1e9) >>> 0; window.__wavePlan = {}; // v3.14 웨이브 편성 시드(판마다 다름)
+    e._runSeed = this._daily ? this._daily.seed : (Math.random() * 1e9) >>> 0; window.__wavePlan = {}; // v3.14 웨이브 편성 시드(판마다 다름)
     e._runEmphasisInfo = pick;
     this._refreshMegaHud();
     setTimeout(() => this.showWaveAnnounce(`이번 판 몬스터: ${pick.map(p => p.label.replace(/^\S+\s+/, '')).join(' · ')} 많음<br><span style="font-size:0.65em">추천 메가: ${pick.map(p => p.hint).join(' / ')}</span>`, '#6aa8ff'), 3200);
@@ -254,7 +254,7 @@ Object.assign(App.prototype, {
     const el = document.getElementById('hud-div');
     if (!el) return;
     el.style.display = types >= 2 ? '' : 'none';
-    el.querySelector('span').textContent = `${types}종${mul > 1 ? ' +' + Math.round((mul - 1) * 100) + '%' : ''}`;
+    el.querySelector('span').innerHTML = `${types}종${mul > 1 ? '<small class="dv-pct"> +' + Math.round((mul - 1) * 100) + '%</small>' : ''}`; // v4: 좁은 화면은 %를 숨김(초록색이 보너스 표시)
     el.style.color = mul > 1 ? '#34d399' : '';
     if (this._lastDivMul && mul > this._lastDivMul) this.showWaveAnnounce(`타입 ${types}종! 전체 공격력 +${Math.round((mul - 1) * 100)}%`, '#34d399');
     this._lastDivMul = mul;

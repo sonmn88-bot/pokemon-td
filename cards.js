@@ -164,10 +164,10 @@ Object.assign(App.prototype, {
       const forceRare = (k === 0 && guaranteeRare);
       let tier;
       const combos = avail.filter(c => c.tier === 'combo' && !picks.includes(c));
-      if (combos.length && Math.random() < 0.12) tier = 'combo';
+      if (combos.length && GachaRng.rand() < 0.12) tier = 'combo';
       else {
         const tiers = TIER_ORDER.filter(t => !(forceRare && t === 'common'));
-        let r = Math.random() * tiers.reduce((a, t) => a + tierW[t], 0);
+        let r = GachaRng.rand() * tiers.reduce((a, t) => a + tierW[t], 0);
         tier = tiers[tiers.length - 1];
         for (const t of tiers) { r -= tierW[t]; if (r <= 0) { tier = t; break; } }
       }
@@ -182,7 +182,7 @@ Object.assign(App.prototype, {
         if (owned[c.id]) wt *= 1.3;                                     // 레벨업 후보
         return wt;
       });
-      let r = Math.random() * wts.reduce((a, b) => a + b, 0), pick = pool[pool.length - 1];
+      let r = GachaRng.rand() * wts.reduce((a, b) => a + b, 0), pick = pool[pool.length - 1];
       for (let i = 0; i < pool.length; i++) { r -= wts[i]; if (r <= 0) { pick = pool[i]; break; } }
       picks.push(pick);
     }
@@ -196,6 +196,7 @@ Object.assign(App.prototype, {
     const cards = this._rollCards(guarantee);
     if (!cards.length) return false;
     this._cardOpen = true;
+    this.SFX && this.SFX.play('card');
     if (!(window.Versus && Versus.active)) e.stop(); // 대전은 시간이 같이 흐르므로 멈추지 않음
     this._showCardOverlay(cards);
     return true;
