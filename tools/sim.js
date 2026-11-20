@@ -1,10 +1,8 @@
 // v4 밸런스 시뮬레이터: 실제 게임 코드를 화면 없는 브라우저에서 자동 플레이 봇으로 빠르게 돌려 숫자로 비교
 // 사용법: node tools/sim.js [판수/영웅=6] [최대웨이브=150]
 //   → 영웅별 도달 웨이브(평균·중앙·최소·최대), 데미지 상위 포켓몬 점유율(쏠림 확인), 판당 소요시간
-// 봇 v3 (사람처럼 판단): 골드 쓸 곳을 '늘어나는 DPS ÷ 비용'으로 비교(일반/프리미엄/도박 뽑기·타입 강화·기술머신·이상한사탕·부지 확장),
-//   이자 300 저축(위험하면 전부 투입) · 무료 성장 항상(먹이기 ★·메가진화·확정 진화·레시피는 자리 모자랄 때) ·
-//   보스는 쿨마다 최고 티어 소환(SIM_BOSS=none|low 로 비교) · 주문·위험 아이템은 필드가 찰 때만 · 카드는 주력 타입/등급 점수, 약하면 건너뛰기 ·
-//   영웅 스킬·거다이맥스·스킬포인트·변신 아이템 · 이브이 진화는 주력 타입 · 영웅 3명 동시(페이지 3개)
+// 봇 v4: 사용자 실제 플레이 방식(보스 계속 소환·쿨마다 전체 주문·영웅 스킬, 센 타워 초입/보조 중간 배치, 먹이 재료 남기기,
+//   스톤 뜨면 즉시 메가, 레전드로 빈 자리 채우기, 부지 확장, 후반 10연) + 골드는 'DPS ÷ 비용' 비교. 상세·설정·유지보수: tools/SIM.md
 // 출력: 판마다 보스 소환/처치/골드, 메가·★, 지출 내역 / 요약: 평균·사망 분포·지출 비중·MVP
 // 렌더링 없이 engine.update()만 고정 dt로 호출 → 실제 시간보다 수십 배 빠름
 const http = require('http'), fs = require('fs'), path = require('path');
@@ -24,7 +22,18 @@ const server = http.createServer((req, res) => {
 });
 
 // 페이지 안에서 도는 한 판 (문자열로 주입)
-const RUN_IN_PAGE = async ({ hero, maxWave, BOSS }) => {
+const RUN_IN_PAGE = async ({ hero, maxWave, STRAT }) => {
+  // ===== 전략 설정 (SIM_STRAT='{"boss":"none"}' 처럼 JSON으로 덮어써서 비교) — 규칙이 바뀌면 여기부터 고침 =====
+  const P = Object.assign({
+    boss: 'max',          // max: 쿨마다 열린 최고 티어 / low: 1티어 / none: 안 함 (보스는 필드 1마리로 계산 → 쌓아두고 나중에 잡기)
+    spells: 'always',     // always: 쿨마다 전체 주문(적 5+) / danger: 위험할 때만
+    tenFromWave: 20,      // 이 웨이브부터(또는 자리가 다 차면) 일반 뽑기 대신 900 모아 10연 (100 절약)
+    interest: 300,        // 이자용 저축 상한 (필드 위험하면 0)
+    place: 'smart',       // smart: 센 타워 = 길 많이 덮는 초입, 감속·빙결·스턴 = 중간 / first: 빈 자리 아무 데나
+    rearrangeEvery: 3,    // 몇 웨이브마다 배치 재정렬
+    utilSlots: 3,         // 중간에 둘 보조(감속·빙결·스턴) 타워 수
+  }, STRAT || {});
+  const BOSS = P.boss;
   const app = window.app, ORDER = window.MERGE_ORDER;
   document.querySelectorAll('.end-overlay,.skin-picker,.card-overlay,.merge-overlay').forEach(o => o.remove());
   if (app.engine) app.backToMapSelect();
@@ -46,7 +55,24 @@ const RUN_IN_PAGE = async ({ hero, maxWave, BOSS }) => {
   const defDps = d => (GD[d.grade] || 0) * (1 + 0.35 * (((d._stack) || 1) - 1));
   const KR = { fire: '불꽃', water: '물', electric: '전기', grass: '풀', psychic: '에스퍼', normal: '노말' };
   const EEVEE = { flareon: 'fire', jolteon: 'electric', vaporeon: 'water' };
-  const emptyIdx = () => e.towerSlots.findIndex(s => !s.occupied);
+  // 슬롯 점수: 사거리(160) 안 길 점 수, 초입일수록 가중(최대 2배) / mid: 덮는 길의 평균 위치(0=입구, 1=끝)
+  let SS = null; const slotScore = () => { if (SS && SS.n === e.towerSlots.length) return SS;
+    const path = (e.paths && e.paths[0]) || [], pts = path.filter((_, i) => i % 2 === 0), L = pts.length || 1;
+    SS = { n: e.towerSlots.length, v: e.towerSlots.map(s => { let sc = 0, mi = 0, c = 0; pts.forEach((p, i) => { if ((p.x - s.x) ** 2 + (p.y - s.y) ** 2 <= 160 * 160) { sc += 1 + (1 - i / L); mi += i / L; c++; } }); return { sc, mid: c ? mi / c : 0.5 }; }) }; return SS; };
+  const isUtil = t => t.def && Array.isArray(t.def.tags) && t.def.tags.some(x => x === 'slow' || x === 'freeze' || x === 'stun') && !t.def.mega;
+  const emptyIdx = () => { const ids = e.towerSlots.map((s, i) => i).filter(i => !e.towerSlots[i].occupied); if (!ids.length) return -1;
+    if (P.place !== 'smart') return ids[0]; const S = slotScore().v; return ids.sort((a, b) => S[b].sc - S[a].sc)[0]; };
+  // 재정렬: 보조 타워 상위 N개는 중간(mid 0.3~0.7) 중 점수 높은 자리, 나머지는 DPS 순으로 점수 높은 자리 (위치만 바꿈)
+  const rearrange = () => {
+    if (P.place !== 'smart') return; const S = slotScore().v, ts = e.towers.filter(t => t._gachaId); if (!ts.length) return;
+    const util = ts.filter(isUtil).sort((a, b) => tdps(b) - tdps(a)).slice(0, P.utilSlots), main = ts.filter(t => !util.includes(t)).sort((a, b) => tdps(b) - tdps(a));
+    const free = e.towerSlots.map((s, i) => i), take = (pred) => { const c = free.filter(pred).sort((a, b) => S[b].sc - S[a].sc)[0] ?? free.sort((a, b) => S[b].sc - S[a].sc)[0]; free.splice(free.indexOf(c), 1); return c; };
+    const plan = []; util.forEach(t => plan.push([t, take(i => S[i].mid > 0.3 && S[i].mid < 0.7)])); main.forEach(t => plan.push([t, take(() => true)]));
+    e.towerSlots.forEach(s => { if (s.tower && s.tower._gachaId) { s.tower = null; s.occupied = false; } });
+    plan.forEach(([t, i]) => { const s = e.towerSlots[i]; s.tower = t; s.occupied = true; t.x = s.x; t.y = s.y; });
+    applyTowerSynergies(e.towers);
+  };
+  let lastRearrange = -99;
   const typeShare = () => { const c = {}; e.towers.forEach(t => { if (t.def) c[t.def.type] = (c[t.def.type] || 0) + tdps(t); }); return Object.entries(c).sort((a, b) => b[1] - a[1]); };
   const bot = () => {
     const w = e.currentWave, n = e.enemies.length, h = e.heroes[0];
@@ -74,8 +100,9 @@ const RUN_IN_PAGE = async ({ hero, maxWave, BOSS }) => {
       if (e._heroItemPending) app._playHeroTransform();
     }
     // --- 주문(무료, 쿨타임): 그물망은 필드 위험할 때, 훈련소는 적 많을 때 ---
-    if (n >= 90 && app.spellMgr.cast('netTrap', e)) ST.spells++;
-    if (n >= 35 && app.spellMgr.cast('trainingCamp', e)) ST.spells++;
+    if (n >= (P.spells === 'always' ? 5 : 90) && app.spellMgr.cast('netTrap', e)) ST.spells++;
+    if (n >= (P.spells === 'always' ? 5 : 35) && app.spellMgr.cast('trainingCamp', e)) ST.spells++;
+    if (w - lastRearrange >= P.rearrangeEvery) { rearrange(); lastRearrange = w; }
     // --- 보스 소환: 쿨 될 때마다 열린 최고 티어 (필드는 1마리로 계산, 나중에 잡으면 큰 골드) ---
     if (BOSS !== 'none' && e.state === 'wave' && (e._bossSummonCooldown || 0) <= 0 && n < 160) {
       const open = BOSS_TIERS.filter(t => w >= t.minWave);
@@ -112,8 +139,10 @@ const RUN_IN_PAGE = async ({ hero, maxWave, BOSS }) => {
     const danger = n >= 100, reserve = w >= 4 && !danger ? Math.min(300, 40 + w * 20) : 0;
     for (let k = 0; k < 12; k++) {
       const empty = emptyIdx() >= 0, C = [];
-      C.push({ k: 'normal', cost: PULL_COSTS.normal, v: EV('normal') * (empty ? 1 : 0.25) });
-      C.push({ k: 'premium', cost: PULL_COSTS.premium, v: EV('premium') * (empty ? 1 : 0.35) });
+      const tenPhase = w >= P.tenFromWave || !empty; // 사람: 초반엔 빨리 잡으려 일반 뽑기, 여유 생기면 무조건 900 모아 10연
+      if (!tenPhase || danger) C.push({ k: 'normal', cost: PULL_COSTS.normal, v: EV('normal') * (empty ? 1 : 0.25) }); // 위험하면 바로 일반 뽑기
+      if (tenPhase) C.push({ k: 'ten', cost: PULL_COSTS.ten, v: EV('normal') * 10 * (empty ? 1 : 0.25) });
+      if (!tenPhase || danger) C.push({ k: 'premium', cost: PULL_COSTS.premium, v: EV('premium') * (empty ? 1 : 0.35) }); // 10연 단계엔 900 모으려고 안 씀
       if (!empty && w >= 30) C.push({ k: 'gamble', cost: PULL_COSTS.gamble, v: EV('gamble') * 0.5 });
       for (const [ty] of typeShare()) {
         const nu = getTypeUpgradeAt(ty, TypeUpgradeLevels[ty] || 0), tw = e.towers.filter(t => t.def && t.def.type === ty);
@@ -124,33 +153,35 @@ const RUN_IN_PAGE = async ({ hero, maxWave, BOSS }) => {
       if (tmT) C.push({ k: 'tm', t: tmT, cost: TM_COST, v: tdps(tmT) * 0.3 });
       const ep = !(e._oneTimeUsed && e._oneTimeUsed.rarecandy) && e.towers.filter(t => t.def && t.def.grade === 'epic').sort((a, b) => tdps(a) - tdps(b))[0];
       if (ep) { const it = ShopItems.find(i => i.key === 'rarecandy'); C.push({ k: 'candy', t: ep, cost: shopItemCost(it, e), v: Math.max(0, GD.legend - tdps(ep)) }); }
-      if (!empty) { const it = ShopItems.find(i => i.key === 'revive'); C.push({ k: 'plot', cost: shopItemCost(it, e), v: EV('normal') * 0.75 }); }
+      if (!empty) { const it = ShopItems.find(i => i.key === 'revive'), best = (app._inventory || []).reduce((m, d) => Math.max(m, defDps(d)), 0); C.push({ k: 'plot', cost: shopItemCost(it, e), v: Math.max(EV('normal'), best) * 0.9 }); }
       const ok = C.filter(c => c.cost > 0 && e.gold - c.cost >= reserve && c.v > 0).sort((a, b) => b.v / b.cost - a.v / a.cost);
       const c = ok[0]; if (!c) break;
-      if (c.k === 'normal' || c.k === 'premium' || c.k === 'gamble') { const ei = emptyIdx(); e.selectedSlotIdx = ei >= 0 ? ei : null; app.doPull(c.k); e.selectedSlotIdx = null; spent(c.k === 'normal' ? '일반뽑기' : c.k === 'premium' ? '프리미엄' : '도박', c.cost); }
+      if (c.k === 'ten') { if (e.gold < PULL_COSTS.ten) break; const ei = emptyIdx(); e.selectedSlotIdx = ei >= 0 ? ei : null; app.doPull('ten'); e.selectedSlotIdx = null; spent('10연', c.cost); }
+      else if (c.k === 'normal' || c.k === 'premium' || c.k === 'gamble') { const ei = emptyIdx(); e.selectedSlotIdx = ei >= 0 ? ei : null; app.doPull(c.k); e.selectedSlotIdx = null; spent(c.k === 'normal' ? '일반뽑기' : c.k === 'premium' ? '프리미엄' : '도박', c.cost); }
       else if (c.k === 'type') { if (!applyTypeUpgrade(c.ty, e)) break; spent('타입강화', c.cost); }
       else if (c.k === 'tm') { if (!e.spendGold(TM_COST)) break; applyTM(c.t); spent('기술머신', c.cost); ST.tm++; }
       else if (c.k === 'candy') { const slot = e.towerSlots.find(s => s.tower === c.t); if (!slot || !e.spendGold(c.cost)) break; if (!useRareCandy(e, slot)) { e.addGold(c.cost); break; } e._oneTimeUsed = e._oneTimeUsed || {}; e._oneTimeUsed.rarecandy = true; spent('이상한사탕', c.cost); ST.candy++; }
       else if (c.k === 'plot') { const it = ShopItems.find(i => i.key === 'revive'); if (!e.spendGold(c.cost)) break; it.buy(e); spent('부지확장', c.cost); }
     }
-    // --- 합성: 보관함에서 자리를 못 받는 것만 같은 등급 3개 → 랜덤 (먹이 재료는 위에서 먼저 소모됨) ---
+    // --- 합성: 먹이 재료(필드 성장 대상과 같은 종·등급 / 메가 원본 종)는 '아래에 쌓아' 두고, 나머지는 3개씩 → 상위 등급 (레전드까지) ---
+    const keep = d => e.towers.some(t => t.def && FEEDABLE(t) && (t.def.mega ? t.def.megaOf === d.id : (t.def.id === d.id && t.def.grade === d.grade))) || (MEGA_OF[d.id] && e.towers.some(t => t.def && (t.def.id === d.id || t.def.megaOf === d.id)));
     const fieldMin = () => { let lo = null; e.towerSlots.forEach((s, i) => { if (s.tower && s.tower._gachaId && (!lo || tdps(s.tower) < lo.d)) lo = { i, d: tdps(s.tower) }; }); return lo; };
-    for (let k = 0; k < 8; k++) {
-      const inv = app._allMaterials(false), lo = fieldMin(); let done = false;
+    // --- 배치: 빈 자리(점수 높은 곳), 없으면 필드 최약체보다 센 것과 교체 (빠진 것은 보관함 → 합성 재료) ---
+    const place = () => { const inv = (app._inventory || []).slice().sort((a, b) => defDps(b) - defDps(a));
+      for (const d of inv) { let idx = emptyIdx();
+        if (idx < 0) { const lo = fieldMin(); if (!lo || lo.d >= defDps(d) * 0.95) break;
+          const old = e.towerSlots[lo.i].tower.def; app._consumeMaterials([{ kind: 'field', slotIdx: lo.i, def: old }]); app._addToStorage([old]); idx = lo.i; }
+        app._placeFromStorage(d.id, idx); } };
+    place(); // 빈 자리 먼저 채우고 남는 것만 합성
+    for (let k = 0; k < 10; k++) {
+      const inv = app._allMaterials(false).filter(m => !keep(m.def)); let done = false;
       for (const g of ['normal', 'rare', 'epic']) {
-        const pool = inv.filter(m => m.def.grade === g && (emptyIdx() < 0 && lo && defDps(m.def) <= lo.d));
-        if (pool.length >= 3) { app._consumeMaterials(pool.slice(0, 3)); app._addToStorage([rollRandomMerge(g, app._mergeState || {})]); done = true; break; }
+        const pool = inv.filter(m => m.def.grade === g);
+        if (pool.length >= 3 && (emptyIdx() < 0 || g !== 'normal' || pool.length >= 6)) { app._consumeMaterials(pool.slice(0, 3)); app._addToStorage([rollRandomMerge(g, app._mergeState || {})]); done = true; break; }
       }
       if (!done) break;
     }
-    // --- 배치: 빈 자리, 없으면 필드 최약체보다 센 것과 교체 (빠진 것은 보관함 → 합성 재료) ---
-    const inv = (app._inventory || []).slice().sort((a, b) => defDps(b) - defDps(a));
-    for (const d of inv) {
-      let idx = emptyIdx();
-      if (idx < 0) { const lo = fieldMin(); if (!lo || lo.d >= defDps(d) * 0.95) break;
-        const old = e.towerSlots[lo.i].tower.def; app._consumeMaterials([{ kind: 'field', slotIdx: lo.i, def: old }]); app._addToStorage([old]); idx = lo.i; }
-      app._placeFromStorage(d.id, idx);
-    }
+    place(); // 합성으로 생긴 것 배치
   };
   const FEEDABLE = t => t.def && (t.def.mega || ['epic', 'legend', 'unique'].includes(t.def.grade)) && ((t.def._stack || 1) < 5);
   const DT = 1 / 30; let t = 0, lastBot = 0; const trace = [];
@@ -180,7 +211,7 @@ const RUN_IN_PAGE = async ({ hero, maxWave, BOSS }) => {
     await pg.evaluate(() => { localStorage.setItem('pokemontd_audio', '{"sfx":false,"bgm":false}'); });
     out[hero] = [];
     for (let i = 0; i < RUNS; i++) {
-      const r = await pg.evaluate(RUN_IN_PAGE, { hero, maxWave: MAXW, BOSS: process.env.SIM_BOSS || 'max' });
+      const r = await pg.evaluate(RUN_IN_PAGE, { hero, maxWave: MAXW, STRAT: Object.assign(process.env.SIM_BOSS ? { boss: process.env.SIM_BOSS } : {}, JSON.parse(process.env.SIM_STRAT || '{}')) });
       out[hero].push(r); if (process.env.SIM_DEBUG) console.log(JSON.stringify({ trace: r.trace, errLog: r.errLog }));
       const st = r.st, sp = Object.entries(st.spend).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([k, g]) => k + ' ' + (g >= 1000 ? (g / 1000).toFixed(1) + 'K' : g)).join(' ');
       process.stdout.write(`${hero} #${i + 1}: 웨이브 ${r.wave}${r.over ? '' : '(상한)'} · 상위 ${r.top.map(([k, p]) => k + ' ' + p + '%').join(', ')}\n` +

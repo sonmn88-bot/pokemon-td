@@ -16,7 +16,7 @@
 - 수정한 JS: `node --check 파일명`
 - 핵심 데이터 점검: `node test-core.js`
 - 플레이 흐름(가능할 때): `python3 -m http.server 8765` 후 `node test-play.js http://localhost:8765/index.html out 390 844` (파이썬판 test-play.py는 Playwright 파이썬이 있을 때만)
-- 밸런스 수치 비교(밸런스 바꿀 때): `node tools/sim.js [판수/영웅] [최대웨이브]` → 영웅별 도달 웨이브·MVP 쏠림, `tools/sim-result.json`. 봇은 단순 전략이라 절대값이 아닌 변경 전후 비교용
+- 밸런스 수치 비교(밸런스 바꿀 때): `node tools/sim.js [판수/영웅] [최대웨이브]` → 영웅별 도달 웨이브·MVP 쏠림, `tools/sim-result.json`. 봇 규칙·설정·규칙 바뀔 때 고치는 법은 `tools/SIM.md`. 절대값이 아닌 변경 전후 비교용
 
 ## 배포 규칙
 - 배포할 때마다 `index.html`의 `#app-version`과 `sw.js`의 `CACHE` 번호를 함께 올림 (시작화면에서 반영 확인용)
