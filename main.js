@@ -1071,7 +1071,26 @@ class App {
     this._applyRunSeedTrait(); // v27-18: 이번 판 한정 랜덤 시드특성 (요청G)
     this._megaRunInit && this._megaRunInit(); // v3.2: 메가스톤·편성·영웅 아이템
     this._cardsInit && this._cardsInit(); // v3.5: 강화 카드
+    this._autoPlaceHero(); // v4: 영웅을 길이 가장 많이 지나는 자리에 자동 배치 (예전엔 직접 '이동'을 눌러야 해서 모르면 영웅 없이 싸웠음)
     this._showStarterTowerPicker(); // v27-5: 시작 시 스타터 타워 3택1 (요청B - 초반 결정 유도)
+  }
+
+  // v4: 사거리 안에 길이 가장 많이 들어오는 빈 땅을 찾아 영웅 배치 (슬롯과 61px 이상, 이후 '이동' 버튼으로 옮길 수 있음)
+  _autoPlaceHero() {
+    const e = this.engine, id = this.starterHero || 'pikachu';
+    if (!e || e.heroes.length || !window.Hero || !window.HeroDefs?.[id]) return;
+    const path = (e.paths && e.paths[0]) || []; if (!path.length) return;
+    const R = (HeroDefs[id].attack?.baseRange || 110) * 0.95, pts = path.filter((_, i) => i % 3 === 0);
+    let best = null, bs = -1;
+    for (let y = e.worldHeight * 0.08; y <= e.worldHeight * 0.92; y += 16) for (let x = e.worldWidth * 0.08; x <= e.worldWidth * 0.92; x += 16) {
+      if (e.towerSlots.some(s => Math.hypot(s.x - x, s.y - y) < 61)) continue;
+      if (window._distToPath && _distToPath(x, y, pts) < 26) continue; // 길 위는 제외
+      let sc = 0; for (const p of pts) if (Math.hypot(p.x - x, p.y - y) <= R) sc++;
+      if (sc > bs) { bs = sc; best = { x, y }; }
+    }
+    if (!best) return;
+    e.heroes.push(new Hero(id, best.x, best.y, this.selectedHeroSkins[id]));
+    this.buildHeroSkillBar && this.buildHeroSkillBar();
   }
 
   // v27-5: 시작 스타터 타워 선택 (무료, 즉시 배치) - 초반에 첫 결정을 하게 만들어 몰입 유도
