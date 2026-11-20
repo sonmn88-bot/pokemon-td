@@ -103,6 +103,7 @@ const RUN_IN_PAGE = async ({ hero, maxWave, BOSS }) => {
     const slotsFull = emptyIdx() < 0;
     for (const r of RECIPES) { // 레시피는 자리가 모자랄 때만 (레전드 3 → 유니크 1로 자리 확보), 뮤츠는 골드 여유 있을 때
       if (!slotsFull || (r.cost && e.gold < r.cost + 300)) continue;
+      if (e.towers.some(t => t._gachaId === r.id) || (app._inventory || []).some(d => d.id === r.id)) continue; // 유니크는 필드 1마리 → 이미 있으면 만들지 않음
       const all = app._allMaterials(true), idx = r.pick(all.map(m => m.def), { miracle: e._miracle }); if (!idx) continue;
       if (r.cost && !e.spendGold(r.cost)) continue; if (r.cost) spent('레시피', r.cost);
       app._consumeMaterials(idx.map(i => all[i])); app._addToStorage([{ ...GachaTowerDefs[r.id], _starLevel: 1 }]); ST.recipes.push(r.id + '@' + w);
@@ -154,7 +155,7 @@ const RUN_IN_PAGE = async ({ hero, maxWave, BOSS }) => {
   const FEEDABLE = t => t.def && (t.def.mega || ['epic', 'legend', 'unique'].includes(t.def.grade)) && ((t.def._stack || 1) < 5);
   const DT = 1 / 30; let t = 0, lastBot = 0; const trace = [];
   const t0 = performance.now();
-  while (!over && e.currentWave < maxWave && t < 60 * 60 * 3) {
+  while (!over && e.currentWave < maxWave && t < 60 * 60 * 8) { // 게임시간 8시간 상한
     if (e.state === 'idle') { trace.push([e.currentWave, Math.round(e.gold), e.towers.length, (app._inventory || []).length, e.enemies.length, document.querySelectorAll('.skin-picker,.card-overlay,.evo-overlay,[class*=overlay]').length]); app.sendWave(); }
     if (t - lastBot >= 0.5) { try { bot(); } catch (err) { console.error('bot', err.message); } lastBot = t; }
     for (let i = 0; i < 15; i++) { e.dt = DT; e._isLastSubstep = i === 14; try { e.update(); } catch (err) { console.error('upd', err.message); } t += DT; if (over) break; }
