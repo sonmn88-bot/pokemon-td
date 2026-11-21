@@ -354,7 +354,7 @@
     },
     _pickWaitText(ready) {
       const o = this.room && this.room[this.me === 'p1' ? 'p2' : 'p1'];
-      return !o ? `코드 ${this.code}를 친구에게 알려주세요` : o.ready ? `${esc(o.name)} 준비 완료` : `${esc(o.name)}이(가) 팀을 고르는 중`;
+      return !o ? `코드 ${this.code}를 친구에게 알려주세요` : o.ready ? `상대(${esc(o.name)}) 준비 완료` : `상대(${esc(o.name)})가 팀을 고르는 중`;
     },
     _moveDesc(m) {
       const f = m.fx || {}, o = [];
@@ -429,7 +429,7 @@
       if (this.st.phase === 'replace') { c.innerHTML = `<div class="pb-ask">다음에 내보낼 포켓몬</div>${team(true)}`; c.querySelectorAll('[data-sw]').forEach(b => b.onclick = () => this._submit({ t: 'switch', to: +b.dataset.sw })); this._timer(() => this._submit({ t: 'switch', to: sd.mons.findIndex((x, i) => x.hp > 0 && i !== sd.active) })); return; }
       const main = () => {
         const moves = m.pp.every(p => p <= 0) ? `<button data-mv="-1" style="--tc:var(--t-normal)"><b>${STRUGGLE.name}</b><span>기술을 모두 써서 마지막 힘을 짜낸다</span></button>`
-          : m.moves.map((mv, i) => { const e = mv.kind === 'status' ? 1 : eff(mv.type, foe.type); return `<button data-mv="${i}" style="--tc:var(--t-${mv.type})" ${m.pp[i] <= 0 ? 'disabled' : ''} title="${esc(this._moveDesc(mv))}"><b>${tIcon(mv.type, 16)}${esc(mv.name)}</b><span>${esc(this._moveDesc(mv)) || '부가효과 없음'}</span><em>${m.pp[i]}/${mv.pp}</em>${e > 1 ? '<i class="up">효과 큼</i>' : e < 1 ? '<i class="dn">효과 작음</i>' : ''}</button>`; }).join('');
+          : m.moves.map((mv, i) => { const e = mv.kind === 'status' ? 1 : eff(mv.type, foe.type); return `<button data-mv="${i}" style="--tc:var(--t-${mv.type})" ${m.pp[i] <= 0 ? 'disabled' : ''} title="${esc(this._moveDesc(mv))}"><b>${tIcon(mv.type, 16)}${esc(mv.name)}</b><span>${esc(this._moveDesc(mv)) || '부가효과 없음'}</span><em>${m.pp[i]}/${mv.pp}</em>${e > 1 ? '<i class="up">효과 큼</i>' : e < 1 ? '<i class="dn">효과 약함</i>' : ''}</button>`; }).join('');
         c.innerHTML = `<div class="pb-moves">${moves}</div><div class="pb-acts"><button data-a="sw">교체</button><button data-a="item" ${sd.item > 0 ? '' : 'disabled'}>회복약 ${sd.item}</button>${this.cpu ? '' : '<span class="pb-timer" aria-label="남은 시간"></span>'}</div>`;
         c.querySelectorAll('[data-mv]').forEach(b => b.onclick = () => this._submit({ t: 'move', i: +b.dataset.mv }));
         c.querySelector('[data-a="sw"]').onclick = () => { c.innerHTML = `<div class="pb-ask">누구로 바꿀까요?</div>${team(false)}`; c.querySelectorAll('[data-sw]').forEach(b => b.onclick = () => this._submit({ t: 'switch', to: +b.dataset.sw })); c.querySelector('[data-a="cancel"]').onclick = main; };
