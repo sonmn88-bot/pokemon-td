@@ -814,7 +814,7 @@ Object.assign(App.prototype, {
       im.src = src;
     });
     const rr = (x, y, w, h, r) => { g.beginPath(); g.roundRect ? g.roundRect(x, y, w, h, r) : g.rect(x, y, w, h); };
-    const font = (px, w = 800) => `${w} ${px}px "Pretendard Variable", Pretendard, -apple-system, sans-serif`;
+    const font = (px, w = 800) => `${w} ${px}px Maple, "Pretendard Variable", Pretendard, -apple-system, sans-serif`;
     const GR = window.GRADES, ORDER = ['unique','legend','epic','rare','normal'];
 
     // 배경

@@ -1,7 +1,7 @@
 /* ===== POKEMON TD - 대폭 업그레이드 디자인 ===== */
 /* 킹덤러쉬 + 포켓몬 감성 */
 
-/* 폰트는 index.html에서 로드 (Pretendard + Outfit) */
+/* 폰트: 메이플스토리체 Light·Bold (assets/fonts, 아래 v4 층 @font-face) */
 
 :root {
   --bg-deep:    #0b0d12;
@@ -17,8 +17,8 @@
   --text-lo:    #3d4f6a;
   --border:     rgba(255,255,255,0.08);
   --gold:       linear-gradient(135deg,#ffc24b,#f59e0b);
-  --font-px:    'Outfit', 'Pretendard Variable', Pretendard, -apple-system, sans-serif;
-  --font-ui:    'Pretendard Variable', Pretendard, -apple-system, 'Apple SD Gothic Neo', sans-serif;
+  --font-px:    'Maple', 'Pretendard Variable', Pretendard, -apple-system, sans-serif; /* v4.1: 메이플 한 가족으로 통일 */
+  --font-ui:    'Maple', 'Pretendard Variable', Pretendard, -apple-system, 'Apple SD Gothic Neo', sans-serif;
   --radius-sm:  8px;
   --radius-md:  14px;
   --radius-lg:  22px;
@@ -1137,7 +1137,7 @@ html, body {
   --g-normal:#a7adba; --g-rare:#5b9dff; --g-epic:#b18cff; --g-legend:#ffc24b; --g-unique:#ff5c7a;
   --sheet-bg:rgba(16,19,27,0.97);
 }
-body { font-feature-settings:'tnum' 1; letter-spacing:-0.01em; }
+body { font-feature-settings:'tnum' 1; letter-spacing:0; }
 button { font-family:var(--font-ui); }
 
 /* --- 타이틀 --- */
@@ -1652,17 +1652,19 @@ html, body { overscroll-behavior: none; }
    글꼴 파일은 직접 호스팅(assets/fonts, 서비스워커 캐시) → 외부 CDN 장애와 무관
    굵기 범위를 100~900으로 선언: 굵은 파일 1개를 모든 굵기에 그대로 써서 가짜 굵게(번짐) 방지
    ===================================================================== */
-@font-face { font-family:'Maple'; src:url('assets/fonts/maple-bold.woff2') format('woff2'); font-weight:100 900; font-display:swap; }
-@font-face { font-family:'Lilita One'; src:url('assets/fonts/lilita-one.woff2') format('woff2'); font-weight:100 900; font-display:swap; unicode-range:U+0000-00FF, U+2000-206F, U+2190-2193, U+2212, U+221E; }
+/* v4.1 글꼴 통일: 메이플스토리체 한 가족 — 굵기 500 이하 = Light(본문·설명), 600 이상 = Bold(제목·버튼·숫자). Pretendard는 서브셋 밖 글자 대비용 */
+@font-face { font-family:'Maple'; src:url('assets/fonts/maple-light.woff2') format('woff2'); font-weight:100 500; font-display:swap; }
+@font-face { font-family:'Maple'; src:url('assets/fonts/maple-bold.woff2') format('woff2'); font-weight:600 900; font-display:swap; }
 :root {
   --font-display:'Maple', 'Pretendard Variable', Pretendard, -apple-system, sans-serif;
-  --font-px:'Lilita One', 'Maple', 'Pretendard Variable', Pretendard, -apple-system, sans-serif; /* 숫자·영문 강조 (한글은 Maple로 이어짐) */
+  --font-px:'Maple', 'Pretendard Variable', Pretendard, -apple-system, sans-serif;
+  --font-ui:'Maple', 'Pretendard Variable', Pretendard, -apple-system, 'Apple SD Gothic Neo', sans-serif;
   --edge-gold:#b87407; --edge-green:#08875d; --edge-dark:rgba(0,0,0,.45);
 }
 /* 제목·주 행동 버튼·큰 알림 = 게임 글꼴 */
 .title-main, .po-title, .skin-picker-title, .end-title, .he-title, .mg-title, .mr-pick-title, .mission-popup-title, .tp-title,
 .skilltree-title, .vs-title, .wave-announce, .title-start-btn, #btn-endless-start, .wave-btn, .diff-btn b, .co-card b, .po-btn.go {
-  font-family:var(--font-display) !important; font-weight:400 !important; letter-spacing:0 !important;
+  font-family:var(--font-display) !important; font-weight:700 !important; letter-spacing:0 !important;
 }
 /* 주 행동 버튼: 아래쪽 두께(눌리는 버튼) — 바깥 빛번짐 없음 */
 .title-start-btn, #btn-endless-start { box-shadow:0 4px 0 var(--edge-gold), 0 10px 22px rgba(0,0,0,.35) !important; transition:transform .12s var(--ease-out), box-shadow .12s var(--ease-out); }
@@ -1676,10 +1678,10 @@ html, body { overscroll-behavior: none; }
 .title-logo-td { color:#fff !important; font-size:clamp(54px,15vw,96px) !important; letter-spacing:0 !important;
   text-shadow:0 3px 0 #2a3350, 0 6px 0 #161b2b, 0 14px 24px rgba(0,0,0,.45) !important; }
 .title-logo-def { color:var(--accent-yel) !important; letter-spacing:.2em !important; text-shadow:0 2px 0 #6b4300, 0 8px 18px rgba(0,0,0,.4) !important; }
-.title-poke-label { font-family:var(--font-px) !important; font-weight:400 !important; }
+.title-poke-label { font-family:var(--font-px) !important; font-weight:700 !important; }
 /* 숫자는 고정폭 정렬 */
 .hud-cell, .rs-num, #gold-val, #wave-val, #score-val, #field-count-val { font-variant-numeric:tabular-nums; }
-.hud-cell { font-weight:400 !important; font-size:16px !important; }
+.hud-cell { font-weight:700 !important; font-size:16px !important; }
 .end-title { font-size:clamp(40px,11vw,64px) !important; text-shadow:0 3px 0 rgba(0,0,0,.45), 0 12px 26px rgba(0,0,0,.4) !important; }
 .wave-announce { text-shadow:0 2px 0 rgba(0,0,0,.55), 0 6px 16px rgba(0,0,0,.45) !important; }
 /* 좁은 화면 HUD: 무한(∞) 표기 숨김, 조작 버튼 34px → 수치가 잘리지 않게 */
@@ -1699,23 +1701,23 @@ html, body { overscroll-behavior: none; }
 @media (prefers-reduced-motion: reduce) { .grade-flash { animation:none; opacity:0; } }
 /* v4 웨이브 미리보기: 약점 타입 + 내 보유 수 (0이면 빨강) */
 #wave-preview .wp-counter { display:inline-flex; align-items:center; gap:2px; margin-left:6px; padding-left:6px; border-left:1px solid rgba(255,255,255,.18); color:#bfe8d0; }
-#wave-preview .wp-counter b { font-family:var(--font-px); font-weight:400; font-size:12px; }
+#wave-preview .wp-counter b { font-family:var(--font-px); font-weight:700; font-size:12px; }
 #wave-preview .wp-counter.none { color:#ff8da1; }
 /* v4 오늘의 도전 버튼 (주 버튼 아래 · 대전 위) — 2줄: 제목(게임 글꼴) + 조건 */
 #btn-daily { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; width:100%; max-width:380px; min-height:56px; margin:10px auto 0;
   border:1.5px solid rgba(106,168,255,.55); border-radius:14px; background:rgba(106,168,255,.1); color:#cfe2ff; cursor:pointer;
   box-shadow:0 3px 0 rgba(30,60,120,.6); transition:transform .12s var(--ease-out), box-shadow .12s var(--ease-out); }
 #btn-daily:active { transform:translateY(2px); box-shadow:0 1px 0 rgba(30,60,120,.6); }
-#btn-daily .dl-main { font-family:var(--font-display); font-size:17px; color:#e6efff; }
+#btn-daily .dl-main { font-family:var(--font-display); font-weight:700; font-size:17px; color:#e6efff; }
 #btn-daily .dl-sub { font-size:12px; color:#8fb3e8; word-break:keep-all; }
 /* v4 판 종료 리포트 */
 .end-record { font-size:15px; color:var(--text-hi); margin:2px 0 4px; }
-.end-record em { font-style:normal; font-family:var(--font-display); color:var(--accent-yel); font-size:18px; }
+.end-record em { font-style:normal; font-family:var(--font-display); font-weight:700; color:var(--accent-yel); font-size:18px; }
 .end-tip { max-width:340px; margin:4px 16px 6px; padding:8px 12px; border-radius:10px; background:rgba(106,168,255,.1); border:1px solid rgba(106,168,255,.25);
   font-size:13px; line-height:1.6; color:#d7e4f7; word-break:keep-all; text-align:left; }
 .end-tip b { color:#fff; } .end-tip img, .end-tip svg { vertical-align:-3px; }
 .dl-rank { width:min(340px, calc(100% - 32px)); margin:6px auto; padding:8px 12px; border-radius:10px; background:rgba(0,0,0,.3); font-size:12px; color:#c9d3e4; }
-.dl-rank b { display:block; font-family:var(--font-display); font-weight:400; color:var(--accent-yel); margin-bottom:4px; font-size:14px; }
+.dl-rank b { display:block; font-family:var(--font-display); font-weight:700; color:var(--accent-yel); margin-bottom:4px; font-size:14px; }
 .dl-row { display:grid; grid-template-columns:20px 1fr auto auto; gap:8px; padding:3px 0; border-top:1px solid rgba(255,255,255,.06); font-variant-numeric:tabular-nums; }
 .dl-row .nm { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .dl-empty { color:#8899bb; }
@@ -1725,3 +1727,4 @@ html, body { overscroll-behavior: none; }
   .hud-cell { padding:4px 2px !important; }
   #hud-top { gap:0 !important; }
 }
+@media (max-width:560px) { .hud-cell { font-size:14.5px !important; } } /* v4.1: 메이플 숫자가 넓어 390px에서 3px 넘침 → 축소 */

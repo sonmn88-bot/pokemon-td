@@ -26,7 +26,7 @@ const ASSETS = [
   '/pokemon-td/audio.js',
   '/pokemon-td/daily.js',
   '/pokemon-td/assets/fonts/maple-bold.woff2',
-  '/pokemon-td/assets/fonts/lilita-one.woff2',
+  '/pokemon-td/assets/fonts/maple-light.woff2',
   '/pokemon-td/lib/three/three.module.min.js',
   '/pokemon-td/lib/three/loaders/GLTFLoader.js',
   '/pokemon-td/lib/three/utils/BufferGeometryUtils.js',

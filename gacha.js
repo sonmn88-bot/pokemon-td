@@ -833,7 +833,7 @@ function _createGachaTower(def, x, y, engine) {
       } else {
         const ti = window.ICON_IMG && ICON_IMG(def.type); // v3.0: 이미지 없는 포켓몬 = 타입 배지 + 이름 첫 글자
         if (ti && ti.complete) ctx.drawImage(ti, this.x - sz*0.42, this.y - sz*0.42, sz*0.84, sz*0.84);
-        ctx.font=`900 ${Math.round(sz*0.3)}px Pretendard,-apple-system,sans-serif`; ctx.textAlign='center'; ctx.textBaseline='middle';
+        ctx.font=`900 ${Math.round(sz*0.3)}px Maple,Pretendard,-apple-system,sans-serif`; ctx.textAlign='center'; ctx.textBaseline='middle';
         ctx.lineWidth=3; ctx.strokeStyle='rgba(0,0,0,0.55)'; ctx.strokeText(def.name[0], this.x, this.y + sz*0.42);
         ctx.fillStyle='#fff'; ctx.fillText(def.name[0], this.x, this.y + sz*0.42);
       }

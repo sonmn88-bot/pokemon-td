@@ -1277,7 +1277,7 @@ class GameEngine {
     ctx.fill();
 
     // 이름 + 이모지
-    ctx.font='bold 11px Pretendard,-apple-system,sans-serif';
+    ctx.font='bold 11px Maple,Pretendard,-apple-system,sans-serif';
     ctx.fillStyle='#fff'; ctx.textAlign='center';
     ctx.shadowColor='rgba(0,0,0,0.9)'; ctx.shadowBlur=0; /* v3.6 발열: 번짐 제거 */
     ctx.fillText(`${boss.name}`, bx+bw/2, by-4); // v3.9 이모지 제거
@@ -1410,7 +1410,7 @@ class FloatingText {
     // v3.6: shadowBlur(번짐·고비용) 대신 또렷한 외곽선 / v4: 게임 글꼴 + 처음 0.12초 살짝 커졌다 줄어드는 '팝'
     ctx.save(); ctx.globalAlpha=this.alpha;
     const pop=this.life<0.12?1+0.35*(1-this.life/0.12):1;
-    ctx.font=`${Math.round(this.fontSize*pop)}px 'Lilita One',Maple,Pretendard,-apple-system,sans-serif`;
+    ctx.font=`${Math.round(this.fontSize*pop)}px Maple,Pretendard,-apple-system,sans-serif`;
     ctx.textAlign='center'; ctx.lineJoin='round';
     ctx.lineWidth=Math.max(2.5,this.fontSize*0.22); ctx.strokeStyle='rgba(8,10,16,0.85)';
     ctx.strokeText(this.text,this.x,this.y);
@@ -1479,7 +1479,7 @@ class ComboFlash {
   draw(ctx){
     ctx.save();ctx.globalAlpha=Math.max(0,this.scale);
     ctx.translate(this.x,this.y);ctx.scale(this.scale,this.scale);
-    ctx.font='bold 22px Pretendard,-apple-system,sans-serif';
+    ctx.font='bold 22px Maple,Pretendard,-apple-system,sans-serif';
     ctx.textAlign='center';ctx.textBaseline='middle';
     ctx.strokeStyle='rgba(0,0,0,0.9)';ctx.lineWidth=4;
     const color=this.combo>=20?'#ff5c7a':this.combo>=10?'#ffc24b':'#34d399';

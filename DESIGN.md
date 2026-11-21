@@ -6,11 +6,10 @@
 
 ## 토큰
 - 색: `--bg-deep #0b0d12` `--bg-panel #14171f` `--text-hi/mid/lo` `--accent-*` `--g-normal~unique` (style.css `:root`)
-- 글꼴 3단 (assets/fonts에 직접 호스팅, 서비스워커 캐시):
-  - 제목·주 행동 버튼·큰 알림: 메이플스토리체 Bold(`--font-display`, KS X 1001 2,350자 서브셋 140KB)
-  - 본문·설명: Pretendard(`--font-ui`)
-  - 숫자·영문 강조: Lilita One(`--font-px`, 한글은 메이플로 이어짐). 캔버스 데미지 숫자도 같음
-  - 굵기 파일이 1개라 `@font-face`에 굵기 100~900 선언 → 가짜 굵게(번짐) 금지. 이 글꼴엔 font-weight를 올리지 않음
+- 글꼴: **메이플스토리체 한 가족으로 통일** (v4.1, assets/fonts 직접 호스팅, KS X 1001 2,350자 서브셋)
+  - 굵기 600 이상 = Bold(제목·버튼·숫자·강조) / 500 이하 = Light(본문·설명). 다른 글꼴 섞지 않음
+  - 변수 `--font-ui` `--font-px` `--font-display` 모두 Maple → 새 화면도 변수만 쓰면 자동 통일. 캔버스 글자도 `Maple,Pretendard`
+  - Pretendard는 서브셋 밖 글자 대비용 대체 글꼴로만 남김. 한글 자간은 좁히지 않음(0)
 - 라운드: 작은 칩 6 · 버튼 12 · 카드 14~16 · 시트 18~22
 - 모션: `--ease-out cubic-bezier(.2,.8,.2,1)`, UI 150~250ms. 무한 반복(숨쉬기·펄스) 금지 — 예외: 합성 가능 링처럼 게임 상태 신호
 

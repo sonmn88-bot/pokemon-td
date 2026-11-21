@@ -681,7 +681,7 @@ class Hero {
       }
 
       ctx.save();
-      ctx.font = 'bold 10px Pretendard,-apple-system,sans-serif';
+      ctx.font = 'bold 10px Maple,Pretendard,-apple-system,sans-serif';
       ctx.textAlign = 'center';
       ctx.shadowColor = 'rgba(0,0,0,0.9)';
       ctx.shadowBlur=0; /* v3.6 발열: 번짐 제거 */
@@ -721,7 +721,7 @@ class Hero {
 
       // 레벨 + 스킬포인트
       ctx.save();
-      ctx.font = 'bold 10px Pretendard,-apple-system,sans-serif';
+      ctx.font = 'bold 10px Maple,Pretendard,-apple-system,sans-serif';
       ctx.textAlign = 'center';
       ctx.shadowColor = 'rgba(0,0,0,0.9)';
       ctx.shadowBlur=0; /* v3.6 발열: 번짐 제거 */
@@ -738,7 +738,7 @@ class Hero {
       ctx.strokeStyle = skin.color; ctx.lineWidth = 2.5; ctx.stroke();
       ctx.font = '28px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText(skin.emoji, this.x, this.y);
-      ctx.font = 'bold 10px Pretendard,-apple-system,sans-serif';
+      ctx.font = 'bold 10px Maple,Pretendard,-apple-system,sans-serif';
       ctx.fillStyle = '#fff'; ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur=0; /* v3.6 발열: 번짐 제거 */
       ctx.textBaseline = 'alphabetic';
       ctx.fillText(`Lv${this.level}`, this.x, this.y+34);
