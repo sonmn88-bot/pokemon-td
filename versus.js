@@ -58,7 +58,7 @@
     { key: 'vs_elite', icon: 'sword', name: '엘리트 보내기 ×3', mul: 1.2, bounty: 0.4, desc: '상대에게 황금 엘리트 3마리 (체력 2.2배·빠름)', vs: 'elite', n: 3 },
     { key: 'vs_boss', icon: 'crown', name: '미니보스 보내기', mul: 3, bounty: 0.4, desc: '상대에게 미니보스 1마리', vs: 'boss', n: 1 },
   ];
-  const itemCost = (it, w) => Math.round(it.mul * inc(w) / 5) * 5; // v4: 대전 수입 배율 제거에 맞춰 ×1.4 → ×1 (결전 할인은 따로)
+  const itemCost = (it, w) => Math.round(it.mul * inc(w) * 1.4 / 5) * 5; // ×1.4 = 대전 수입 배율(1.6)에 맞춤 (결전 할인은 따로)
   const AUTO = w => 3 + Math.floor(w / 5);                     // 웨이브를 시간 안에 다 잡으면 자동으로 보내는 수
 
   const HEROES = [['pikachu', '피카츄'], ['togepi', '토게피'], ['eevee', '이브이']], STARTERS = [['bulbasaur', '이상해씨'], ['charmander', '파이리'], ['squirtle', '꼬부기']];
@@ -184,12 +184,19 @@
       // 같은 시드로 시작 → 두 사람의 판 특성·강조 몬스터·웨이브 구성이 똑같음 (뽑기 운만 다름)
       const mine = room[this.me] || {};
       app.starterHero = mine.hero || 'pikachu'; app._vsStarter = mine.starter || 'charmander';   // 대기실에서 고른 영웅·시작 몬스터
-      // v4: 대전 전용 수치 보정 제거 — 밸런스는 혼자 하기와 동일(시뮬로 맞춘 값), 대전 시스템(공용 시계·견제·결전·카드)만 유지
+      // 대전 전용 밸런스(혼자 하기는 그대로): 토게피 공격 6→9 (골드 +20%는 heroes.js에서 _vsGoldMul 보고 적용)
+      const tg = window.HeroDefs && HeroDefs.togepi && HeroDefs.togepi.attack;
+      if (tg && this._tgDmg === undefined) { this._tgDmg = tg.baseDamage; tg.baseDamage = 9; }
       app._vsRng = _mapRng(room.seed || 1);                                             // 판 특성·강조 몬스터를 시드로 (이전 판 기록과 무관)
       try { app.startGame(); } finally { app._vsRng = null; }
       const e = app.engine;
       e._runSeed = room.seed || 1; window.__wavePlan = {};
-      // v4: 대전 전용 경제 보정(시작 골드 600·골드 ×1.6·초반 체력 75%) 제거 — 혼자 하기와 같은 수치
+      // v3.17 대전 경제: 웨이브가 시계대로 와서 혼자 할 때보다 준비 시간이 짧음 → 시작 골드 600, 처치·클리어 골드 ×1.6,
+      //   초반 몹 체력 낮춤(1~8웨이브 75% → 16웨이브에 100%). 판매 환급 등엔 배율 없음(무한 골드 방지)
+      e._vsGoldMul = 1.6; e.addGold(300);
+      const spawn = e._spawnEnemy.bind(e);
+      e._spawnEnemy = (item) => { spawn(item); const en = e.enemies[e.enemies.length - 1], w = e.currentWave || 1;
+        if (en && !en.isBoss && !en._vsHp) { const m = w <= 8 ? 0.75 : w < 16 ? 0.75 + (w - 8) / 8 * 0.25 : 1; en.maxHp = Math.round(en.maxHp * m); en.hp = Math.min(en.hp, en.maxHp); en._vsHp = 1; } };
       this.speed = room.speed || 1; this.startAt = this._startAt || Date.now(); e.speedMul = this.speed; // 공용 시계 기준 = 각자 카운트다운이 끝난 순간
       document.getElementById('game-screen').classList.add('vs-mode');          // 배속·웨이브 버튼 숨김 (공용 시계)
       if (this.me === 'p1') this.net.update(this.code, { state: 'playing' }).catch(() => {});
@@ -320,6 +327,8 @@
       if (window.ShopItems) for (let i = window.ShopItems.length - 1; i >= 0; i--) if (window.ShopItems[i].vs) window.ShopItems.splice(i, 1);
       this._panel && this._panel.remove(); this._panel = null; this._done = false; this._endOn = false; this._endT = 0; this._cardAt = 0;
       document.getElementById('game-screen')?.classList.remove('vs-mode');
+      const tg = window.HeroDefs && HeroDefs.togepi && HeroDefs.togepi.attack;          // 대전 끝나면 혼자 하기 수치로 되돌림
+      if (tg && this._tgDmg !== undefined) { tg.baseDamage = this._tgDmg; this._tgDmg = undefined; }
       if (removeRoom && this.code && this.net) this.net.remove(this.code);
       this.active = false;
     },
