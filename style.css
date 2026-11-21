@@ -1936,3 +1936,12 @@ html, body { overscroll-behavior: none; }
   .pb-menu .pb-sub { margin-bottom:10px; } .pb-btn { height:48px; margin-top:8px; }
   .pb-fcards { top:56px; } .pb-tip { top:138px; } .pb-ticker { top:122px; }
 }
+
+/* v5.3 특성·저주·보호막·시너지 */
+.pb-trait { margin-top:6px; font-size:11.5px; color:var(--text-mid); line-height:1.45; word-break:keep-all; } .pb-trait b { color:var(--accent-yel); font-weight:700; margin-right:4px; }
+.pb-syn { display:flex; flex-wrap:wrap; gap:5px; margin:6px 16px 0; } .pb-syn i { font-style:normal; font-size:11px; font-weight:700; padding:3px 9px; border-radius:10px; background:rgba(61,220,151,.14); color:#7ff0bd; box-shadow:inset 0 0 0 1px rgba(61,220,151,.35); }
+.pb-traitnote { display:block; margin-top:3px; font-size:11px; color:var(--text-mid); }
+.pb-hpb::after { content:''; position:absolute; left:0; top:0; bottom:0; width:calc(var(--sh, 0) * 100%); background:rgba(130,190,255,.9); border-radius:4px; }
+.pb-stc.curse, .pb-st.curse { color:#d9a8ff; } .pb-st.curse { background:#6b3fa0; }
+.pb-pop.trait { color:#ffe08a; font-size:16px; }
+@media (max-height:760px) { .pb-trait { display:none; } .pb-syn { margin-top:4px; } }

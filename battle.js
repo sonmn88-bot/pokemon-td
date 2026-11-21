@@ -8,15 +8,15 @@
 // 3D 경기장은 arena3d.js (필요할 때만 불러옴)
 (function () {
   'use strict';
-  const TPS = 20, GK = 0.27, LIMIT = 240 * TPS, BUSY = 12, HB_MS = 5000, ITEM_CD = 8 * TPS;
-  const PROF = { H: { hp: 1.12, atk: 1.04, def: 1.1, spd: 0.86 }, N: { hp: 1, atk: 1, def: 1, spd: 1 }, F: { hp: 0.96, atk: 1.2, def: 0.96, spd: 1.3 } };
+  const TPS = 20, GK = 0.22, LIMIT = 300 * TPS, BUSY = 12, HB_MS = 5000, ITEM_CD = 8 * TPS;
+  const PROF = { H: { hp: 1.12, atk: 1.04, def: 1.1, spd: 0.86 }, N: { hp: 1, atk: 1, def: 1, spd: 1 }, F: { hp: 0.96, atk: 1.26, def: 0.96, spd: 1.3 } };
   const ROLE = { dealer: { atk: 1.12 }, aoe: {}, control: { def: 1.05, atk: 0.94 }, support: { hp: 1.12, def: 1.08, atk: 0.86 }, execute: { atk: 1.06, spd: 1.05 }, boss: { atk: 1.1, hp: 1.08 } };
   const TKR = { fire: '불꽃', water: '물', electric: '전기', grass: '풀', psychic: '에스퍼', normal: '노말' };
   const TCOL = { fire: 0xff6b3d, water: 0x3fa9ff, electric: 0xffd84a, grass: 0x58d06b, psychic: 0xc77dff, normal: 0xe8e8f0 };
-  const ST_KR = { burn: '화상', poison: '독', shock: '감전', freeze: '빙결' };
+  const ST_KR = { burn: '화상', poison: '독', shock: '감전', freeze: '빙결', curse: '저주' };
   const STAT_KR = { atk: '공격', def: '방어', spd: '스피드' };
   // 트레이너 패시브 (CPU끼리 대량 대결로 승률 맞춤 — PokeBattle._engine으로 다시 확인)
-  const TP = { redCrit: 0.3, blueFirst: 2.0, greenRegen: 0.0012, yellowItems: 2, yellowDot: 0.6, rocketFx: 1.5, rocketSlow: 0.92 };
+  const TP = { redCrit: 0.3, blueFirst: 2.0, greenRegen: 0.0008, yellowItems: 2, yellowDot: 0.6, rocketFx: 1.5, rocketSlow: 0.92 };
   const TRAINERS = {
     red:    { name: '레드',   color: '#e5484d', style: '공격형', desc: `모든 기술의 급소율 +${Math.round(TP.redCrit * 100)}%p` },
     blue:   { name: '블루',   color: '#3b82f6', style: '전략형', desc: `포켓몬마다 첫 공격 위력 +${Math.round((TP.blueFirst - 1) * 100)}%` },
@@ -34,7 +34,7 @@
     electric: { st: 'shock', ch: 0.3 },     // 전기: 감전(상대 게이지 반속)
     grass: { drain: 0.3 },                  // 풀: 준 피해의 30% 회복
     psychic: { debuff: ['def', -1], dch: 0.1 },  // 에스퍼: 10% 방어 하락
-    normal: { crit: 0.14 },                 // 노말: 급소율 증가
+    normal: { crit: 0.18 },                 // 노말: 급소율 증가
   };
   const TYPE_KR_FX = { fire: '화상', water: '게이지 밀기', electric: '감전', grass: '체력 흡수', psychic: '방어 하락', normal: '급소율' };
   // 주력기(게이지 100): 태그가 있으면 태그 기술, 없으면 타입 강타
@@ -44,16 +44,16 @@
     slow: { name: '끈끈한 덫', power: 102, fx: { slow: 9 } },
     stun: { name: '전류 스파크', power: 82, fx: { st: 'shock', ch: 0.4 } },
     freeze: { name: '냉기 일섬', power: 104, fx: { st: 'freeze', ch: 0.6 } },
-    chain: { name: '연속 타격', power: 30, fx: { hits: [2, 4] } },
+    chain: { name: '연속 타격', power: 34, fx: { hits: [2, 4], spread: true } },
     multi: { name: '흩뿌리기 사격', power: 44, tgt: 'foes', fx: {} },
     knockback: { name: '날려버리기', power: 78, fx: { push: 40 } },
     crit: { name: '급소 노리기', power: 88, fx: { crit: 0.35 } },
     pierce: { name: '관통 일격', power: 86, fx: { pierce: true } },
-    antiAir: { name: '대공 사격', power: 100, fx: { vsFast: 1.7 } },
-    gold: { name: '럭키 펀치', power: 62, fx: { crit: 0.1 } },
-    blast: { name: '자폭 돌진', power: 96, fx: { recoil: 0.28 } },
-    stack: { name: '기 모으기 타격', power: 96, fx: { stack: 50 } },
-    range: { name: '끊어치기', power: 70, fx: { push: 25, cut: true } },
+    antiAir: { name: '대공 사격', power: 100, fx: { vsFast: 1.9, snipe: true } },
+    gold: { name: '럭키 펀치', power: 54, fx: { crit: 0.1 } },
+    blast: { name: '자폭 돌진', power: 96, fx: { recoil: 0.24 } },
+    stack: { name: '기 모으기 타격', power: 96, fx: { stack: 58 } },
+    range: { name: '끊어치기', power: 70, fx: { push: 25, cut: true, snipe: true } },
   };
   const BASIC_POW = 40, MAIN_POW = 95, DMG_K = 0.22, SPD_EXP = 0.3; // DMG_K: 판 길이 / SPD_EXP: 빠를수록 한 방 약하게
 
@@ -86,22 +86,22 @@
       electric: { name: '충전', cost: 60, power: 50, tgt: 'foe', fx: { st: 'shock', ch: 0.3, selfGauge: 32 } },
       grass: { name: '광합성', cost: 70, power: 50, tgt: 'foe', fx: { drain: 0.45, selfStage: ['atk', 1] } },
       psychic: { name: '명상', cost: 70, power: 54, tgt: 'foe', fx: { debuff: ['def', -1], dch: 0.3, selfStage: ['def', 1] } },
-      normal: { name: '기합 충전', cost: 70, power: 72, tgt: 'foe', fx: { crit: 0.2, selfStage: ['atk', 1] } },
+      normal: { name: '기합 충전', cost: 70, power: 80, tgt: 'foe', fx: { crit: 0.22, selfStage: ['atk', 1] } },
     },
     support: {
       fire: { name: '온기', cost: 70, kind: 'heal', tgt: 'ally', fx: { heal: 0.28, cleanse: true } },
       water: { name: '치유의 물', cost: 70, kind: 'heal', tgt: 'ally', fx: { heal: 0.38 } },
       electric: { name: '응원 충전', cost: 60, kind: 'buff', tgt: 'ally', fx: { gaugeAlly: 42 } },
       grass: { name: '씨앗 수확', cost: 80, kind: 'heal', tgt: 'allies', fx: { healAll: 0.14 } },
-      psychic: { name: '빛의 장막', cost: 70, kind: 'buff', tgt: 'ally', fx: { stage: ['def', 1], selfHeal: 0.1 } },
+      psychic: { name: '빛의 장막', cost: 70, kind: 'buff', tgt: 'ally', fx: { shield: 0.28 } },
       normal: { name: '응급 처치', cost: 60, kind: 'heal', tgt: 'ally', fx: { heal: 0.4, cleanse: true } },
     },
     control: {
       fire: { name: '연막 폭발', cost: 80, kind: 'debuff', tgt: 'foes', fx: { debuff: ['atk', -1] } },
       water: { name: '물 가두기', cost: 80, kind: 'debuff', tgt: 'foe', fx: { slow: 6, push: 50 } },
-      electric: { name: '마비 전파', cost: 80, kind: 'debuff', tgt: 'foe', fx: { st: 'shock', ch: 1, push: 22 } },
+      electric: { name: '마비 전파', cost: 80, kind: 'debuff', tgt: 'foe', fx: { st: 'shock', ch: 1, push: 26, slow: 5 } },
       grass: { name: '덩굴 속박', cost: 80, kind: 'debuff', tgt: 'foe', fx: { slow: 9, push: 25 } },
-      psychic: { name: '정신 지배', cost: 90, kind: 'debuff', tgt: 'foe', fx: { stunT: 1.8 } },
+      psychic: { name: '저주 걸기', cost: 80, kind: 'debuff', tgt: 'foe', fx: { st: 'curse', ch: 1, push: 15 } },
       normal: { name: '발묶기', cost: 70, kind: 'debuff', tgt: 'foe', fx: { debuff: ['spd', -2], push: 20 } },
     },
     aoe: {
@@ -109,7 +109,7 @@
       water: { name: '해일', cost: 90, power: 14, tgt: 'foes', fx: { push: 18 } },
       electric: { name: '방전', cost: 90, power: 14, tgt: 'foes', fx: { st: 'shock', ch: 0.2 } },
       grass: { name: '꽃가루 폭풍', cost: 90, power: 12, tgt: 'foes', fx: { st: 'poison', ch: 0.3 } },
-      psychic: { name: '사이코 웨이브', cost: 90, power: 12, tgt: 'foes', fx: { debuff: ['def', -1] } },
+      psychic: { name: '악몽 파동', cost: 90, power: 11, tgt: 'foes', fx: { st: 'curse', ch: 0.3 } },
       normal: { name: '휩쓸기', cost: 80, power: 12, tgt: 'foes', fx: { debuff: ['def', -1] } },
     },
     execute: {
@@ -118,14 +118,14 @@
       electric: { name: '번개 처형', cost: 70, power: 53, tgt: 'foe', fx: { finisher: 0.4, crit: 0.3 } },
       grass: { name: '가시 처형', cost: 70, power: 55, tgt: 'foe', fx: { finisher: 0.4, drain: 0.4 } },
       psychic: { name: '정신 일격', cost: 70, power: 55, tgt: 'foe', fx: { finisher: 0.4, pierce: true } },
-      normal: { name: '마무리 일격', cost: 70, power: 59, tgt: 'foe', fx: { finisher: 0.4 } },
+      normal: { name: '마무리 일격', cost: 70, power: 68, tgt: 'foe', fx: { finisher: 0.4 } },
     },
     boss: {
       fire: { name: '불꽃 추격', cost: 80, power: 92, tgt: 'foe', fx: { pierce: true, st: 'burn', ch: 0.3 } },
       water: { name: '급류 추격', cost: 80, power: 90, tgt: 'foe', fx: { pierce: true, push: 20 } },
       electric: { name: '번개 추격', cost: 80, power: 88, tgt: 'foe', fx: { pierce: true, crit: 0.25 } },
       grass: { name: '가시 추격', cost: 80, power: 90, tgt: 'foe', fx: { pierce: true, drain: 0.3 } },
-      psychic: { name: '염동 추격', cost: 80, power: 90, tgt: 'foe', fx: { pierce: true, debuff: ['def', -1], dch: 0.35 } },
+      psychic: { name: '저주 추격', cost: 80, power: 90, tgt: 'foe', fx: { pierce: true, st: 'curse', ch: 0.45 } },
       normal: { name: '끝장 추격', cost: 80, power: 94, tgt: 'foe', fx: { pierce: true } },
     },
     tank: {
@@ -150,6 +150,50 @@
     return [mk({ name: names[d.no % 3], power: v.pow, fx: { ...tfx } }, 'basic', v.cost), mk(tag ? TAGMOVE[tag] : { name: fb[0], power: MAIN_POW, acc: 92, fx: fb[1] }, 'main', 100), mk(sp, 'special', spc)];
   }
 
+  // ---------- 고유 특성(패시브) 24종: 팀을 어떻게 짜느냐에 따라 전략이 달라지게 ----------
+  const TRAITS = {
+    thorns: ['가시갑옷', '공격받으면 받은 피해의 14%를 되돌려줘요'],
+    vengeance: ['복수심', '아군이 쓰러지면 내 게이지 +28, 공격 +1'],
+    vanguard: ['선봉장', '전열에 있으면 받는 피해 -15%'],
+    opportunist: ['기회주의', '상태이상·저주에 걸린 상대에게 피해 +25%'],
+    hunter: ['사냥꾼', '체력 50% 미만인 상대에게 피해 +35%'],
+    cursemaster: ['저주술사', '공격이 25% 확률로 저주를 걸어요'],
+    rally: ['응원가', '특수기를 쓰면 아군 전체 게이지 +12'],
+    guardian: ['수호막', '시작할 때 최대 체력 22%의 보호막'],
+    regen: ['재생', '체력 60% 미만이면 초당 0.6% 회복'],
+    contagion: ['전염', '건 상태이상이 40% 확률로 다른 상대에게도 번져요'],
+    endure: ['불굴', '쓰러질 공격을 한 번 체력 1로 버텨요'],
+    leech: ['흡혈', '준 피해의 18%를 회복'],
+    haste: ['가속', '행동할 때마다 스피드 +6% (최대 5번)'],
+    firststrike: ['선제', '게이지 65로 시작'],
+    counter: ['반격', '단일 공격을 받으면 20% 확률로 반격'],
+    intimidate: ['위협', '시작할 때 12초 동안 상대 전체 공격 -1'],
+    bodyguard: ['호위', '전열에 있으면 후열 아군이 받는 피해 -10%'],
+    sniper: ['저격수', '전열 엄호를 무시하고 후열을 노려요'],
+    berserk: ['광폭화', '잃은 체력 10%마다 피해 +2.5% (최대 +25%)'],
+    overload: ['과충전', '게이지 100에서 기다리면 피해가 초당 6%씩 증가 (최대 +50%)'],
+    resist: ['저항', '상태이상을 60% 확률로 무시, 화상·독 피해 절반'],
+    mirror: ['거울', '걸린 상태이상·능력 하락을 35% 확률로 되돌려요'],
+    finisher: ['마무리꾼', '쓰러뜨리면 체력 30% 회복, 게이지 +35'],
+    tempo: ['템포', '아군이 상대 게이지를 깎으면 내 게이지 +10'],
+  };
+  const ROLEPOOL = { tank: ['vanguard', 'thorns', 'guardian', 'bodyguard', 'endure', 'counter', 'regen'], support: ['rally', 'regen', 'resist', 'guardian', 'mirror', 'tempo'],
+    dealer: ['opportunist', 'hunter', 'berserk', 'overload', 'leech', 'firststrike', 'haste', 'vengeance'], aoe: ['contagion', 'intimidate', 'rally', 'haste', 'leech'],
+    control: ['cursemaster', 'tempo', 'mirror', 'intimidate', 'contagion', 'firststrike'], execute: ['hunter', 'finisher', 'sniper', 'opportunist'], boss: ['sniper', 'berserk', 'endure', 'hunter', 'finisher'] };
+  const TYPEPREF = { psychic: ['cursemaster', 'mirror', 'tempo'], grass: ['regen', 'leech', 'guardian'], fire: ['berserk', 'vengeance', 'hunter'], water: ['resist', 'guardian', 'rally'], electric: ['haste', 'firststrike', 'overload', 'tempo'], normal: ['counter', 'endure', 'finisher', 'vanguard'] };
+  function traitOf(d) { // 역할(탱커·지원·딜러…)에 맞는 후보 중, 타입이 선호하는 것을 두 배 가중해 도감 번호로 고정 선택
+    const key = d.role === 'support' ? 'support' : d.profile === 'H' ? 'tank' : (ROLEPOOL[d.role] ? d.role : 'dealer'), pool = ROLEPOOL[key];
+    const pref = (TYPEPREF[d.type] || []).filter(x => pool.includes(x)), cand = pref.length ? pool.concat(pref, pref) : pool;
+    return cand[(d.no * 5 + d.type.length * 3) % cand.length];
+  }
+  function synergyOf(ids) { // 팀 구성 시너지
+    const cnt = {}; ids.forEach(id => { const t = GachaTowerDefs[id].type; cnt[t] = (cnt[t] || 0) + 1; });
+    const out = { atk: {}, hp: 1, chips: [] };
+    for (const [t, n] of Object.entries(cnt)) if (n >= 2) { out.atk[t] = n >= 3 ? 1.18 : 1.1; out.chips.push(`${TKR[t]} ${n}마리: ${TKR[t]} 타입 공격 +${n >= 3 ? 18 : 10}%`); }
+    if (Object.keys(cnt).length >= 3) { out.hp = 1.1; out.chips.push('서로 다른 타입 3종: 아군 전체 체력 +10%'); }
+    return out;
+  }
+
   // ---------- 규칙 엔진 (결정적: 같은 시드·같은 입력 틱 → 같은 결과) ----------
   const rngOf = seed => { let a = seed >>> 0; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; };
   const stageMul = s => (s >= 0 ? 1 + 0.25 * s : 1 / (1 + 0.25 * -s));
@@ -158,15 +202,31 @@
   function mkUnit(id, i, R) {
     const d = GachaTowerDefs[id], s = statsOf(d);
     return { id, name: d.name, type: d.type, s, maxHp: s.hp, hp: s.hp, g: 10 + Math.floor(R() * 20), row: i === 0 ? 0 : 1, i, st: null, stT: 0, slowT: 0, tauntT: 0, busy: 0,
-      stg: { atk: 0, def: 0, spd: 0 }, moves: movesOf(d), first: true, stack: 0 };
+      stg: { atk: 0, def: 0, spd: 0 }, moves: movesOf(d), first: true, stack: 0, trait: traitOf(d), sh: 0, over: 0, haste: 0, endured: false };
   }
   function newState(p1, p2, seed) {
     const R = rngOf(seed ^ 0xabc);
-    const side = p => ({ name: p.name || '트레이너', trainer: TRAINERS[p.trainer] ? p.trainer : 'red', items: p.trainer === 'yellow' ? TP.yellowItems : 1, itemCd: 0, units: (p.team || []).map((id, i) => mkUnit(id, i, R)) });
-    return { t: 0, seed, side: { p1: side(p1), p2: side(p2) }, winner: null, why: '' };
+    const side = p => { const syn = synergyOf(p.team || []);
+      const units = (p.team || []).map((id, i) => { const u = mkUnit(id, i, R); u.s = { ...u.s, atk: Math.round(u.s.atk * (syn.atk[u.type] || 1)) }; u.maxHp = u.hp = Math.round(u.s.hp * syn.hp); return u; });
+      return { name: p.name || '트레이너', trainer: TRAINERS[p.trainer] ? p.trainer : 'red', items: p.trainer === 'yellow' ? TP.yellowItems : 1, itemCd: 0, units, syn: syn.chips }; };
+    const st = { t: 0, seed, side: { p1: side(p1), p2: side(p2) }, winner: null, why: '' };
+    for (const s of ['p1', 'p2']) for (const u of st.side[s].units) { // 시작 효과 특성
+      if (u.trait === 'guardian') u.sh = Math.round(u.maxHp * 0.22);
+      if (u.trait === 'firststrike') u.g = Math.max(u.g, 65);
+      if (u.trait === 'intimidate') for (const o of st.side[foeOf(s)].units) { o.stg.atk = Math.max(-3, o.stg.atk - 1); o.intim = (o.intim || 0) + 12 * TPS; }
+    }
+    return st;
+  }
+  const healAmt = (u, n) => Math.round(n * (u.st === 'curse' ? 0.5 : 1)); // 저주 중엔 회복 절반
+  // 쓰러졌을 때 연쇄 효과: 복수심·저주 옮김·마무리꾼
+  function onDeath(st, ev, R, t, side, killer) {
+    const sd = st.side[side];
+    for (const a of alive(sd)) if (a.trait === 'vengeance') { a.g = Math.min(100, a.g + 28); a.stg.atk = Math.min(3, a.stg.atk + 1); ev.push({ k: 'boost', s: side, i: a.i }); ev.push({ k: 'trait', s: side, i: a.i, text: '복수심!' }); }
+    if (t.st === 'curse') { const o = alive(sd).filter(x => x.st !== 'curse'); if (o.length) { const x = o[Math.floor(R() * o.length)]; x.st = 'curse'; x.stT = 8 * TPS; ev.push({ k: 'status', s: side, i: x.i, st: 'curse' }); ev.push({ k: 'trait', s: side, i: x.i, text: '저주가 옮겨붙었다!' }); } }
+    if (killer && killer.hp > 0 && killer.trait === 'finisher') { killer.hp = Math.min(killer.maxHp, killer.hp + healAmt(killer, Math.round(killer.maxHp * 0.3))); killer.g = Math.min(100, killer.g + 35); ev.push({ k: 'trait', s: foeOf(side), i: killer.i, text: '마무리!' }); }
   }
   const alive = sd => sd.units.filter(u => u.hp > 0);
-  const rate = (st, s, u) => u.s.spd * stageMul(u.stg.spd) * GK / TPS * (u.st === 'shock' ? 0.5 : 1) * (u.slowT > 0 ? 0.6 : 1) * (u.st === 'freeze' ? 0 : 1) * (st.side[foeOf(s)].trainer === 'rocket' ? TP.rocketSlow : 1);
+  const rate = (st, s, u) => u.s.spd * stageMul(u.stg.spd) * (1 + 0.06 * u.haste) * GK / TPS * (u.st === 'shock' ? 0.5 : 1) * (u.slowT > 0 ? 0.6 : 1) * (u.st === 'freeze' ? 0 : 1) * (st.side[foeOf(s)].trainer === 'rocket' ? TP.rocketSlow : 1);
   const canUse = (u, m) => u.hp > 0 && u.busy <= 0 && u.st !== 'freeze' && u.g >= m.cost;
   function validTargets(st, s, m) {
     if (m.tgt === 'ally') return st.side[s].units.filter(u => u.hp > 0).map(u => ({ s, i: u.i }));
@@ -180,11 +240,14 @@
       for (const u of sd.units) {
         if (u.hp <= 0) continue;
         if (u.busy > 0) u.busy--; else u.g = Math.min(100, u.g + rate(st, s, u));
+        if (u.trait === 'overload' && u.g >= 100 && !u.busy) u.over = Math.min(0.5, u.over + 0.003);
         if (u.slowT > 0) u.slowT--; if (u.tauntT > 0) u.tauntT--;
+        if (u.intim > 0 && --u.intim === 0) u.stg.atk = Math.min(3, u.stg.atk + 1);
         if (u.st && --u.stT <= 0) { ev.push({ k: 'cure', s, i: u.i, st: u.st }); u.st = null; }
         if (st.t % TPS === 0) {
-          if (u.st === 'burn' || u.st === 'poison') { const d = Math.max(1, Math.round(u.maxHp * (u.st === 'burn' ? 0.02 : 0.03) * (sd.trainer === 'yellow' ? TP.yellowDot : 1))); u.hp = Math.max(0, u.hp - d); ev.push({ k: 'dot', s, i: u.i, amt: d, st: u.st }); if (u.hp <= 0) ev.push({ k: 'faint', s, i: u.i }); }
-          if (u.hp > 0 && sd.trainer === 'green' && u.hp < u.maxHp) u.hp = Math.min(u.maxHp, u.hp + Math.max(1, Math.round(u.maxHp * TP.greenRegen)));
+          if (u.st === 'burn' || u.st === 'poison') { const d = Math.max(1, Math.round(u.maxHp * (u.st === 'burn' ? 0.02 : 0.03) * (sd.trainer === 'yellow' ? TP.yellowDot : 1) * (u.trait === 'resist' ? 0.5 : 1))); u.hp = Math.max(0, u.hp - d); ev.push({ k: 'dot', s, i: u.i, amt: d, st: u.st }); if (u.hp <= 0) { ev.push({ k: 'faint', s, i: u.i }); onDeath(st, ev, rngOf((st.seed + st.t * 31) >>> 0), u, s, null); } }
+          if (u.hp > 0 && sd.trainer === 'green' && u.hp < u.maxHp) u.hp = Math.min(u.maxHp, u.hp + Math.max(1, healAmt(u, Math.round(u.maxHp * TP.greenRegen))));
+          if (u.hp > 0 && u.trait === 'regen' && u.hp < u.maxHp * 0.6) u.hp = Math.min(u.maxHp, u.hp + Math.max(1, healAmt(u, Math.round(u.maxHp * 0.006))));
         }
       }
     }
@@ -214,56 +277,85 @@
     else { let t = st.side[f].units[a.ti]; if (!t || t.hp <= 0) t = alive(st.side[f])[0];
       const taunter = alive(st.side[f]).find(x => x.tauntT > 0); if (taunter && taunter !== t) { t = taunter; ev.push({ k: 'msg', text: `${t.name}의 도발! 공격이 끌려간다` }); }
       tgts = [t]; }
-    me.g -= m.cost; me.busy = BUSY;
+    me.g -= m.cost; me.busy = BUSY; me.over = 0; if (me.trait === 'haste') me.haste = Math.min(5, me.haste + 1);
+    if (me.trait === 'rally' && m.slot === 'special') for (const a of alive(sd)) if (a !== me) { a.g = Math.min(100, a.g + 12); ev.push({ k: 'boost', s, i: a.i }); }
     ev.push({ k: 'act', s, i: me.i, move: m.name, mtype: m.type, kind: m.kind, slot: m.slot, fx: Object.keys(m.fx || {}), fxst: (m.fx || {}).st, foes: m.tgt === 'foes', tgts: tgts.map(t => ({ s: sd.units.includes(t) ? s : f, i: t.i })) });
     const fx = m.fx || {};
     function stage(u, side, k, d) { const b = u.stg[k]; u.stg[k] = Math.max(-3, Math.min(3, b + d)); ev.push({ k: 'stage', s: side, i: u.i, stat: k, d: u.stg[k] - b }); }
+    const ST_DUR = { freeze: 3, shock: 5, burn: 8, poison: 8, curse: 7 };
+    function putStatus(t, side, k, spread = true) { // 상태이상을 거는 공통 함수: 저항·거울·전염 특성 반영
+      if (t.st || t.hp <= 0) return false;
+      if ((k === 'burn' || k === 'freeze') && t.type === 'fire') return false; if (k === 'shock' && t.type === 'electric') return false;
+      if (t.trait === 'resist' && R() < 0.6) { ev.push({ k: 'trait', s: side, i: t.i, text: '저항!' }); return false; }
+      if (t.trait === 'mirror' && R() < 0.35 && !me.st && me.hp > 0 && side !== s) { ev.push({ k: 'trait', s: side, i: t.i, text: '거울!' }); return putStatus(me, s, k, false); }
+      t.st = k; t.stT = (ST_DUR[k] || 6) * TPS; ev.push({ k: 'status', s: side, i: t.i, st: k });
+      if (spread && me.trait === 'contagion' && side !== s && R() < 0.4) { const o = alive(st.side[side]).filter(x => x !== t && !x.st); if (o.length) { putStatus(o[Math.floor(R() * o.length)], side, k, false); ev.push({ k: 'trait', s, i: me.i, text: '전염!' }); } }
+      return true;
+    }
     function hitFx(t, side) {
-      if (fx.st && !t.st && R() < fx.ch * (sd.trainer === 'rocket' ? TP.rocketFx : 1) && !((fx.st === 'burn' || fx.st === 'freeze') && t.type === 'fire') && !(fx.st === 'shock' && t.type === 'electric')) {
-        t.st = fx.st; t.stT = (fx.st === 'freeze' ? 3 : fx.st === 'shock' ? 5 : 8) * TPS; ev.push({ k: 'status', s: side, i: t.i, st: fx.st }); }
+      if (fx.st && R() < fx.ch * (sd.trainer === 'rocket' ? TP.rocketFx : 1)) putStatus(t, side, fx.st);
+      if (me.trait === 'cursemaster' && side !== s && !t.st && t.hp > 0 && R() < 0.25) putStatus(t, side, 'curse');
       if (fx.slow) { t.slowT = fx.slow * TPS; ev.push({ k: 'slow', s: side, i: t.i }); }
-      if (fx.push) { const cut = fx.cut && t.g >= 85; t.g = Math.max(0, t.g - (cut ? 45 : fx.push)); ev.push({ k: 'push', s: side, i: t.i, cut }); }
-      if (fx.debuff && (fx.dch == null || R() < fx.dch)) stage(t, side, fx.debuff[0], fx.debuff[1]);
+      if (fx.push) { const cut = fx.cut && t.g >= 85; t.g = Math.max(0, t.g - (cut ? 45 : fx.push)); ev.push({ k: 'push', s: side, i: t.i, cut }); for (const al of alive(sd)) if (al.trait === 'tempo') { al.g = Math.min(100, al.g + 10); ev.push({ k: 'boost', s, i: al.i }); } }
+      if (fx.debuff && (fx.dch == null || R() < fx.dch)) { if (t.trait === 'mirror' && R() < 0.35 && me.hp > 0) { ev.push({ k: 'trait', s: side, i: t.i, text: '거울!' }); stage(me, s, fx.debuff[0], fx.debuff[1]); } else stage(t, side, fx.debuff[0], fx.debuff[1]); }
       if (fx.stunT) { t.g = 0; t.busy = Math.max(t.busy, Math.round(fx.stunT * TPS)); ev.push({ k: 'stun', s: side, i: t.i }); }
     }
-    if (m.kind === 'heal') { for (const t of tgts) { const amt = Math.round(t.maxHp * (fx.heal || fx.healAll || 0)); t.hp = Math.min(t.maxHp, t.hp + amt); if (fx.cleanse || fx.heal) { if (t.st === 'burn' || t.st === 'poison') t.st = null; } ev.push({ k: 'heal', s, i: t.i, hp: t.hp }); } }
+    if (m.kind === 'heal') { for (const t of tgts) { const amt = healAmt(t, Math.round(t.maxHp * (fx.heal || fx.healAll || 0))); t.hp = Math.min(t.maxHp, t.hp + amt); if (fx.cleanse) { if (t.st === 'burn' || t.st === 'poison' || t.st === 'curse') t.st = null; } else if (fx.heal && (t.st === 'burn' || t.st === 'poison')) t.st = null; ev.push({ k: 'heal', s, i: t.i, hp: t.hp }); } }
     else if (m.kind === 'buff') {
       for (const t of tgts) {
         if (fx.taunt) { t.tauntT = fx.taunt * TPS; ev.push({ k: 'taunt', s, i: t.i }); }
         if (fx.stage) stage(t, s, fx.stage[0], fx.stage[1]); if (fx.stage2) stage(t, s, fx.stage2[0], fx.stage2[1]);
-        if (fx.selfHeal) { t.hp = Math.min(t.maxHp, t.hp + Math.round(t.maxHp * fx.selfHeal)); ev.push({ k: 'heal', s, i: t.i, hp: t.hp, small: true }); }
+        if (fx.selfHeal) { t.hp = Math.min(t.maxHp, t.hp + healAmt(t, Math.round(t.maxHp * fx.selfHeal))); ev.push({ k: 'heal', s, i: t.i, hp: t.hp, small: true }); }
+        if (fx.shield) { t.sh = Math.min(Math.round(t.maxHp * 0.5), t.sh + Math.round(t.maxHp * fx.shield)); ev.push({ k: 'shield', s, i: t.i }); }
         if (fx.gaugeSelf || fx.gaugeAlly) { t.g = Math.min(100, t.g + (fx.gaugeSelf || fx.gaugeAlly)); ev.push({ k: 'boost', s, i: t.i }); }
       }
     }
     else if (m.kind === 'debuff') { for (const t of tgts) hitFx(t, f); }
     else {
-      const tr = sd.trainer;
-      for (const t of tgts) {
-        if (t.hp <= 0) continue;
-        if (m.acc < 100 && R() * 100 >= m.acc) { ev.push({ k: 'miss', s: f, i: t.i }); continue; }
-        const hits = fx.hits ? fx.hits[0] + Math.floor(R() * (fx.hits[1] - fx.hits[0] + 1)) : 1;
-        for (let h = 0; h < hits && t.hp > 0; h++) {
+      const tr = sd.trainer, F = st.side[f];
+      for (const t0 of tgts) {
+        if (t0.hp <= 0) continue;
+        if (m.acc < 100 && R() * 100 >= m.acc) { ev.push({ k: 'miss', s: f, i: t0.i }); continue; }
+        const hits = fx.hits ? fx.hits[0] + Math.floor(R() * (fx.hits[1] - fx.hits[0] + 1)) : 1, hitSet = new Set();
+        for (let h = 0; h < hits && me.hp > 0; h++) {
+          let t = t0; if (fx.spread && h > 0) { const al = alive(F); t = al[Math.floor(R() * al.length)]; }
+          if (!t || t.hp <= 0) { if (h === 0) break; continue; }
           let p = m.power + (fx.stack ? me.stack * fx.stack : 0);
           if (fx.finisher && t.hp / t.maxHp < fx.finisher) p *= 2;
           if (fx.vsFast && t.s.spd > me.s.spd) p *= fx.vsFast;
           const atk = me.s.atk * stageMul(me.stg.atk) * (me.st === 'burn' ? 0.8 : 1), def = t.s.def * (fx.pierce ? 0.75 : stageMul(t.stg.def));
-          const e = eff(m.type, t.type), stab = m.type === me.type ? 1.2 : 1;
-          const cover = t.row === 1 && m.tgt === 'foe' && st.side[f].units[0].hp > 0 ? 0.7 : 1;  // 전열 엄호
-          const spdComp = Math.pow(60 / me.s.spd, SPD_EXP);                                    // 빠르면 한 방이 약함
+          const e = eff(m.type, t.type), stab = m.type === me.type ? 1.2 : 1, snipe = fx.snipe || me.trait === 'sniper';
+          const cover = t.row === 1 && m.tgt === 'foe' && F.units[0].hp > 0 && !snipe ? 0.7 : 1;  // 전열 엄호
+          const spdComp = Math.pow(60 / me.s.spd, SPD_EXP);                                      // 빠르면 한 방이 약함
           const crit = R() < (fx.crit || 0.0625) + (tr === 'red' ? TP.redCrit : 0);
-          let dmg = p * (atk / def) * DMG_K * stab * e * cover * spdComp * (crit ? 1.5 : 1) * (tr === 'blue' && me.first ? TP.blueFirst : 1) * (0.9 + R() * 0.1);
-          dmg = Math.max(1, Math.round(dmg)); t.hp = Math.max(0, t.hp - dmg);
+          let tm = 1; // 특성·저주 보정
+          if (me.trait === 'opportunist' && t.st) tm *= 1.25;
+          if (me.trait === 'hunter' && t.hp / t.maxHp < 0.5) tm *= 1.35;
+          if (me.trait === 'berserk') tm *= 1 + Math.min(0.25, (1 - me.hp / me.maxHp) * 0.25);
+          if (me.over) tm *= 1 + me.over;
+          if (t.trait === 'vanguard' && t.row === 0) tm *= 0.85;
+          if (t.row === 1 && F.units[0].hp > 0 && F.units[0].trait === 'bodyguard') tm *= 0.9;
+          if (t.st === 'curse') tm *= 1.2;
+          let dmg = p * (atk / def) * DMG_K * stab * e * cover * spdComp * tm * (crit ? 1.5 : 1) * (tr === 'blue' && me.first ? TP.blueFirst : 1) * (0.9 + R() * 0.1);
+          dmg = Math.max(1, Math.round(dmg)); let real = dmg;
+          if (t.sh > 0) { const ab = Math.min(t.sh, real); t.sh -= ab; real -= ab; }
+          t.hp = Math.max(0, t.hp - real);
+          if (t.hp <= 0 && t.trait === 'endure' && !t.endured) { t.hp = 1; t.endured = true; ev.push({ k: 'trait', s: f, i: t.i, text: '불굴!' }); }
           ev.push({ k: 'dmg', s: f, i: t.i, amt: dmg, eff: e, crit, cover: cover < 1, hp: t.hp });
-          if (fx.drain && me.hp > 0 && me.hp < me.maxHp) { const hl = Math.max(1, Math.round(dmg * fx.drain)); me.hp = Math.min(me.maxHp, me.hp + hl); ev.push({ k: 'heal', s, i: me.i, hp: me.hp, small: true }); }
-          if (t.hp <= 0) ev.push({ k: 'faint', s: f, i: t.i });
+          hitSet.add(t);
+          const dr = (fx.drain || 0) + (me.trait === 'leech' ? 0.18 : 0);
+          if (dr && me.hp > 0 && me.hp < me.maxHp) { const hl = Math.max(1, healAmt(me, Math.round(dmg * dr))); me.hp = Math.min(me.maxHp, me.hp + hl); ev.push({ k: 'heal', s, i: me.i, hp: me.hp, small: true }); }
+          if (t.trait === 'thorns' && me.hp > 0 && real > 0) { const rf = Math.max(1, Math.round(real * 0.14)); me.hp = Math.max(0, me.hp - rf); ev.push({ k: 'dot', s, i: me.i, amt: rf, st: 'thorn' }); if (me.hp <= 0) { ev.push({ k: 'faint', s, i: me.i }); onDeath(st, ev, R, me, s, t); } }
+          if (t.trait === 'counter' && t.hp > 0 && me.hp > 0 && m.tgt === 'foe' && R() < 0.2) { const cd = Math.max(1, Math.round(DMG_K * 55 * (t.s.atk * stageMul(t.stg.atk)) / (me.s.def * stageMul(me.stg.def)))); me.hp = Math.max(0, me.hp - cd); ev.push({ k: 'trait', s: f, i: t.i, text: '반격!' }); ev.push({ k: 'dot', s, i: me.i, amt: cd, st: 'counter' }); if (me.hp <= 0) { ev.push({ k: 'faint', s, i: me.i }); onDeath(st, ev, R, me, s, t); } }
+          if (t.hp <= 0) { ev.push({ k: 'faint', s: f, i: t.i }); onDeath(st, ev, R, t, f, me); }
         }
         if (hits > 1) ev.push({ k: 'msg', text: `${hits}번 맞혔다!` });
-        if (t.hp > 0) hitFx(t, f);
+        for (const t of hitSet) if (t.hp > 0) hitFx(t, f);
       }
       if (fx.stack) me.stack = Math.min(3, me.stack + 1);
       if (fx.selfStage && me.hp > 0) stage(me, s, fx.selfStage[0], fx.selfStage[1]);
       if (fx.selfGauge && me.hp > 0) { me.g = Math.min(100, me.g + fx.selfGauge); ev.push({ k: 'boost', s, i: me.i }); }
-      if (fx.recoil) { const r = Math.round(me.maxHp * fx.recoil); me.hp = Math.max(0, me.hp - r); ev.push({ k: 'dot', s, i: me.i, amt: r, st: 'recoil' }); if (me.hp <= 0) ev.push({ k: 'faint', s, i: me.i }); }
+      if (fx.recoil) { const r = Math.round(me.maxHp * fx.recoil); me.hp = Math.max(0, me.hp - r); ev.push({ k: 'dot', s, i: me.i, amt: r, st: 'recoil' }); if (me.hp <= 0) { ev.push({ k: 'faint', s, i: me.i }); onDeath(st, ev, R, me, s, null); } }
       me.first = false;
     }
     checkEnd(st); return true;
@@ -338,6 +430,7 @@
     if (f.st) o.push(`${Math.round(f.ch * 100)}% ${ST_KR[f.st]}`); if (f.slow) o.push(`${f.slow}초 둔화`); if (f.push) o.push(f.cut ? '게이지 밀기·끊기' : `게이지 -${f.push}`);
     if (f.stunT) o.push(`${f.stunT}초 기절·게이지 0`); if (f.crit) o.push(`급소 ${Math.round(f.crit * 100)}%`); if (f.pierce) o.push('방어 무시'); if (f.drain) o.push(`피해의 ${Math.round(f.drain * 100)}% 회복`);
     if (f.recoil) o.push(`반동 ${Math.round(f.recoil * 100)}%`); if (f.stack) o.push('쓸수록 강해짐'); if (f.heal) o.push(`체력 ${Math.round(f.heal * 100)}% 회복${f.cleanse ? '·상태이상 해제' : ''}`); if (f.healAll) o.push(`체력 ${Math.round(f.healAll * 100)}% 회복`);
+    if (f.spread) o.push('맞는 상대가 무작위로 퍼짐'); if (f.snipe) o.push('전열 엄호 무시'); if (f.shield) o.push(`보호막 ${Math.round(f.shield * 100)}%`);
     if (f.selfStage) o.push(`내 ${STAT_KR[f.selfStage[0]]} +${f.selfStage[1]}`); if (f.selfGauge) o.push(`내 게이지 +${f.selfGauge}`);
     if (f.selfHeal) o.push(`체력 ${Math.round(f.selfHeal * 100)}% 회복`); if (f.gaugeSelf) o.push(`내 게이지 +${f.gaugeSelf}`); if (f.gaugeAlly) o.push(`아군 게이지 +${f.gaugeAlly}`); if (f.taunt) o.push(`${f.taunt}초 도발`);
     if (f.stage) o.push(`${m.tgt === 'ally' ? '아군 ' : ''}${STAT_KR[f.stage[0]]} ${f.stage[1] > 0 ? '+' : ''}${f.stage[1]}`); if (f.stage2) o.push(`${STAT_KR[f.stage2[0]]} +${f.stage2[1]}`);
@@ -408,7 +501,9 @@
           <p class="pb-trdesc" style="--tc:${T.color}"><b>${T.name} · ${T.style}</b> ${T.desc}${trainer === 'yellow' ? '' : '. 회복약 1개'}</p>
           <section class="pb-detail" style="--tc:var(--t-${d.type})">${img(d.id, 'pb-dimg')}<div class="pb-dinfo"><div class="pb-dname"><b>${esc(d.name)}</b>${typeChip(d.type)}<span class="pb-shape">${shapeOf(d)} · ${STAGE_KR[lineInfo(d).st]} · 게이지 ${cycleSec(s)}초</span></div>
             <div class="pb-stats">${['hp', 'atk', 'def', 'spd'].map(k => `<div><span>${STAT_LBL[k]}</span><i><b style="width:${Math.min(100, s[k] / max[k] * 100)}%"></b></i><em>${s[k]}</em></div>`).join('')}</div>
-            <div class="pb-mvs">${mv.map(m => `<span style="--tc:var(--t-${m.type})" title="${esc(moveDesc(m))}"><small>${SLOT_KR[m.slot]} ${m.cost}</small>${esc(m.name)}</span>`).join('')}</div></div></section>
+            <div class="pb-mvs">${mv.map(m => `<span style="--tc:var(--t-${m.type})" title="${esc(moveDesc(m))}"><small>${SLOT_KR[m.slot]} ${m.cost}</small>${esc(m.name)}</span>`).join('')}</div>
+            <div class="pb-trait"><b>특성 · ${TRAITS[traitOf(d)][0]}</b> ${TRAITS[traitOf(d)][1]}</div></div></section>
+          ${team.length >= 2 && synergyOf(team).chips.length ? `<div class="pb-syn">${synergyOf(team).chips.map(c => `<i>${c}</i>`).join('')}</div>` : ''}
           <nav class="pb-filter" aria-label="타입 거르기">${['all', 'fire', 'water', 'electric', 'grass', 'psychic', 'normal'].map(t => `<button data-f="${t}" class="${filter === t ? 'on' : ''}" ${t !== 'all' ? `style="--tc:var(--t-${t})"` : ''}>${t === 'all' ? '전체' : tIcon(t, 15) + TKR[t]}</button>`).join('')}</nav>
           <div class="pb-grid">${all.filter(x => filter === 'all' || x.type === filter).map(x => { const inT = team.includes(x.id), full = !inT && team.length >= 3;
             return `<button class="pb-face ${inT ? 'in' : ''} ${focus === x.id ? 'focus' : ''} ${full ? 'full' : ''}" data-id="${x.id}" style="--tc:var(--t-${x.type})" aria-label="${esc(x.name)}">${img(x.id)}<span>${esc(x.name)}</span>${inT ? `<i>${team.indexOf(x.id) + 1}</i>` : ''}</button>`; }).join('')}</div>
@@ -456,7 +551,7 @@
       const r = this._root(), foe = foeOf(this.me), F = this.st.side[foe], M = this.st.side[this.me];
       r.innerHTML = `<div class="pb-battle">
         <div class="pb-arena"></div>
-        <div class="pb-hudtop"><span class="pb-tr">${emblem(F.trainer, 26)}<b>${esc(F.name)}</b></span><span class="pb-clock" aria-label="남은 시간">4:00</span><button class="pb-ff" data-a="ff">기권</button></div>
+        <div class="pb-hudtop"><span class="pb-tr">${emblem(F.trainer, 26)}<b>${esc(F.name)}</b></span><span class="pb-clock" aria-label="남은 시간">5:00</span><button class="pb-ff" data-a="ff">기권</button></div>
         <div class="pb-fcards">${F.units.map(u => `<div class="pb-fc" data-i="${u.i}" style="--tc:var(--t-${u.type});order:${[2, 1, 3][u.i]}"><div class="pb-fcn"><b>${esc(u.name)}</b>${tIcon(u.type, 14)}<small>${u.i === 0 ? '전열' : '후열'}</small></div><em class="pb-stc"></em><i class="pb-hpb"><b></b></i><i class="pb-gb"><b></b></i></div>`).join('')}</div>
         <div class="pb-ticker" aria-live="polite"></div>
         <div class="pb-tray" hidden></div>
@@ -564,7 +659,7 @@
       } else {
         const u = sd.units[i];
         const tn = this._taunter();
-        tray.innerHTML = `<div class="pb-trayh">${tn ? `<b class="pb-tauntnote">상대 ${esc(tn.name)}가 도발 중</b> 단일 공격은 ${esc(tn.name)}에게만 갈 수 있어요 (${Math.ceil(tn.tauntT / TPS)}초)` : `<b>${esc(u.name)}</b> 기술 아이콘을 상대에게 끌어다 놓으세요`}</div><div class="pb-moves">${u.moves.map((m, k) => { const ok = canUse(u, m);
+        tray.innerHTML = `<div class="pb-trayh">${tn ? `<b class="pb-tauntnote">상대 ${esc(tn.name)}가 도발 중</b> 단일 공격은 ${esc(tn.name)}에게만 갈 수 있어요 (${Math.ceil(tn.tauntT / TPS)}초)` : `<b>${esc(u.name)}</b> 기술 아이콘을 상대에게 끌어다 놓으세요`}<small class="pb-traitnote">특성 · ${TRAITS[u.trait][0]}: ${TRAITS[u.trait][1]}</small></div><div class="pb-moves">${u.moves.map((m, k) => { const ok = canUse(u, m);
           return `<button class="pb-mv ${ok ? '' : 'off'}" data-m="${k}" style="--tc:var(--t-${m.type})"><span class="pb-mvi">${tIcon(m.type, 28)}<i>${m.cost}</i></span><b>${esc(m.name)}</b><small>${SLOT_KR[m.slot]}</small><em>${esc(moveDesc(m))}</em></button>`; }).join('')}</div>`;
       }
       tray.hidden = false; this._drawHud();
@@ -614,7 +709,7 @@
       const put = (el, u) => {
         if (!el) return; el.classList.toggle('dead', u.hp <= 0);
         const hp = el.querySelector('.pb-hpb b'), g = el.querySelector('.pb-gb b'), pct = u.hp / u.maxHp;
-        hp.style.width = pct * 100 + '%'; hp.className = pct < 0.25 ? 'red' : pct < 0.5 ? 'yel' : '';
+        hp.style.width = pct * 100 + '%'; hp.className = pct < 0.25 ? 'red' : pct < 0.5 ? 'yel' : ''; el.style.setProperty('--sh', Math.min(1, (u.sh || 0) / u.maxHp));
         g.style.width = u.g + '%'; el.classList.toggle('half', u.hp > 0 && u.g >= Math.min(...u.moves.map(m => m.cost)) && u.g < 100 && !u.busy && u.st !== 'freeze'); el.classList.toggle('full', u.hp > 0 && u.g >= 100 && !u.busy && u.st !== 'freeze');
         const sc = el.querySelector('.pb-stc'), tags = [u.st ? ST_KR[u.st] : '', u.tauntT > 0 ? '도발' : '', u.slowT > 0 ? '둔화' : ''].filter(Boolean); sc.textContent = tags.join(' '); sc.className = 'pb-stc ' + (u.st || '');
         const n = el.querySelector('.pb-mchp'); if (n) n.textContent = u.hp > 0 ? `${u.hp}/${u.maxHp}` : '기절';
@@ -638,7 +733,7 @@
           if (e.crit) this._tick('급소에 맞았다!'); else if (e.eff > 1) this._tick('상성이 좋다! ×1.4'); else if (e.eff < 1) this._tick('상성이 나쁘다… ×0.7'); else if (e.cover) this._tick('전열이 엄호해서 피해가 줄었다 ×0.7'); }
         else if (e.k === 'faint') { setTimeout(() => A && u && A.faint(u), 450); this._tick(`${who}${nm()}은(는) 쓰러졌다!`); sfx('life_lost'); if (this.sel && e.s === this.me && this.sel.i === e.i) this._closeTray(); }
         else if (e.k === 'miss') this._tick('빗나갔다!');
-        else if (e.k === 'status') { u && A.setTint(u, e.st === 'freeze' ? 0x9fd8ff : e.st === 'burn' ? 0xffb199 : e.st === 'poison' ? 0xd7a6ff : 0xfff08a); this._tick(`${who}${nm()}은(는) ${ST_KR[e.st]} 상태!`); }
+        else if (e.k === 'status') { u && A.setTint(u, e.st === 'freeze' ? 0x9fd8ff : e.st === 'burn' ? 0xffb199 : e.st === 'poison' ? 0xd7a6ff : e.st === 'curse' ? 0xb98cff : 0xfff08a); this._tick(`${who}${nm()}은(는) ${ST_KR[e.st]} 상태!`); }
         else if (e.k === 'cure') { u && A.setTint(u, null); }
         else if (e.k === 'heal' || e.k === 'item') { this._pop(e.s, e.i, '회복', 'heal'); if (e.k === 'item') { u && A && A.cast(u, [u], { type: 'grass', kind: 'heal', fx: [] }); u && A.setTint(u, null); this._tick(`${who}회복약! ${nm()} 회복`); } sfx('buy'); }
         else if (e.k === 'dot' && e.st !== 'recoil') this._pop(e.s, e.i, `-${e.amt}`, 'dot');
@@ -646,6 +741,8 @@
         else if (e.k === 'taunt') { this._tick(`${who}${nm()}의 도발! 4초 동안 단일 공격이 ${nm()}에게 끌려요`); }
         else if (e.k === 'stage' && e.d) this._pop(e.s, e.i, `${STAT_KR[e.stat]}${e.d > 0 ? '↑' : '↓'}`, e.d > 0 ? 'up' : 'down');
         else if (e.k === 'slow') this._pop(e.s, e.i, '둔화', 'down');
+        else if (e.k === 'trait') { this._pop(e.s, e.i, e.text, 'trait'); this._tick(`${who}${nm()}: ${e.text}`); }
+        else if (e.k === 'shield') { this._pop(e.s, e.i, '보호막', 'up'); u && A && A.cast(u, [u], { type: 'psychic', kind: 'buff', fx: [] }); }
         else if (e.k === 'boost') { this._pop(e.s, e.i, '게이지↑', 'up'); u && A && A.cast(u, [u], { type: 'electric', kind: 'buff', fx: [] }); }
         else if (e.k === 'stun') { this._pop(e.s, e.i, '기절!', 'down'); u && A && A.setTint(u, 0xfff08a); setTimeout(() => A && u && A.setTint(u, null), 1500); }
         else if (e.k === 'msg') this._tick(e.text);
@@ -677,5 +774,5 @@
     while (!st.winner) { const R = rngOf((seed + st.t * 7919) >>> 0); for (const a of cpuThink(st, 'p1', lv1, R, mem)) apply(st, a, ev); for (const a of cpuThink(st, 'p2', lv2, R, mem)) apply(st, a, ev); tick(st, ev); ev.length = 0; }
     return st;
   }
-  PB._engine = { TP, TRAINERS, STAGE, lineInfo, TPS, statsOf, movesOf, newState, apply, tick, cpuThink, cpuTeam, rngOf, roster, simulate, cycleSec };
+  PB._engine = { TP, TRAINERS, STAGE, lineInfo, traitOf, TRAITS, synergyOf, TPS, statsOf, movesOf, newState, apply, tick, cpuThink, cpuTeam, rngOf, roster, simulate, cycleSec };
 })();
