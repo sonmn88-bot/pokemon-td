@@ -9,7 +9,7 @@
 ## 파일 구조
 - `index.html`, `style.css`, `main.js`(진입), `engine.js`(게임 루프·렌더·입력)
 - 데이터: `towers.js` `heroes.js` `enemies.js` `cards.js` `maps.js` `mega.js` `pokedex.js`
-- 시스템: `audio.js`(효과음·배경음) `daily.js`(오늘의 도전·판 종료 리포트) `battle.js`(포켓몬 배틀 3:3 턴제 — 능력치·기술 자동 생성, 결정적 replay로 온라인 동기화, 밸런스 확인은 `PokeBattle._engine`) `gacha.js`(뽑기·합성, `GachaRng` 시드) `shop.js` `leaderboard.js` `storage.js` `sprites.js` `icons.js` `ui-builders.js`
+- 시스템: `audio.js`(효과음·배경음) `daily.js`(오늘의 도전·판 종료 리포트) `battle.js`(포켓몬 배틀 3:3 실시간 ATB — 능력치 총합 동일, 기술 드래그 타깃, 온라인은 방장 틱 기록+손님 롤백, 밸런스 확인은 `PokeBattle._engine.simulate`) `arena3d.js`(배틀 3D 실내 스타디움, 필요할 때만 import) `gacha.js`(뽑기·합성, `GachaRng` 시드) `shop.js` `leaderboard.js` `storage.js` `sprites.js` `icons.js` `ui-builders.js`
 - `sw.js` 서비스워커 캐시, `assets/` 이미지, `tools/` 아이콘 생성 도구
 
 ## 검증 (커밋 전)

@@ -7,8 +7,8 @@ import * as THREE from 'three';
 const TEAM = { me: 0x3b82f6, foe: 0xef4444 };
 // 진형 좌표: [전열, 후열 왼쪽, 후열 오른쪽]. 내 팀은 카메라 쪽(z+), 상대는 안쪽(z-)
 const POS = {
-  me:  [[0, 0, 3.6], [-4.6, 0, 7.4], [4.6, 0, 7.4]],
-  foe: [[0, 0, -3.6], [-4.6, 0, -7.4], [4.6, 0, -7.4]],
+  me:  [[0, 0, 3.2], [-3.9, 0, 6.6], [3.9, 0, 6.6]],
+  foe: [[0, 0, -3.2], [-3.9, 0, -6.6], [3.9, 0, -6.6]],
 };
 
 function floorTexture() {
@@ -148,7 +148,10 @@ export function createArena(host, opts = {}) {
   // 카메라: 내 팀 뒤 위에서 상대 쪽을 내려다봄. 세로 화면이면 더 멀리
   function resize() {
     const w = host.clientWidth || 1, h = host.clientHeight || 1; R.setSize(w, h, false); cam.aspect = w / h;
-    const portrait = w / h < 1; cam.fov = portrait ? 58 : 44; cam.position.set(0, portrait ? 13.5 : 10, portrait ? 21 : 17.5); cam.lookAt(0, 0.6, portrait ? -1.4 : -1); cam.updateProjectionMatrix();
+    // 세로 화면: 위에서 더 내려다보게(빈 하늘을 줄이고 양옆 후열이 잘리지 않게), 가로 너비 기준으로 거리 맞춤
+    const portrait = w / h < 1, a = w / h; cam.fov = portrait ? 50 : 42;
+    const dist = portrait ? Math.max(18, 12.5 / a) : 17;
+    cam.position.set(0, dist * 0.82, dist * 0.78); cam.lookAt(0, 0, portrait ? 0.9 : 0); cam.updateProjectionMatrix();
   }
   const ro = new ResizeObserver(resize); ro.observe(host); resize();
 

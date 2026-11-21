@@ -1800,7 +1800,7 @@ html, body { overscroll-behavior: none; }
 .pb-stats i { height:6px; border-radius:3px; background:rgba(255,255,255,.08); overflow:hidden; } .pb-stats i b { display:block; height:100%; background:color-mix(in srgb, var(--tc) 75%, white); border-radius:3px; }
 .pb-stats em { font-style:normal; text-align:right; color:var(--text-hi); font-weight:700; font-variant-numeric:tabular-nums; }
 .pb-mvs { display:flex; flex-wrap:wrap; gap:4px; } .pb-mvs span { padding:3px 8px; border-radius:8px; background:color-mix(in srgb, var(--tc) 18%, #1a2030); border:1px solid color-mix(in srgb, var(--tc) 40%, transparent); font-size:11.5px; }
-.pb-mvs small { margin-left:5px; color:var(--text-mid); font-variant-numeric:tabular-nums; }
+.pb-mvs small { margin-right:6px; color:var(--text-mid); font-variant-numeric:tabular-nums; }
 .pb-filter { display:flex; gap:6px; padding:10px 16px 6px; overflow-x:auto; scrollbar-width:none; } .pb-filter::-webkit-scrollbar { display:none; }
 .pb-filter button { flex-shrink:0; display:inline-flex; align-items:center; gap:4px; height:40px; padding:0 12px 0 8px; border-radius:17px; border:1px solid rgba(255,255,255,.1); background:#141a28; font-size:12.5px; font-weight:700; }
 .pb-filter button:first-child { padding:0 14px; }
