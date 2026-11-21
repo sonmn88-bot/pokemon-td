@@ -169,13 +169,13 @@ const HeroDefs = {
       { id:'togetic', name:'토게틱', color:'#f8bbd0', dmgMul:1.15, rangeMul:1.35, fireRateMul:1.10 },
     ]},
     attack:{
-      baseRange:112, baseDamage:8, baseFireRate:1.0, // v4: 6→8 (시뮬 3판 모두 111웨이브로 최하위, 영웅 성장 곡선 완화분 보전) // v3.4: 토게피는 경제·행운 지원형 → 공격력은 피카츄의 약 60% (대전에선 versus.js가 9로)
+      baseRange:112, baseDamage:8, baseFireRate:1.0, // v4: 6→8 (시뮬 3판 모두 111웨이브로 최하위, 영웅 성장 곡선 완화분 보전) // v3.4: 토게피는 경제·행운 지원형 → 공격력은 피카츄의 약 60% (v4: 대전도 동일)
       rangePerLevel:4, damagePerLevel:1.5, // v27-46: damagePerLevel 2→4 (요청5: 성장이 너무 약했음)
       projColor:'#fff59d', projEmoji:'✨', dmgType:'special',
     },
     passiveApply(engine, hero) {
       // v28 (설계서 §6): 직접 화력은 최하, 대신 경제·합성 운 담당
-      engine._togepiGoldMul = 1.10 + (engine._vsGoldMul ? 0.10 : 0) + hero._skillVal('goldBonus', 0); // 대전에선 +20%
+      engine._togepiGoldMul = 1.10 + hero._skillVal('goldBonus', 0); // v4: 대전 전용 +10%p 제거 (혼자 하기와 동일)
       engine._interestCapBonus = 5 + hero._skillVal('interestCap', 0);
       engine._waveBonusMul = 1 + hero._skillVal('waveBonus', 0);
       engine._mergeJumpChance = (hero.evolved === 'togetic' ? 0.10 : 0) + hero._skillVal('jump', 0);
