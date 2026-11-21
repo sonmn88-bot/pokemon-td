@@ -67,6 +67,7 @@
   const starterImg = id => (window.GachaTowerDefs && GachaTowerDefs[id] && window.PKM) ? PKM(GachaTowerDefs[id], 26) : '';
 
   const VS = window.Versus = {
+    makeNet: () => makeNet(), COL, LOST_MS, // v4.4: 포켓몬 배틀(battle.js)이 같은 방 서버를 씀
     net: null, code: null, me: null, opp: null, room: null, unsub: null, active: false,
     kills: 0, sentAuto: 0, recv: { small: 0, elite: 0, boss: 0 }, pending: [], timer: null, spawnTimer: null, ended: false,
 
@@ -82,11 +83,13 @@
         <button class="vs-btn primary" data-a="create">방 만들기</button>
         <div class="vs-join"><input class="vs-code" inputmode="numeric" maxlength="4" placeholder="방 코드 4자리"><button class="vs-btn" data-a="join">참가</button></div>
         <div class="vs-msg"></div>
+        <button class="vs-btn pb-entry" data-a="battle">포켓몬 배틀 · 3:3 턴제</button>
         <button class="vs-btn ghost" data-a="close">닫기</button></div>`;
       document.body.appendChild(ov);
       const msg = t => { ov.querySelector('.vs-msg').textContent = t; };
       const myName = () => { const n = ov.querySelector('.vs-name').value.trim() || '트레이너'; try { localStorage.setItem('pokemontd_vsname', n); } catch (_) {} return n; };
       ov.querySelector('[data-a="close"]').onclick = () => ov.remove();
+      ov.querySelector('[data-a="battle"]').onclick = () => { myName(); ov.remove(); window.PokeBattle && PokeBattle.openMenu(); };
       ov.querySelector('[data-a="create"]').onclick = async () => {
         const code = String(1000 + Math.floor(Math.random() * 9000));
         try {

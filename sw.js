@@ -25,6 +25,7 @@ const ASSETS = [
   '/pokemon-td/versus.js',
   '/pokemon-td/audio.js',
   '/pokemon-td/daily.js',
+  '/pokemon-td/battle.js',
   '/pokemon-td/assets/fonts/maple-bold.woff2',
   '/pokemon-td/assets/fonts/maple-light.woff2',
   '/pokemon-td/lib/three/three.module.min.js',
