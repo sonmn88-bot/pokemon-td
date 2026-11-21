@@ -1,271 +1,254 @@
-// ===== BATTLE.JS - v4.4 포켓몬 배틀 (2인 대전 안의 3:3 턴제 모드) =====
-// 이 게임만의 규칙: 모든 포켓몬은 능력치 '총합이 같고'(등급 차이 없음) 모양만 다름(탱커·속공·공격형), 기술은 도감 태그·역할에서 자동 생성.
-// 승패는 상성(6속성 순환 1.4/0.7)·기술 특성·교체 판단으로 갈림. 아무 3마리나 고름. 매 턴 기술/교체/회복약 → 교체·약 먼저, 그다음 선제도·스피드 순.
-// 트레이너 5명(레드·블루·그린·옐로우·로켓단)은 각자 패시브 1개 + 회복약 1개. 연습 모드: CPU 쉬움·보통·어려움.
-// 온라인: 두 사람의 선택을 방 문서(acts)에 쌓고, 양쪽이 같은 시드로 같은 계산(replay)을 해서 결과가 항상 똑같음 (동기화 어긋남 없음)
+// ===== BATTLE.JS - v5 포켓몬 배틀: 3:3 동시 출전 실시간 ATB 난전 (2인 대전 안의 모드) =====
+// 규칙: 151마리 능력치 총합 동일(모양만 다름). 6마리가 동시에 필드에, 각자 스피드만큼 행동 게이지가 참.
+//   기본기(게이지 50) · 주력기(100) · 특수기(70). 기술 아이콘을 상대(또는 아군)에게 끌어다 놓아 사용 (탭→탭도 가능).
+//   전열(1번)이 살아 있으면 후열을 노린 단일 공격은 ×0.7(엄호). 빠를수록 자주 치지만 한 방은 약함(속도 보정).
+//   밀어내기(상대 게이지 감소)·끊기(곧 행동할 상대를 되돌림)·도발(단일 공격을 나에게)로 타이밍 싸움.
+// 연습: CPU 쉬움·보통·어려움, 기술을 고르는 동안 시간 0.25배. 온라인: 방장(p1) 기준 진행, 상대 입력은 방 문서로 전달,
+//   방장이 '몇 번째 틱에 적용'을 기록하면 양쪽이 같은 결정적 계산을 함 (늦게 받은 쪽은 되감아 다시 계산 = 롤백)
+// 3D 경기장은 arena3d.js (필요할 때만 불러옴)
 (function () {
   'use strict';
-  const TURN_SEC = 45, HB_MS = 5000;
-  const PROF = { H: { hp: 1.12, atk: 1.0, def: 1.12, spd: 0.76 }, N: { hp: 1, atk: 1, def: 1, spd: 1 }, F: { hp: 0.92, atk: 1.16, def: 0.9, spd: 1.3 } }; // 시뮬 4000판: 탱커 57%·속공 44% → 속공은 공격도 높게
+  const TPS = 20, GK = 0.42, LIMIT = 180 * TPS, BUSY = 12, HB_MS = 5000, ITEM_CD = 8 * TPS;
+  const PROF = { H: { hp: 1.12, atk: 1.0, def: 1.12, spd: 0.76 }, N: { hp: 1, atk: 1, def: 1, spd: 1 }, F: { hp: 0.92, atk: 1.16, def: 0.9, spd: 1.3 } };
   const ROLE = { dealer: { atk: 1.12 }, aoe: {}, control: { def: 1.05, atk: 0.94 }, support: { hp: 1.12, def: 1.08, atk: 0.86 }, execute: { atk: 1.06, spd: 1.05 }, boss: { atk: 1.05, hp: 1.05 } };
   const TKR = { fire: '불꽃', water: '물', electric: '전기', grass: '풀', psychic: '에스퍼', normal: '노말' };
+  const TCOL = { fire: 0xff6b3d, water: 0x3fa9ff, electric: 0xffd84a, grass: 0x58d06b, psychic: 0xc77dff, normal: 0xe8e8f0 };
   const ST_KR = { burn: '화상', poison: '독', shock: '감전', freeze: '빙결' };
   const STAT_KR = { atk: '공격', def: '방어', spd: '스피드' };
-  // 트레이너 패시브 수치 (CPU끼리 대량 대결로 승률을 맞춤 — 바꾸면 PokeBattle._engine으로 다시 확인)
-  const TP = { redCrit: 0.12, blueFresh: 1.4, greenHeal: 0.014, yellowCure: 0.6, yellowDot: 0.5, yellowItems: 2, rocketFx: 1.5, rocketEntry: 1, rocketEntryCh: 0.5 };
+  // 트레이너 패시브 (CPU끼리 대량 대결로 승률 맞춤 — PokeBattle._engine으로 다시 확인)
+  const TP = { redCrit: 0.12, blueFirst: 1.4, greenRegen: 0.004, yellowItems: 2, yellowDot: 0.5, rocketFx: 1.5, rocketSlow: 0.92 };
   const TRAINERS = {
     red:    { name: '레드',   color: '#e5484d', style: '공격형', desc: `모든 기술의 급소율 +${Math.round(TP.redCrit * 100)}%p` },
-    blue:   { name: '블루',   color: '#3b82f6', style: '전략형', desc: `새로 나온 포켓몬의 첫 공격 위력 +${Math.round((TP.blueFresh - 1) * 100)}%` },
-    green:  { name: '그린',   color: '#22a06b', style: '회복형', desc: `매 턴 끝에 나와 있는 포켓몬 체력 ${+(TP.greenHeal * 100).toFixed(1)}% 회복` },
-    yellow: { name: '옐로우', color: '#f5b400', style: '교감형', desc: `회복약 ${TP.yellowItems}개, 화상·독 피해 절반, 턴 끝마다 상태이상이 ${TP.yellowCure * 100}% 확률로 풀림` },
-    rocket: { name: '로켓단', color: '#a1264f', style: '방해형', desc: `상태이상을 걸 확률 ×${TP.rocketFx}, 상대가 새로 내보낸 포켓몬은 ${TP.rocketEntryCh * 100}% 확률로 스피드 -${TP.rocketEntry}` },
+    blue:   { name: '블루',   color: '#3b82f6', style: '전략형', desc: `포켓몬마다 첫 공격 위력 +${Math.round((TP.blueFirst - 1) * 100)}%` },
+    green:  { name: '그린',   color: '#22a06b', style: '회복형', desc: `아군 전체가 초당 체력 ${+(TP.greenRegen * 100).toFixed(1)}% 회복` },
+    yellow: { name: '옐로우', color: '#f5b400', style: '교감형', desc: `회복약 ${TP.yellowItems}개, 화상·독 피해 절반` },
+    rocket: { name: '로켓단', color: '#a1264f', style: '방해형', desc: `상태이상 확률 ×${TP.rocketFx}, 상대 게이지 속도 -${Math.round((1 - TP.rocketSlow) * 100)}%` },
   };
   const TR_IDS = Object.keys(TRAINERS);
-  // 기술 (이 게임 고유 이름). kind: atk/status, fx: 부가효과
   const BASIC = { fire: ['불씨 돌진', '작열 강타'], water: ['물보라 쏘기', '해일 포격'], electric: ['찌릿 펀치', '낙뢰 강타'], grass: ['잎날 베기', '거목 내려치기'], psychic: ['염동 파동', '정신 붕괴파'], normal: ['박치기 돌격', '전력 돌격'] };
+  // 주력기(게이지 100): 태그가 있으면 태그 기술, 없으면 타입 강타
   const TAGMOVE = {
-    burn: { name: '불티 흩뿌리기', power: 52, acc: 100, pp: 10, fx: { st: 'burn', ch: 0.5 } },
-    poison: { name: '독가루 바람', power: 40, acc: 100, pp: 10, fx: { st: 'poison', ch: 0.5 } },
-    slow: { name: '끈끈한 덫', power: 45, acc: 100, pp: 10, fx: { stage: ['spd', -1, 'foe'] } },
-    stun: { name: '전류 스파크', power: 45, acc: 100, pp: 10, fx: { st: 'shock', ch: 0.3 } },
-    freeze: { name: '냉기 일섬', power: 55, acc: 95, pp: 8, fx: { st: 'freeze', ch: 0.3 } },
-    chain: { name: '연속 타격', power: 28, acc: 95, pp: 10, fx: { hits: [2, 4] } },
-    multi: { name: '흩뿌리기 사격', power: 65, acc: 90, pp: 10, fx: {} },
-    knockback: { name: '날려버리기', power: 40, acc: 100, pp: 8, fx: { force: true } },
-    crit: { name: '급소 노리기', power: 62, acc: 100, pp: 10, fx: { crit: 0.35 } },
-    pierce: { name: '관통 일격', power: 52, acc: 100, pp: 10, fx: { pierce: true } },
-    antiAir: { name: '대공 사격', power: 66, acc: 100, pp: 10, fx: { vsFast: 1.5 } },
-    gold: { name: '럭키 펀치', power: 68, acc: 100, pp: 10, fx: { crit: 0.3 } },
-    blast: { name: '자폭 돌진', power: 130, acc: 100, pp: 5, fx: { recoil: 0.2 } },
-    stack: { name: '기 모으기 타격', power: 50, acc: 100, pp: 10, fx: { stack: 25 } },
-    range: { name: '선제 저격', power: 30, acc: 100, pp: 10, pri: 1, fx: {} },
+    burn: { name: '불티 폭풍', power: 82, fx: { st: 'burn', ch: 0.45 } },
+    poison: { name: '독가루 바람', power: 78, fx: { st: 'poison', ch: 0.55 } },
+    slow: { name: '끈끈한 덫', power: 80, fx: { slow: 5 } },
+    stun: { name: '전류 스파크', power: 82, fx: { st: 'shock', ch: 0.4 } },
+    freeze: { name: '냉기 일섬', power: 84, fx: { st: 'freeze', ch: 0.3 } },
+    chain: { name: '연속 타격', power: 32, fx: { hits: [2, 4] } },
+    multi: { name: '흩뿌리기 사격', power: 58, tgt: 'foes', fx: {} },
+    knockback: { name: '날려버리기', power: 78, fx: { push: 40 } },
+    crit: { name: '급소 노리기', power: 88, fx: { crit: 0.35 } },
+    pierce: { name: '관통 일격', power: 86, fx: { pierce: true } },
+    antiAir: { name: '대공 사격', power: 84, fx: { vsFast: 1.35 } },
+    gold: { name: '럭키 펀치', power: 92, fx: { crit: 0.25 } },
+    blast: { name: '자폭 돌진', power: 150, fx: { recoil: 0.22 } },
+    stack: { name: '기 모으기 타격', power: 76, fx: { stack: 18 } },
+    range: { name: '끊어치기', power: 70, fx: { push: 25, cut: true } },
   };
-  const ROLEMOVE = {
-    dealer: { name: '집중', kind: 'status', pp: 5, fx: { stage: ['atk', 2, 'self'] } },
-    aoe: { name: '휩쓸기', power: 50, acc: 100, pp: 10, fx: { stage: ['def', -1, 'foe'] } },
-    control: { name: '발묶기', kind: 'status', acc: 100, pp: 10, fx: { stage: ['spd', -2, 'foe'], stage2: ['atk', -1, 'foe'] } },
-    support: { name: '응급 처치', kind: 'status', pp: 2, fx: { heal: 0.4 } },
-    execute: { name: '마무리 일격', power: 45, acc: 100, pp: 8, fx: { finisher: 0.4 } },
-    boss: { name: '끝장 추격', power: 62, acc: 95, pp: 8, fx: { pierce: true } },
-  };
-  const GUARD = { name: '방어 태세', kind: 'status', pp: 5, fx: { stage: ['def', 2, 'self'] } };
-  const STRUGGLE = { name: '안간힘', power: 30, acc: 100, pp: 99, fx: {} };
+  const BASIC_POW = 40, MAIN_POW = 95, SP_COST = 70;
 
   // ---------- 데이터 ----------
   const roster = () => Object.values(window.GachaTowerDefs || {}).filter(d => d.no >= 1 && d.no <= 151).sort((a, b) => a.no - b.no);
   const vary = (no, k) => 1 + (((no * k) % 13) - 6) / 100;
-  // 모든 포켓몬 능력치 총합 동일 (등급 무관). 프로필·역할·종마다 작은 개성으로 '모양'만 바꾸고 평균 배율이 1이 되게 정규화
   const BASE = { hp: 150, atk: 62, def: 60, spd: 60 };
-  function statsOf(d) {
+  function statsOf(d) { // 모든 포켓몬 능력치 총합 동일. 모양만 다름
     const P = PROF[d.profile] || PROF.N, R = ROLE[d.role] || {};
     const f = { hp: P.hp * (R.hp || 1) * vary(d.no, 7), atk: P.atk * (R.atk || 1) * vary(d.no, 11), def: P.def * (R.def || 1) * vary(d.no, 5), spd: P.spd * (R.spd || 1) * vary(d.no, 3) };
-    const avg = (f.hp + f.atk + f.def + f.spd) / 4;
-    const o = {}; for (const k in BASE) o[k] = Math.round(BASE[k] * f[k] / avg); return o;
+    const avg = (f.hp + f.atk + f.def + f.spd) / 4, o = {}; for (const k in BASE) o[k] = Math.round(BASE[k] * f[k] / avg); return o;
   }
   const shapeOf = d => ({ H: '탱커형', N: '균형형', F: '속공형' }[d.profile] || '균형형');
+  const cycleSec = s => +(100 / (s.spd * GK)).toFixed(1);
+  function specialOf(d) { // 특수기(게이지 70): 역할·체형별
+    if (d.role === 'support') return { name: '응급 처치', kind: 'heal', tgt: 'ally', fx: { heal: 0.32 } };
+    if (d.profile === 'H') return { name: '도발', kind: 'buff', tgt: 'self', fx: { taunt: 6, stage: ['def', 1] } };
+    if (d.role === 'dealer') return { name: '집중', kind: 'buff', tgt: 'self', fx: { stage: ['atk', 2] } };
+    if (d.role === 'aoe') return { name: '휩쓸기', power: 42, tgt: 'foes', fx: { debuff: ['def', -1] } };
+    if (d.role === 'control') return { name: '발묶기', kind: 'debuff', tgt: 'foe', fx: { slow: 6, push: 30 } };
+    if (d.role === 'execute') return { name: '마무리 일격', power: 55, tgt: 'foe', fx: { finisher: 0.4 } };
+    if (d.role === 'boss') return { name: '끝장 추격', power: 72, tgt: 'foe', fx: { pierce: true } };
+    return { name: '방어 태세', kind: 'buff', tgt: 'self', fx: { stage: ['def', 2] } };
+  }
   function movesOf(d) {
-    const t = d.type, [b1, b2] = BASIC[t] || BASIC.normal, mk = (o, extra) => Object.assign({ type: t, kind: 'atk', acc: 100, fx: {} }, o, extra || {});
-    const tag = (d.tags || []).find(x => TAGMOVE[x]);
-    return [mk({ name: b1, power: 55, pp: 20 }), mk({ name: b2, power: 85, acc: 85, pp: 8 }), mk(tag ? TAGMOVE[tag] : GUARD), mk(ROLEMOVE[d.role] || GUARD)];
+    const t = d.type, [b1, b2] = BASIC[t] || BASIC.normal, tag = (d.tags || []).find(x => TAGMOVE[x]);
+    const mk = (o, slot, cost) => Object.assign({ type: t, kind: 'atk', tgt: 'foe', acc: 100, fx: {}, slot, cost }, o);
+    return [mk({ name: b1, power: BASIC_POW }, 'basic', 50), mk(tag ? TAGMOVE[tag] : { name: b2, power: MAIN_POW, acc: 92 }, 'main', 100), mk(specialOf(d), 'special', SP_COST)];
   }
 
-  // ---------- 규칙 엔진 (순수 계산, 같은 입력·시드 → 같은 결과) ----------
+  // ---------- 규칙 엔진 (결정적: 같은 시드·같은 입력 틱 → 같은 결과) ----------
   const rngOf = seed => { let a = seed >>> 0; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; };
   const stageMul = s => (s >= 0 ? 1 + 0.25 * s : 1 / (1 + 0.25 * -s));
   const eff = (a, b) => (window.typeEffectiveness ? typeEffectiveness(a, b) : 1);
-  function mkMon(id) {
-    const d = GachaTowerDefs[id], s = statsOf(d), moves = movesOf(d);
-    return { id, name: d.name, type: d.type, grade: d.grade, s, maxHp: s.hp, hp: s.hp, status: null, stT: 0, stg: { atk: 0, def: 0, spd: 0 }, pp: moves.map(m => m.pp), moves, fresh: true, stack: 0 };
-  }
-  function newState(p1, p2) {
-    const side = p => ({ name: p.name || '트레이너', trainer: TRAINERS[p.trainer] ? p.trainer : 'red', mons: (p.team || []).map(mkMon), active: 0, item: p.trainer === 'yellow' ? TP.yellowItems : 1 });
-    return { side: { p1: side(p1), p2: side(p2) }, step: 1, phase: 'turn', need: ['p1', 'p2'], winner: null };
-  }
-  const alive = sd => sd.mons.filter(m => m.hp > 0);
-  const act = sd => sd.mons[sd.active];
   const foeOf = s => (s === 'p1' ? 'p2' : 'p1');
-  const spdOf = m => m.s.spd * stageMul(m.stg.spd) * (m.status === 'shock' ? 0.7 : 1);
-
-  function validate(st, s, a) {
-    const sd = st.side[s], m = act(sd);
-    if (st.phase === 'replace') { const i = a && a.to; return Number.isInteger(i) && sd.mons[i] && sd.mons[i].hp > 0 && i !== sd.active ? { t: 'switch', to: i } : { t: 'switch', to: sd.mons.findIndex(x => x.hp > 0) }; }
-    if (a && a.t === 'switch' && Number.isInteger(a.to) && sd.mons[a.to] && sd.mons[a.to].hp > 0 && a.to !== sd.active) return a;
-    if (a && a.t === 'item' && sd.item > 0) return a;
-    if (a && a.t === 'move' && m.pp[a.i] > 0) return a;
-    const i = m.pp.findIndex(p => p > 0); return i >= 0 ? { t: 'move', i } : { t: 'move', i: -1 };
+  function mkUnit(id, i, R) {
+    const d = GachaTowerDefs[id], s = statsOf(d);
+    return { id, name: d.name, type: d.type, s, maxHp: s.hp, hp: s.hp, g: 10 + Math.floor(R() * 20), row: i === 0 ? 0 : 1, i, st: null, stT: 0, slowT: 0, tauntT: 0, busy: 0,
+      stg: { atk: 0, def: 0, spd: 0 }, moves: movesOf(d), first: true, stack: 0 };
   }
-
-  // 한 단계 진행: acts = { p1: {...}, p2: {...} } (필요한 쪽만). 반환: 이벤트 목록
-  function step(st, acts, seed) {
-    const R = rngOf((seed ^ Math.imul(st.step, 2654435761)) >>> 0), ev = [];
-    const say = text => ev.push({ t: 'msg', text });
-    const doSwitch = (s, to, forced) => {
-      const sd = st.side[s], from = act(sd); from.stg = { atk: 0, def: 0, spd: 0 }; from.stack = 0;
-      sd.active = to; const m = act(sd); m.fresh = true;
-      ev.push({ t: 'switch', side: s, idx: to, name: m.name, forced: !!forced });
-      if (st.side[foeOf(s)].trainer === 'rocket' && R() < TP.rocketEntryCh) { m.stg.spd = Math.max(-3, m.stg.spd - TP.rocketEntry); ev.push({ t: 'stage', side: s, name: m.name, stat: 'spd', d: -TP.rocketEntry }); }
-    };
-    if (st.phase === 'replace') {
-      for (const s of st.need) doSwitch(s, validate(st, s, acts[s]).to);
-      st.step++; st.phase = 'turn'; st.need = ['p1', 'p2']; return ev;
-    }
-    const A = { p1: validate(st, 'p1', acts.p1), p2: validate(st, 'p2', acts.p2) };
-    const pri = s => (A[s].t !== 'move' ? 6 : (A[s].i >= 0 ? act(st.side[s]).moves[A[s].i].pri || 0 : 0));
-    const order = ['p1', 'p2'].map(s => ({ s, p: pri(s), v: spdOf(act(st.side[s])), r: R() })).sort((a, b) => b.p - a.p || b.v - a.v || a.r - b.r);
-    const actor = { p1: act(st.side.p1), p2: act(st.side.p2) };
-    for (const { s } of order) {
-      const sd = st.side[s], me = act(sd), f = foeOf(s), fsd = st.side[f];
-      if (st.winner) break;
-      const a = A[s];
-      if (a.t === 'switch') { doSwitch(s, a.to); continue; }
-      if (a.t === 'item') { sd.item--; const h = Math.round(me.maxHp * 0.5); me.hp = Math.min(me.maxHp, me.hp + h); me.status = null; ev.push({ t: 'item', side: s, name: me.name, hp: me.hp, max: me.maxHp }); continue; }
-      if (me !== actor[s] || me.hp <= 0) continue; // 교체·기절로 바뀐 포켓몬은 예약된 기술을 못 씀
-      // 상태이상으로 행동 불가
-      if (me.status === 'freeze') { me.stT++; if (R() < 0.3 || me.stT >= 3) { me.status = null; ev.push({ t: 'cure', side: s, name: me.name, st: 'freeze' }); } else { ev.push({ t: 'cant', side: s, name: me.name, why: '얼어서 움직일 수 없다' }); continue; } }
-      if (me.status === 'shock' && R() < 0.25) { ev.push({ t: 'cant', side: s, name: me.name, why: '몸이 저려서 움직일 수 없다' }); continue; }
-      const mv = a.i >= 0 ? me.moves[a.i] : STRUGGLE; if (a.i >= 0) me.pp[a.i]--;
-      const tg = act(fsd);
-      ev.push({ t: 'use', side: s, name: me.name, move: mv.name, mtype: mv.type || me.type, kind: mv.kind || 'atk' });
-      if (mv.acc && mv.acc < 100 && mv.kind !== 'status' && R() * 100 >= mv.acc) { ev.push({ t: 'miss', side: f }); me.fresh = false; continue; }
-      if (mv.kind === 'status' && mv.acc && R() * 100 >= mv.acc) { ev.push({ t: 'miss', side: f }); continue; }
-      const fx = mv.fx || {};
-      const stageFx = ([k, d, who]) => { if (who === 'self') return applyStage(me, s, k, d); const extra = d < 0 && sd.trainer === 'rocket' && R() < TP.rocketFx - 1 ? -1 : 0; applyStage(tg, f, k, d + extra); };
-      if (mv.kind !== 'status') {
-        const hits = fx.hits ? fx.hits[0] + Math.floor(R() * (fx.hits[1] - fx.hits[0] + 1)) : 1;
-        let done = 0;
-        for (let h = 0; h < hits && tg.hp > 0; h++) {
-          let power = mv.power + (fx.stack ? me.stack * fx.stack : 0);
-          if (fx.finisher && tg.hp / tg.maxHp < fx.finisher) power *= 2;
-          if (fx.vsFast && spdOf(tg) > spdOf(me)) power *= fx.vsFast;
-          const atk = me.s.atk * stageMul(me.stg.atk) * (me.status === 'burn' ? 0.8 : 1);
-          const def = tg.s.def * (fx.pierce ? 0.75 : stageMul(tg.stg.def));
-          const e = eff(mv.type || me.type, tg.type), stab = (mv.type || me.type) === me.type ? 1.2 : 1;
-          const tr = TRAINERS[sd.trainer] ? sd.trainer : 'red';
-          const trMul = tr === 'blue' && me.fresh ? TP.blueFresh : 1;
-          const critCh = (fx.crit || 0.0625) + (tr === 'red' ? TP.redCrit : 0), crit = R() < critCh;
-          let dmg = power * (atk / def) * 0.45 * stab * e * trMul * (crit ? 1.5 : 1) * (0.9 + R() * 0.1);
-          dmg = Math.max(1, Math.round(dmg)); tg.hp = Math.max(0, tg.hp - dmg); done += dmg;
-          ev.push({ t: 'dmg', side: f, amt: dmg, hp: tg.hp, max: tg.maxHp, eff: e, crit });
+  function newState(p1, p2, seed) {
+    const R = rngOf(seed ^ 0xabc);
+    const side = p => ({ name: p.name || '트레이너', trainer: TRAINERS[p.trainer] ? p.trainer : 'red', items: p.trainer === 'yellow' ? TP.yellowItems : 1, itemCd: 0, units: (p.team || []).map((id, i) => mkUnit(id, i, R)) });
+    return { t: 0, seed, side: { p1: side(p1), p2: side(p2) }, winner: null, why: '' };
+  }
+  const alive = sd => sd.units.filter(u => u.hp > 0);
+  const rate = (st, s, u) => u.s.spd * stageMul(u.stg.spd) * GK / TPS * (u.st === 'shock' ? 0.5 : 1) * (u.slowT > 0 ? 0.6 : 1) * (u.st === 'freeze' ? 0 : 1) * (st.side[foeOf(s)].trainer === 'rocket' ? TP.rocketSlow : 1);
+  const canUse = (u, m) => u.hp > 0 && u.busy <= 0 && u.st !== 'freeze' && u.g >= m.cost;
+  function validTargets(st, s, m) {
+    if (m.tgt === 'ally') return st.side[s].units.filter(u => u.hp > 0).map(u => ({ s, i: u.i }));
+    if (m.tgt === 'foe') return st.side[foeOf(s)].units.filter(u => u.hp > 0).map(u => ({ s: foeOf(s), i: u.i }));
+    return [];
+  }
+  function tick(st, ev) { // 한 틱: 게이지·상태이상·시간제한
+    st.t++;
+    for (const s of ['p1', 'p2']) {
+      const sd = st.side[s]; if (sd.itemCd > 0) sd.itemCd--;
+      for (const u of sd.units) {
+        if (u.hp <= 0) continue;
+        if (u.busy > 0) u.busy--; else u.g = Math.min(100, u.g + rate(st, s, u));
+        if (u.slowT > 0) u.slowT--; if (u.tauntT > 0) u.tauntT--;
+        if (u.st && --u.stT <= 0) { ev.push({ k: 'cure', s, i: u.i, st: u.st }); u.st = null; }
+        if (st.t % TPS === 0) {
+          if (u.st === 'burn' || u.st === 'poison') { const d = Math.max(1, Math.round(u.maxHp * (u.st === 'burn' ? 0.02 : 0.03) * (sd.trainer === 'yellow' ? TP.yellowDot : 1))); u.hp = Math.max(0, u.hp - d); ev.push({ k: 'dot', s, i: u.i, amt: d, st: u.st }); if (u.hp <= 0) ev.push({ k: 'faint', s, i: u.i }); }
+          if (u.hp > 0 && sd.trainer === 'green' && u.hp < u.maxHp) u.hp = Math.min(u.maxHp, u.hp + Math.max(1, Math.round(u.maxHp * TP.greenRegen)));
         }
-        if (hits > 1) say(`${hits}번 맞혔다!`);
-        if (fx.stack) me.stack = Math.min(3, me.stack + 1);
-        if (fx.recoil && me.hp > 0) { const r = Math.max(1, Math.round(me.maxHp * fx.recoil)); me.hp = Math.max(0, me.hp - r); ev.push({ t: 'recoil', side: s, amt: r, hp: me.hp, max: me.maxHp }); }
-        if (tg.hp > 0 && fx.st && !tg.status && R() < fx.ch * (sd.trainer === 'rocket' ? TP.rocketFx : 1)) applySt(tg, f, fx.st);
-        if (tg.hp > 0 && fx.stage) stageFx(fx.stage);
-        if (tg.hp > 0 && fx.force) { const others = fsd.mons.map((m, i) => i).filter(i => i !== fsd.active && fsd.mons[i].hp > 0); if (others.length) doSwitch(f, others[Math.floor(R() * others.length)], true); }
-      } else {
-        if (fx.heal) { const h = Math.round(me.maxHp * fx.heal); me.hp = Math.min(me.maxHp, me.hp + h); ev.push({ t: 'heal', side: s, name: me.name, hp: me.hp, max: me.maxHp }); }
-        if (fx.stage) stageFx(fx.stage); if (fx.stage2) stageFx(fx.stage2);
       }
-      me.fresh = false;
-      for (const x of [tg, me]) if (x.hp <= 0 && !x._fe) { x._fe = 1; ev.push({ t: 'faint', side: x === me ? s : f, name: x.name }); }
-      checkWin();
     }
-    function applySt(m, side, k) {
-      if ((k === 'burn' || k === 'freeze') && m.type === 'fire') return; if (k === 'shock' && m.type === 'electric') return;
-      m.status = k; m.stT = 0; ev.push({ t: 'status', side, name: m.name, st: k });
+    checkEnd(st);
+  }
+  function checkEnd(st) {
+    if (st.winner) return;
+    const a = alive(st.side.p1).length, b = alive(st.side.p2).length;
+    if (!a || !b) { st.winner = !a && !b ? 'draw' : !a ? 'p2' : 'p1'; return; }
+    if (st.t >= LIMIT) { const pct = s => st.side[s].units.reduce((x, u) => x + u.hp / u.maxHp, 0); const d = pct('p1') - pct('p2'); st.winner = Math.abs(d) < 0.01 ? 'draw' : d > 0 ? 'p1' : 'p2'; st.why = '시간 종료 — 남은 체력 비교'; }
+  }
+  // 행동: a = { s, i, m: 0|1|2|'item', ts, ti }. 잘못된 입력은 무시
+  function apply(st, a, ev) {
+    if (st.winner || !a || !st.side[a.s]) return false;
+    const s = a.s, f = foeOf(s), sd = st.side[s], R = rngOf((st.seed + Math.imul(st.t + 1, 2654435761) + (s === 'p1' ? 17 : 91) + (a.i | 0) * 7) >>> 0);
+    if (a.m === 'item') {
+      const u = sd.units[a.ti]; if (!u || u.hp <= 0 || sd.items <= 0 || sd.itemCd > 0) return false;
+      sd.items--; sd.itemCd = ITEM_CD; u.hp = Math.min(u.maxHp, u.hp + Math.round(u.maxHp * 0.4)); const had = u.st; u.st = null;
+      ev.push({ k: 'item', s, i: u.i, hp: u.hp, cured: had }); return true;
     }
-    function applyStage(m, side, k, d) {
-      const before = m.stg[k]; m.stg[k] = Math.max(-3, Math.min(3, before + d));
-      ev.push({ t: 'stage', side, name: m.name, stat: k, d: m.stg[k] - before });
+    const me = sd.units[a.i]; if (!me) return false; const m = me.moves[a.m]; if (!m || !canUse(me, m)) return false;
+    let tgts = [];
+    if (m.tgt === 'self') tgts = [me];
+    else if (m.tgt === 'foes') tgts = alive(st.side[f]);
+    else if (m.tgt === 'ally') { const t = sd.units[a.ti]; if (!t || t.hp <= 0) return false; tgts = [t]; }
+    else { let t = st.side[f].units[a.ti]; if (!t || t.hp <= 0) t = alive(st.side[f])[0];
+      const taunter = alive(st.side[f]).find(x => x.tauntT > 0); if (taunter && taunter !== t) { t = taunter; ev.push({ k: 'msg', text: `${t.name}의 도발! 공격이 끌려간다` }); }
+      tgts = [t]; }
+    me.g -= m.cost; me.busy = BUSY;
+    ev.push({ k: 'act', s, i: me.i, move: m.name, mtype: m.type, kind: m.kind, slot: m.slot, tgts: tgts.map(t => ({ s: sd.units.includes(t) ? s : f, i: t.i })) });
+    const fx = m.fx || {};
+    function stage(u, side, k, d) { const b = u.stg[k]; u.stg[k] = Math.max(-3, Math.min(3, b + d)); ev.push({ k: 'stage', s: side, i: u.i, stat: k, d: u.stg[k] - b }); }
+    function hitFx(t, side) {
+      if (fx.st && !t.st && R() < fx.ch * (sd.trainer === 'rocket' ? TP.rocketFx : 1) && !((fx.st === 'burn' || fx.st === 'freeze') && t.type === 'fire') && !(fx.st === 'shock' && t.type === 'electric')) {
+        t.st = fx.st; t.stT = (fx.st === 'freeze' ? 3 : fx.st === 'shock' ? 5 : 8) * TPS; ev.push({ k: 'status', s: side, i: t.i, st: fx.st }); }
+      if (fx.slow) { t.slowT = fx.slow * TPS; ev.push({ k: 'slow', s: side, i: t.i }); }
+      if (fx.push) { const cut = fx.cut && t.g >= 85; t.g = Math.max(0, t.g - (cut ? 45 : fx.push)); ev.push({ k: 'push', s: side, i: t.i, cut }); }
+      if (fx.debuff) stage(t, side, fx.debuff[0], fx.debuff[1]);
     }
-    function checkWin() {
-      const a1 = alive(st.side.p1).length, a2 = alive(st.side.p2).length;
-      if (!a1 || !a2) st.winner = !a1 && !a2 ? 'draw' : !a1 ? 'p2' : 'p1';
+    if (m.kind === 'heal') { for (const t of tgts) { t.hp = Math.min(t.maxHp, t.hp + Math.round(t.maxHp * fx.heal)); if (t.st === 'burn' || t.st === 'poison') t.st = null; ev.push({ k: 'heal', s, i: t.i, hp: t.hp }); } }
+    else if (m.kind === 'buff') { if (fx.taunt) { me.tauntT = fx.taunt * TPS; ev.push({ k: 'taunt', s, i: me.i }); } if (fx.stage) stage(me, s, fx.stage[0], fx.stage[1]); }
+    else if (m.kind === 'debuff') { for (const t of tgts) hitFx(t, f); }
+    else {
+      const tr = sd.trainer;
+      for (const t of tgts) {
+        if (t.hp <= 0) continue;
+        if (m.acc < 100 && R() * 100 >= m.acc) { ev.push({ k: 'miss', s: f, i: t.i }); continue; }
+        const hits = fx.hits ? fx.hits[0] + Math.floor(R() * (fx.hits[1] - fx.hits[0] + 1)) : 1;
+        for (let h = 0; h < hits && t.hp > 0; h++) {
+          let p = m.power + (fx.stack ? me.stack * fx.stack : 0);
+          if (fx.finisher && t.hp / t.maxHp < fx.finisher) p *= 2;
+          if (fx.vsFast && t.s.spd > me.s.spd) p *= fx.vsFast;
+          const atk = me.s.atk * stageMul(me.stg.atk) * (me.st === 'burn' ? 0.8 : 1), def = t.s.def * (fx.pierce ? 0.75 : stageMul(t.stg.def));
+          const e = eff(m.type, t.type), stab = m.type === me.type ? 1.2 : 1;
+          const cover = t.row === 1 && m.tgt === 'foe' && st.side[f].units[0].hp > 0 ? 0.7 : 1;  // 전열 엄호
+          const spdComp = Math.pow(60 / me.s.spd, 0.5);                                        // 빠르면 한 방이 약함
+          const crit = R() < (fx.crit || 0.0625) + (tr === 'red' ? TP.redCrit : 0);
+          let dmg = p * (atk / def) * 0.42 * stab * e * cover * spdComp * (crit ? 1.5 : 1) * (tr === 'blue' && me.first ? TP.blueFirst : 1) * (0.9 + R() * 0.1);
+          dmg = Math.max(1, Math.round(dmg)); t.hp = Math.max(0, t.hp - dmg);
+          ev.push({ k: 'dmg', s: f, i: t.i, amt: dmg, eff: e, crit, cover: cover < 1, hp: t.hp });
+          if (t.hp <= 0) ev.push({ k: 'faint', s: f, i: t.i });
+        }
+        if (hits > 1) ev.push({ k: 'msg', text: `${hits}번 맞혔다!` });
+        if (t.hp > 0) hitFx(t, f);
+      }
+      if (fx.stack) me.stack = Math.min(3, me.stack + 1);
+      if (fx.recoil) { const r = Math.round(me.maxHp * fx.recoil); me.hp = Math.max(0, me.hp - r); ev.push({ k: 'dot', s, i: me.i, amt: r, st: 'recoil' }); if (me.hp <= 0) ev.push({ k: 'faint', s, i: me.i }); }
+      me.first = false;
     }
-    // 턴 끝: 화상·독, 토게피 회복
-    if (!st.winner) for (const s of ['p1', 'p2']) {
-      const sd = st.side[s], m = act(sd); if (m.hp <= 0) continue;
-      if (m.status === 'burn' || m.status === 'poison') { const d = Math.max(1, Math.round(m.maxHp * (m.status === 'burn' ? 0.06 : 0.1) * (sd.trainer === 'yellow' ? TP.yellowDot : 1))); m.hp = Math.max(0, m.hp - d); ev.push({ t: 'dot', side: s, name: m.name, st: m.status, amt: d, hp: m.hp, max: m.maxHp }); if (m.hp <= 0) { m._fe = 1; ev.push({ t: 'faint', side: s, name: m.name }); } }
-      if (m.hp > 0 && sd.trainer === 'green' && m.hp < m.maxHp) { m.hp = Math.min(m.maxHp, m.hp + Math.round(m.maxHp * TP.greenHeal)); ev.push({ t: 'heal', side: s, name: m.name, hp: m.hp, max: m.maxHp, small: true }); }
-      if (m.hp > 0 && sd.trainer === 'yellow' && m.status && R() < TP.yellowCure) { const k = m.status; m.status = null; ev.push({ t: 'cure', side: s, name: m.name, st: k }); }
-    }
-    checkWin();
-    st.step++;
-    if (!st.winner) {
-      const need = ['p1', 'p2'].filter(s => act(st.side[s]).hp <= 0 && alive(st.side[s]).length);
-      if (need.length) { st.phase = 'replace'; st.need = need; } else { st.phase = 'turn'; st.need = ['p1', 'p2']; }
-    } else st.need = [];
-    return ev;
+    checkEnd(st); return true;
   }
 
-  // ---------- CPU (연습 상대): lv 0 쉬움 / 1 보통 / 2 어려움 ----------
-  // 어려움: 실제 데미지 식으로 기대 피해를 계산하고, 상대 기술에 약하면 버티는 포켓몬으로 교체
-  function expDmg(st, s, me, foe, mv) {
-    if (mv.kind === 'status') return 0;
-    const sd = st.side[s], hits = mv.fx.hits ? (mv.fx.hits[0] + mv.fx.hits[1]) / 2 : 1;
-    let p = mv.power * (mv.fx.finisher && foe.hp / foe.maxHp < mv.fx.finisher ? 2 : 1) * (mv.fx.vsFast && spdOf(foe) > spdOf(me) ? mv.fx.vsFast : 1);
-    const atk = me.s.atk * stageMul(me.stg.atk) * (me.status === 'burn' ? 0.8 : 1), def = foe.s.def * (mv.fx.pierce ? 0.75 : stageMul(foe.stg.def));
-    const crit = (mv.fx.crit || 0.0625) + (sd.trainer === 'red' ? TP.redCrit : 0);
-    return p * hits * (atk / def) * 0.45 * (mv.type === me.type ? 1.2 : 1) * eff(mv.type, foe.type) * (1 + crit * 0.5) * (sd.trainer === 'blue' && me.fresh ? TP.blueFresh : 1) * (mv.acc / 100) * 0.95;
+  // ---------- CPU (lv 0 쉬움 / 1 보통 / 2 어려움) ----------
+  function expDmg(st, s, me, t, m) {
+    if (!m.power) return 0; const f = foeOf(s);
+    const cover = t.row === 1 && m.tgt === 'foe' && st.side[f].units[0].hp > 0 ? 0.7 : 1, hits = m.fx.hits ? 3 : 1;
+    return m.power * hits * (me.s.atk * stageMul(me.stg.atk) / (t.s.def * stageMul(t.stg.def))) * 0.42 * (m.type === me.type ? 1.2 : 1) * eff(m.type, t.type) * cover * Math.pow(60 / me.s.spd, 0.5) * (m.fx.finisher && t.hp / t.maxHp < m.fx.finisher ? 2 : 1) * (m.acc / 100);
   }
-  const bestHit = (st, s, me, foe) => me.moves.reduce((m, mv, i) => (me.pp[i] > 0 ? Math.max(m, expDmg(st, s, me, foe, mv)) : m), 0);
-  function cpuChoose(st, s, R, lv = 1) {
-    const sd = st.side[s], me = act(sd), f = foeOf(s), foe = act(st.side[f]);
-    if (lv >= 2 && st.phase === 'turn') { // 어려움: 확실히 쓰러뜨릴 수 있으면 그 기술(느리면 선제기 우선), 아니면 아래 판단을 덜 흔들리게
-      const ko = me.moves.map((m, i) => ({ m, i })).filter(({ m, i }) => me.pp[i] > 0 && m.kind !== 'status' && expDmg(st, s, me, foe, m) / (m.acc / 100) * 0.9 >= foe.hp);
-      if (ko.length) { const slow = spdOf(foe) > spdOf(me), pick = (slow && ko.find(x => x.m.pri)) || ko.sort((a, b) => b.m.acc - a.m.acc)[0]; return { t: 'move', i: pick.i }; }
+  function cpuThink(st, s, lv, R, mem) {
+    const sd = st.side[s], f = foeOf(s), foes = alive(st.side[f]), acts = [];
+    if (!foes.length) return acts;
+    if (sd.items > 0 && sd.itemCd <= 0) { const low = alive(sd).sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)[0]; if (low && low.hp / low.maxHp < 0.3 && R() < [0.2, 0.5, 0.9][lv]) acts.push({ s, m: 'item', ti: low.i }); }
+    for (const u of alive(sd)) {
+      if (u.busy > 0 || u.st === 'freeze' || u.g < 50) continue;
+      const key = s + u.i; if (mem[key] == null) mem[key] = Math.floor([28, 12, 4][lv] * (0.6 + R() * 0.8)); if (mem[key] > 0) { mem[key]--; continue; } // 반응 지연
+      let best = null, bv = -1;
+      u.moves.forEach((m, k) => {
+        if (!canUse(u, m)) return; let v = 0, ti = foes[0].i;
+        if (m.kind === 'heal') { const low = alive(sd).sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)[0]; v = low.hp / low.maxHp < 0.5 ? 60 * (1 - low.hp / low.maxHp) : 0; ti = low.i; }
+        else if (m.kind === 'buff') v = m.fx.taunt ? (alive(sd).some(x => x !== u && x.hp / x.maxHp < 0.5) && u.hp / u.maxHp > 0.5 ? 28 : 4) : (u.hp / u.maxHp > 0.6 && u.stg[m.fx.stage[0]] < 2 ? 22 : 2);
+        else if (m.kind === 'debuff') { const fast = foes.slice().sort((a, b) => b.g - a.g)[0]; v = fast.slowT > 0 ? 3 : 18 + fast.g / 10; ti = fast.i; }
+        else if (m.tgt === 'foes') v = foes.reduce((x, t) => x + expDmg(st, s, u, t, m), 0);
+        else { for (const t of foes) { let d = expDmg(st, s, u, t, m); if (lv >= 1) d *= d >= t.hp ? 2.2 : 1 + (1 - t.hp / t.maxHp) * (lv >= 2 ? 0.9 : 0.3); if (lv === 0) d *= 0.5 + R(); if (d > v) { v = d; ti = t.i; } } }
+        if (lv === 0) v *= 0.6 + R() * 0.8;
+        if (m.slot === 'basic' && u.g < 100) { const kill = foes.some(t => expDmg(st, s, u, t, m) >= t.hp); if (!kill && R() > [0.6, 0.25, 0.1][lv]) v = -1; } // 50에서 끊을지, 100까지 모을지
+        if (v > bv) { bv = v; best = { s, i: u.i, m: k, ts: m.tgt === 'ally' ? s : f, ti }; }
+      });
+      if (best && bv > 0) { acts.push(best); mem[key] = null; }
+      else if (u.g >= 100) mem[key] = null;
     }
-    if (st.phase === 'replace') {
-      let best = -1, bv = -1e9;
-      sd.mons.forEach((m, i) => { if (m.hp <= 0 || i === sd.active) return;
-        const v = lv >= 2 ? bestHit(st, s, m, foe) / foe.hp - bestHit(st, f, foe, m) / m.hp : eff(m.type, foe.type) * 2 - eff(foe.type, m.type) + m.hp / m.maxHp + (lv === 0 ? R() * 3 : 0);
-        if (v > bv) { bv = v; best = i; } });
-      return { t: 'switch', to: best };
-    }
-    if (lv === 0 && R() < 0.45) { const ok = me.moves.map((m, i) => i).filter(i => me.pp[i] > 0); return { t: 'move', i: ok[Math.floor(R() * ok.length)] }; }
-    if (sd.item > 0 && me.hp / me.maxHp < (lv >= 2 ? 0.35 : 0.3) && R() < 0.75) return { t: 'item' };
-    if (lv >= 2) { // 버티기 힘든 상성이면 교체 (상대 최고 기대 피해가 내 남은 체력의 70%+ 이고, 맞받아치기 약할 때)
-      const threat = bestHit(st, f, foe, me), mine = bestHit(st, s, me, foe);
-      const foeFirst = spdOf(foe) > spdOf(me);
-      if (threat >= me.hp * (foeFirst ? 0.8 : 1.1) && mine < foe.hp * 0.5) { // 내가 먼저 못 쓰러뜨리고, 맞으면 쓰러지는 경우만
-        let bi = -1, bv = 0; sd.mons.forEach((m, i) => { if (i === sd.active || m.hp <= 0) return; const v = bestHit(st, s, m, foe) / foe.hp - bestHit(st, f, foe, m) / m.hp; if (v > bv) { bv = v; bi = i; } });
-        if (bi >= 0 && bv > 0.3 && R() < 0.7) return { t: 'switch', to: bi };
-      }
-    } else if (eff(foe.type, me.type) > 1 && me.hp / me.maxHp < 0.6 && R() < 0.35) {
-      const i = sd.mons.findIndex((m, k) => k !== sd.active && m.hp > m.maxHp * 0.4 && eff(foe.type, m.type) <= 1); if (i >= 0) return { t: 'switch', to: i };
-    }
-    let best = 0, bv = -1;
-    me.moves.forEach((m, i) => {
-      if (me.pp[i] <= 0) return; let v;
-      if (m.kind === 'status') v = m.fx.heal ? (me.hp / me.maxHp < 0.45 ? 80 : 0) : m.fx.stage ? (m.fx.stage[2] === 'self' ? (me.hp / me.maxHp > 0.7 && me.stg[m.fx.stage[0]] < 2 ? 45 : 3) : (foe.stg[m.fx.stage[0]] > -2 ? 28 : 2)) : 8;
-      else v = m.power * eff(m.type, foe.type) * (m.type === me.type ? 1.2 : 1) * (m.acc / 100) * (m.fx.hits ? 3 : 1) * (m.fx.finisher && foe.hp / foe.maxHp < 0.4 ? 2 : 1) * 0.35;
-      v *= lv >= 2 ? 0.97 + R() * 0.06 : 0.85 + R() * 0.3; if (v > bv) { bv = v; best = i; }
-    });
-    return { t: 'move', i: best };
+    return acts;
   }
-  // CPU 팀: 아무 3마리 (어려움은 서로 다른 타입 3개로 상성 커버)
-  // 어려움: 내 팀(foeTeam) 타입을 보고 맞받아치는 타입으로 고름 (나를 이기는 타입 우선, 나에게 지는 타입 피함)
-  const cpuTeam = (R, lv = 1, foeTeam) => { const all = roster(), team = [], types = new Set();
-    if (lv >= 2 && foeTeam && foeTeam.length) {
-      const ft = foeTeam.map(id => GachaTowerDefs[id].type), score = d => ft.reduce((a, t) => a + (eff(d.type, t) - 1) - (eff(t, d.type) - 1), 0) + (d.role === 'support' || d.profile === 'H' ? 0.15 : 0) + R() * 0.5;
-      const ranked = all.slice().sort((a, b) => score(b) - score(a));
-      for (const d of ranked) { if (team.length >= 3) break; if (types.has(d.type) && team.length < 2) continue; team.push(d.id); types.add(d.type); }
-      return team;
+  const cpuTeam = (R, lv = 1, foeTeam) => {
+    const all = roster(), team = [], types = new Set();
+    if (lv >= 2 && foeTeam && foeTeam.length) { // 어려움: 내 팀 타입을 보고 상성으로 맞받아침, 탱커를 전열에
+      const ft = foeTeam.map(id => GachaTowerDefs[id].type), score = d => ft.reduce((a, t) => a + (eff(d.type, t) - 1) - (eff(t, d.type) - 1), 0) + R() * 0.5;
+      for (const d of all.slice().sort((a, b) => score(b) - score(a))) { if (team.length >= 3) break; if (types.has(d.type) && team.length < 2) continue; team.push(d.id); types.add(d.type); }
+      const front = team.map(id => GachaTowerDefs[id]).sort((a, b) => (b.profile === 'H') - (a.profile === 'H'))[0].id; return [front, ...team.filter(x => x !== front)];
     }
-    while (team.length < 3) { const d = all[Math.floor(R() * all.length)]; if (team.includes(d.id)) continue; team.push(d.id); types.add(d.type); } return team; };
+    while (team.length < 3) { const d = all[Math.floor(R() * all.length)]; if (!team.includes(d.id)) team.push(d.id); } return team;
+  };
 
-  // ---------- 화면 ----------
-  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-  const img = (id, cls = '') => { const p = window.TowerSpriteImages && window.TowerSpriteImages[id]; /* towers.js의 옛 const와 이름이 같아 window.로 읽음 */ return p ? `<img class="${cls}" src="${p}" alt="" draggable="false">` : `<span class="${cls} pb-noimg">${window.ICON ? ICON(GachaTowerDefs[id].type, 40) : ''}</span>`; };
+  // ---------- 화면 공통 ----------
+  const esc = x => String(x).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const srcOf = id => window.TowerSpriteImages && window.TowerSpriteImages[id]; /* towers.js의 옛 const와 이름이 같아 window.로 읽음 */
+  const img = (id, cls = '') => { const p = srcOf(id); return p ? `<img class="${cls}" src="${p}" alt="" draggable="false">` : `<span class="${cls} pb-noimg">${window.ICON ? ICON(GachaTowerDefs[id].type, 40) : ''}</span>`; };
   const tIcon = (t, n = 16) => (window.ICON ? ICON(t, n) : '');
   const typeChip = t => `<i class="pb-type" style="--tc:var(--t-${t})">${tIcon(t, 13)}${TKR[t]}</i>`;
-  const sleep = ms => new Promise(r => setTimeout(r, ms));
   const sfx = k => { try { window.GameAudio && GameAudio.sfx.play(k); } catch (_) {} };
-  // 트레이너 엠블럼 (자체 디자인 SVG: 색 원판 + 모자 실루엣 / 로켓단은 로켓 문양)
   const CAP = '<path d="M15 33c0-10 6-16.5 14-16.5S43 23 43 33z" fill="#fff"/><path d="M11 33.5h36c0 3.2-2.6 5-5.8 5H14.6c-2.4 0-3.6-2.1-3.6-5z" fill="#fff" opacity=".86"/><path d="M29 16.5c-2.5 3.2-3.3 9-3.3 16.5" stroke="var(--tc)" stroke-width="2.2" fill="none" opacity=".55"/>';
   const ROCKET = '<path d="M29 9c7.5 5.5 10.5 14 10.5 23l-4 6.5h-13l-4-6.5C18.5 23 21.5 14.5 29 9z" fill="#fff"/><circle cx="29" cy="24" r="4.2" fill="var(--tc)"/><path d="M22.5 37.5 16 46l8.5-3.6zm13 0L42 46l-8.5-3.6z" fill="#fff" opacity=".86"/>';
-  const emblem = (id, size = 48) => { const T = TRAINERS[id] || TRAINERS.red;
-    return `<svg class="pb-emb" width="${size}" height="${size}" viewBox="0 0 58 58" style="--tc:${T.color}" aria-hidden="true"><defs><radialGradient id="g-${id}" cx="35%" cy="30%" r="75%"><stop offset="0" stop-color="#fff" stop-opacity=".35"/><stop offset="1" stop-color="#000" stop-opacity=".25"/></radialGradient></defs><circle cx="29" cy="29" r="27" fill="${T.color}"/><circle cx="29" cy="29" r="27" fill="url(#g-${id})"/><circle cx="29" cy="29" r="25.5" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width="1.5"/>${id === 'rocket' ? ROCKET : CAP}</svg>`; };
+  let embN = 0;
+  const emblem = (id, size = 48) => { const T = TRAINERS[id] || TRAINERS.red, gid = 'pbg' + (embN++);
+    return `<svg class="pb-emb" width="${size}" height="${size}" viewBox="0 0 58 58" style="--tc:${T.color}" aria-hidden="true"><defs><radialGradient id="${gid}" cx="35%" cy="30%" r="75%"><stop offset="0" stop-color="#fff" stop-opacity=".35"/><stop offset="1" stop-color="#000" stop-opacity=".25"/></radialGradient></defs><circle cx="29" cy="29" r="27" fill="${T.color}"/><circle cx="29" cy="29" r="27" fill="url(#${gid})"/><circle cx="29" cy="29" r="25.5" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width="1.5"/>${id === 'rocket' ? ROCKET : CAP}</svg>`; };
   const LV_KR = ['쉬움', '보통', '어려움'];
   const STAT_LBL = { hp: '체력', atk: '공격', def: '방어', spd: '스피드' };
+  const SLOT_KR = { basic: '기본기', main: '주력기', special: '특수기' };
+  const moveDesc = m => { const f = m.fx || {}, o = [];
+    if (m.power) o.push(`위력 ${m.power}${f.hits ? ` ×${f.hits[0]}~${f.hits[1]}` : ''}`); if (m.acc < 100) o.push(`명중 ${m.acc}`);
+    if (m.tgt === 'foes') o.push('상대 전체'); if (m.tgt === 'ally') o.push('아군 1마리'); if (f.st) o.push(`${Math.round(f.ch * 100)}% ${ST_KR[f.st]}`);
+    if (f.slow) o.push(`${f.slow}초 둔화`); if (f.push) o.push(f.cut ? '게이지 밀기·끊기' : `게이지 -${f.push}`); if (f.crit) o.push(`급소 ${Math.round(f.crit * 100)}%`); if (f.pierce) o.push('방어 무시');
+    if (f.recoil) o.push(`반동 ${Math.round(f.recoil * 100)}%`); if (f.stack) o.push('쓸수록 강해짐'); if (f.heal) o.push(`체력 ${Math.round(f.heal * 100)}% 회복`); if (f.taunt) o.push(`${f.taunt}초 도발·방어 +1`);
+    else if (f.stage) o.push(`${STAT_KR[f.stage[0]]} +${f.stage[1]}`); if (f.debuff) o.push(`방어 ${f.debuff[1]}`); if (f.finisher) o.push(`체력 ${f.finisher * 100}% 미만 2배`); if (f.vsFast) o.push('빠른 상대에게 강함');
+    return o.join(' · '); };
 
   const PB = window.PokeBattle = {
-    root: null, net: null, code: null, me: 'p1', room: null, unsub: null, st: null, seed: 1, cpu: false, cpuLv: 1, busy: false, hbT: null, tmT: null,
+    root: null, net: null, code: null, me: 'p1', room: null, unsub: null, st: null, cpu: false, cpuLv: 1, hbT: null, arena: null,
 
-    _root() { document.getElementById('pb-root')?.remove(); const r = document.createElement('div'); r.id = 'pb-root'; document.body.appendChild(r); this.root = r; return r; },
+    _root() { this._stopLoop(); document.getElementById('pb-root')?.remove(); const r = document.createElement('div'); r.id = 'pb-root'; document.body.appendChild(r); this.root = r; return r; },
     close() {
-      this.unsub && this.unsub(); this.unsub = null; clearInterval(this.hbT); clearInterval(this.tmT);
+      this._stopLoop(); this.unsub && this.unsub(); this.unsub = null; clearInterval(this.hbT); window.removeEventListener('keydown', this._key);
       if (this.code && this.net && !this.cpu) this.net.update(this.code, { [`${this.me}.left`]: true }).catch(() => {});
       this.root && this.root.remove(); this.root = null; this.code = null; this.room = null; this.st = null;
     },
@@ -276,9 +259,9 @@
     openMenu() {
       const r = this._root();
       r.innerHTML = `<div class="pb-menu">
-        <div class="pb-hero">${['red', 'blue', 'green', 'yellow', 'rocket'].map((id, i) => `<span style="--i:${i}">${emblem(id, 46)}</span>`).join('')}</div>
+        <div class="pb-hero">${TR_IDS.map((id, i) => `<span style="--i:${i}">${emblem(id, 46)}</span>`).join('')}</div>
         <div class="pb-h1">포켓몬 배틀</div>
-        <p class="pb-sub">151마리 모두 같은 힘. 상성과 기술, 교체 타이밍으로 이기는 3:3 턴제 대결</p>
+        <p class="pb-sub">3마리가 한꺼번에 나서는 실시간 난전. 게이지가 찬 포켓몬의 기술을 상대에게 끌어다 놓으세요</p>
         <button class="pb-btn primary" data-a="cpu">연습하기 (CPU)</button>
         <button class="pb-btn" data-a="create">친구와 대결 · 방 만들기</button>
         <div class="pb-join"><input class="pb-code" inputmode="numeric" maxlength="4" placeholder="방 코드 4자리" aria-label="방 코드"><button class="pb-btn" data-a="join">참가</button></div>
@@ -289,7 +272,7 @@
       r.querySelector('[data-a="create"]').onclick = async () => {
         this.net = this.net || Versus.makeNet(); this.cpu = false;
         const code = String(1000 + Math.floor(Math.random() * 9000));
-        try { await this.net.create(code, { code, kind: 'battle', state: 'pick', created: Date.now(), seed: (Math.random() * 1e9) >>> 0, p1: { name: this.myName(), hb: Date.now(), ready: false }, p2: null, acts: {} });
+        try { await this.net.create(code, { code, kind: 'battle', state: 'pick', created: Date.now(), seed: (Math.random() * 1e9) >>> 0, p1: { name: this.myName(), hb: Date.now(), ready: false }, p2: null, log: {}, cmd: {} });
           this.code = code; this.me = 'p1'; this.openPick(); } catch (e) { msg(Versus._errText(e)); }
       };
       r.querySelector('[data-a="join"]').onclick = async () => {
@@ -303,25 +286,26 @@
       };
     },
 
-    // ----- 팀 고르기 (격투게임식 얼굴 격자) -----
+    // ----- 팀 고르기: 위 = 내 3마리 큰 초상(전열 크게, 트레이너 엠블럼 워터마크), 아래 = 얼굴 격자 -----
     openPick() {
       const r = this._root(), all = roster();
       let team = [], trainer = TRAINERS[this._pref('trainer')] ? this._pref('trainer') : 'red', filter = 'all', focus = all[0].id, ready = false;
       this.cpuLv = Math.max(0, Math.min(2, +(this._pref('lv') ?? 1)));
       const render = () => {
         const d = GachaTowerDefs[focus], s = statsOf(d), mv = movesOf(d), max = { hp: 200, atk: 85, def: 85, spd: 85 }, T = TRAINERS[trainer];
+        const slot = (i, lbl) => { const id = team[i], x = id && GachaTowerDefs[id]; return `<button class="pb-por ${i === 0 ? 'front' : ''} ${id ? '' : 'empty'}" ${id ? `data-rm="${i}" aria-label="${esc(x.name)} 빼기"` : 'disabled'} style="--tc:var(--t-${x ? x.type : 'normal'})">${id ? img(id, 'pb-porimg') : ''}<span class="pb-porlbl">${lbl}</span>${id ? `<b>${esc(x.name)}</b>` : '<b class="pb-porph">비어 있음</b>'}</button>`; };
         r.innerHTML = `<div class="pb-pick">
           <header class="pb-top"><button class="pb-x" data-a="back" aria-label="뒤로">${window.ICON ? ICON('back', 20) : '‹'}</button><b>${this.cpu ? '연습 모드' : '방 ' + this.code}</b><span class="pb-count">${team.length}/3</span></header>
-          <div class="pb-trainers" role="radiogroup" aria-label="트레이너">${TR_IDS.map(id => `<button role="radio" aria-checked="${trainer === id}" data-tr="${id}" class="${trainer === id ? 'on' : ''}" style="--tc:${TRAINERS[id].color}" ${ready ? 'disabled' : ''}>${emblem(id, 34)}<b>${TRAINERS[id].name}</b><small>${TRAINERS[id].style}</small></button>`).join('')}</div>
-          <p class="pb-trdesc" style="--tc:${T.color}"><b>${T.name}</b> ${T.desc}${trainer === "yellow" ? "" : ". 회복약 1개"}</p>
-          <div class="pb-team">${[0, 1, 2].map(i => { const id = team[i]; return id ? `<button class="pb-slot" data-rm="${i}" aria-label="${esc(GachaTowerDefs[id].name)} 빼기" style="--tc:var(--t-${GachaTowerDefs[id].type})">${img(id)}<span>${esc(GachaTowerDefs[id].name)}</span>${i === 0 ? '<i>선봉</i>' : ''}</button>` : `<div class="pb-slot empty">${i === 0 ? '선봉' : '빈 자리'}</div>`; }).join('')}</div>
-          <section class="pb-detail" style="--tc:var(--t-${d.type})">${img(d.id, 'pb-dimg')}<div class="pb-dinfo"><div class="pb-dname"><b>${esc(d.name)}</b>${typeChip(d.type)}<span class="pb-shape">${shapeOf(d)}</span></div>
+          <section class="pb-stage" style="--tc:${T.color}"><div class="pb-stagebg">${emblem(trainer, 170)}</div>${slot(0, '전열 · 1')}<div class="pb-back">${slot(1, '후열 · 2')}${slot(2, '후열 · 3')}</div></section>
+          <div class="pb-trainers" role="radiogroup" aria-label="트레이너">${TR_IDS.map(id => `<button role="radio" aria-checked="${trainer === id}" data-tr="${id}" class="${trainer === id ? 'on' : ''}" style="--tc:${TRAINERS[id].color}" ${ready ? 'disabled' : ''}>${emblem(id, 30)}<b>${TRAINERS[id].name}</b></button>`).join('')}</div>
+          <p class="pb-trdesc" style="--tc:${T.color}"><b>${T.name} · ${T.style}</b> ${T.desc}${trainer === 'yellow' ? '' : '. 회복약 1개'}</p>
+          <section class="pb-detail" style="--tc:var(--t-${d.type})">${img(d.id, 'pb-dimg')}<div class="pb-dinfo"><div class="pb-dname"><b>${esc(d.name)}</b>${typeChip(d.type)}<span class="pb-shape">${shapeOf(d)} · 게이지 ${cycleSec(s)}초</span></div>
             <div class="pb-stats">${['hp', 'atk', 'def', 'spd'].map(k => `<div><span>${STAT_LBL[k]}</span><i><b style="width:${Math.min(100, s[k] / max[k] * 100)}%"></b></i><em>${s[k]}</em></div>`).join('')}</div>
-            <div class="pb-mvs">${mv.map(m => `<span style="--tc:var(--t-${m.type})" title="${esc(this._moveDesc(m))}">${esc(m.name)}<small>${m.kind === 'status' ? '변화' : m.power}</small></span>`).join('')}</div></div></section>
+            <div class="pb-mvs">${mv.map(m => `<span style="--tc:var(--t-${m.type})" title="${esc(moveDesc(m))}"><small>${SLOT_KR[m.slot]} ${m.cost}</small>${esc(m.name)}</span>`).join('')}</div></div></section>
           <nav class="pb-filter" aria-label="타입 거르기">${['all', 'fire', 'water', 'electric', 'grass', 'psychic', 'normal'].map(t => `<button data-f="${t}" class="${filter === t ? 'on' : ''}" ${t !== 'all' ? `style="--tc:var(--t-${t})"` : ''}>${t === 'all' ? '전체' : tIcon(t, 15) + TKR[t]}</button>`).join('')}</nav>
           <div class="pb-grid">${all.filter(x => filter === 'all' || x.type === filter).map(x => { const inT = team.includes(x.id), full = !inT && team.length >= 3;
             return `<button class="pb-face ${inT ? 'in' : ''} ${focus === x.id ? 'focus' : ''} ${full ? 'full' : ''}" data-id="${x.id}" style="--tc:var(--t-${x.type})" aria-label="${esc(x.name)}">${img(x.id)}<span>${esc(x.name)}</span>${inT ? `<i>${team.indexOf(x.id) + 1}</i>` : ''}</button>`; }).join('')}</div>
-          <footer class="pb-bottom">${this.cpu ? `<div class="pb-lv" role="radiogroup" aria-label="CPU 난이도">${LV_KR.map((t, i) => `<button role="radio" aria-checked="${this.cpuLv === i}" data-lv="${i}" class="${this.cpuLv === i ? 'on' : ''}">${t}</button>`).join('')}</div>` : `<span class="pb-wait">${this._pickWaitText(ready)}</span>`}
+          <footer class="pb-bottom">${this.cpu ? `<div class="pb-lv" role="radiogroup" aria-label="CPU 난이도">${LV_KR.map((t, i) => `<button role="radio" aria-checked="${this.cpuLv === i}" data-lv="${i}" class="${this.cpuLv === i ? 'on' : ''}">${t}</button>`).join('')}</div>` : `<span class="pb-wait">${this._pickWaitText()}</span>`}
             <button class="pb-btn primary" data-a="ready" ${team.length === 3 ? '' : 'disabled'}>${ready ? '준비 취소' : team.length === 3 ? (this.cpu ? '대결 시작' : '준비 완료') : `${3 - team.length}마리 더`}</button></footer></div>`;
         r.querySelector('[data-a="back"]').onclick = () => { this.close(); this.openMenu(); };
         r.querySelectorAll('[data-tr]').forEach(b => b.onclick = () => { trainer = b.dataset.tr; this._pref('trainer', trainer); sfx('tap'); render(); });
@@ -336,7 +320,7 @@
         const grid = r.querySelector('.pb-grid'); if (grid) { grid.scrollTop = this._gridScroll || 0; grid.addEventListener('scroll', () => { this._gridScroll = grid.scrollTop; }, { passive: true }); }
         r.querySelector('[data-a="ready"]').onclick = () => {
           if (team.length !== 3) return;
-          if (this.cpu) { this.seed = (Math.random() * 1e9) >>> 0; const R = rngOf(this.seed ^ 77); this.startBattle({ name: this.myName(), trainer, team }, { name: `CPU · ${LV_KR[this.cpuLv]}`, trainer: TR_IDS[Math.floor(R() * TR_IDS.length)], team: cpuTeam(R, this.cpuLv, team) }); return; }
+          if (this.cpu) { const seed = (Math.random() * 1e9) >>> 0, R = rngOf(seed ^ 77); this.startBattle({ name: this.myName(), trainer, team }, { name: `CPU · ${LV_KR[this.cpuLv]}`, trainer: TR_IDS[Math.floor(R() * TR_IDS.length)], team: cpuTeam(R, this.cpuLv, team) }, seed); return; }
           ready = !ready; this.net.update(this.code, { [`${this.me}.ready`]: ready, [`${this.me}.trainer`]: trainer, [`${this.me}.team`]: team, [`${this.me}.hb`]: Date.now() }).catch(() => {}); render();
         };
       };
@@ -347,160 +331,230 @@
           if (!d) return; this.room = d;
           if (d.state === 'battle' && !this.st) return this.startBattle(d.p1, d.p2, d.seed);
           if (d.p1 && d.p2 && d.p1.ready && d.p2.ready && d.state === 'pick') this.net.update(this.code, { state: 'battle' }).catch(() => {});
-          const w = this.root && this.root.querySelector('.pb-wait'); if (w) w.textContent = this._pickWaitText(d[this.me] && d[this.me].ready);
+          const w = this.root && this.root.querySelector('.pb-wait'); if (w) w.textContent = this._pickWaitText();
         });
         clearInterval(this.hbT); this.hbT = setInterval(() => this.code && this.net.update(this.code, { [`${this.me}.hb`]: Date.now() }).catch(() => {}), HB_MS);
       }
     },
-    _pickWaitText(ready) {
+    _pickWaitText() {
       const o = this.room && this.room[this.me === 'p1' ? 'p2' : 'p1'];
       return !o ? `코드 ${this.code}를 친구에게 알려주세요` : o.ready ? `상대(${esc(o.name)}) 준비 완료` : `상대(${esc(o.name)})가 팀을 고르는 중`;
     },
-    _moveDesc(m) {
-      const f = m.fx || {}, o = [];
-      if (m.kind !== 'status') o.push(`위력 ${m.power}`); if (m.acc && m.acc < 100) o.push(`명중 ${m.acc}`); if (m.pri) o.push('먼저 공격');
-      if (f.st) o.push(`${Math.round(f.ch * 100)}% ${ST_KR[f.st]}`); if (f.stage) o.push(`${f.stage[2] === 'self' ? '내' : '상대'} ${STAT_KR[f.stage[0]]} ${f.stage[1] > 0 ? '+' : ''}${f.stage[1]}`);
-      if (f.hits) o.push(`${f.hits[0]}~${f.hits[1]}회 공격`); if (f.crit) o.push(`급소율 ${Math.round(f.crit * 100)}%`); if (f.pierce) o.push('방어 무시');
-      if (f.force) o.push('상대 강제 교체'); if (f.recoil) o.push(`반동 ${f.recoil * 100}%`); if (f.stack) o.push('쓸수록 위력 상승'); if (f.heal) o.push(`체력 ${f.heal * 100}% 회복`);
-      if (f.finisher) o.push(`상대 체력 ${f.finisher * 100}% 미만이면 위력 2배`); if (f.vsFast) o.push('나보다 빠른 상대에게 강함');
-      return o.join(', ');
-    },
 
-    // ----- 배틀 -----
-    startBattle(p1, p2, seed) {
-      if (seed) this.seed = seed;
-      this.st = newState(p1, p2); this.view = JSON.parse(JSON.stringify(this.st)); this.busy = false; this.acts = {}; this._sent = {};
+    // ----- 대결 -----
+    async startBattle(p1, p2, seed) {
+      this.st = newState(p1, p2, seed); this.mem = {}; this.log = []; this.snaps = []; this.cmdN = 0; this.hostSeen = 0; this.sel = null; this.aim = null; this.seenEv = new Set(); this._resultShown = false;
       const r = this._root(), foe = foeOf(this.me), F = this.st.side[foe], M = this.st.side[this.me];
       r.innerHTML = `<div class="pb-battle">
-        <div class="pb-bar foe"><span class="pb-balls" data-s="${foe}"></span><b>${esc(F.name)}</b>${emblem(F.trainer, 28)}</div>
-        <div class="pb-field">
-          <div class="pb-plat foe"></div><div class="pb-plat me"></div>
-          <div class="pb-card foe" data-s="${foe}"></div><div class="pb-mon foe" data-s="${foe}"></div>
-          <div class="pb-mon me" data-s="${this.me}"></div><div class="pb-card me" data-s="${this.me}"></div>
-        </div>
-        <div class="pb-bar me">${emblem(M.trainer, 28)}<b>${esc(M.name)}</b><span class="pb-balls" data-s="${this.me}"></span><button class="pb-ff" data-a="ff">기권</button></div>
-        <div class="pb-log" aria-live="polite">대결 시작!</div>
-        <div class="pb-cmd"></div></div>`;
+        <div class="pb-arena"></div>
+        <div class="pb-hudtop"><span class="pb-tr">${emblem(F.trainer, 26)}<b>${esc(F.name)}</b></span><span class="pb-clock" aria-label="남은 시간">3:00</span><button class="pb-ff" data-a="ff">기권</button></div>
+        <div class="pb-fcards">${F.units.map(u => `<div class="pb-fc" data-i="${u.i}" style="--tc:var(--t-${u.type})"><div class="pb-fcn"><b>${esc(u.name)}</b>${tIcon(u.type, 14)}</div><em class="pb-stc"></em><i class="pb-hpb"><b></b></i><i class="pb-gb"><b></b></i></div>`).join('')}</div>
+        <div class="pb-ticker" aria-live="polite"></div>
+        <div class="pb-tray" hidden></div>
+        <div class="pb-mycards">${M.units.map(u => `<button class="pb-mc" data-i="${u.i}" style="--tc:var(--t-${u.type})" aria-label="${esc(u.name)} 선택 (${u.i + 1})">${img(u.id, 'pb-mcimg')}<span class="pb-mcn"><b>${esc(u.name)}</b><small>${u.i === 0 ? '전열' : '후열'}</small></span><em class="pb-stc"></em><span class="pb-mchp"></span><i class="pb-hpb"><b></b></i><i class="pb-gb"><b></b><s></s></i><kbd>${u.i + 1}</kbd></button>`).join('')}
+          <button class="pb-itembtn" data-a="item" aria-label="회복약">${window.ICON ? ICON('candy', 22) : ''}<span>회복약</span><b></b></button></div>
+        <div class="pb-loading">경기장 준비 중</div></div>`;
       r.querySelector('[data-a="ff"]').onclick = () => { if (confirm('기권하면 바로 패배해요. 기권할까요?')) this._forfeit(); };
-      ['p1', 'p2'].forEach(s => this._drawSide(s));
+      try { const mod = await import('./arena3d.js'); if (!this.root) return; this.arena = mod.createArena(r.querySelector('.pb-arena'));
+        const side = s => (s === this.me ? 'me' : 'foe');
+        for (const s of ['p1', 'p2']) this.st.side[s].units.forEach(u => this.arena.setUnit(side(s), u.i, srcOf(u.id), side(s) === 'me'));
+      } catch (e) { console.warn('3D 경기장 실패', e); r.querySelector('.pb-arena').classList.add('fallback'); }
+      r.querySelector('.pb-loading')?.remove();
+      this._bindInput(); this._drawHud();
       this._intro(M, F);
       if (!this.cpu) {
         this.unsub && this.unsub();
-        this.unsub = this.net.listen(this.code, d => { if (d) { this.room = d; this._pump(); } });
+        this.unsub = this.net.listen(this.code, d => { if (d) this._onRoom(d); });
         clearInterval(this.hbT); this.hbT = setInterval(() => this.code && this.net.update(this.code, { [`${this.me}.hb`]: Date.now() }).catch(() => {}), HB_MS);
       }
-      setTimeout(() => this._pump(), matchMedia('(prefers-reduced-motion: reduce)').matches ? 200 : 1900);
+      setTimeout(() => this._startLoop(), matchMedia('(prefers-reduced-motion: reduce)').matches ? 200 : 1800);
     },
-    // 시작 연출 (이 모드의 단 하나의 큰 연출): 두 트레이너 카드가 양쪽에서 들어와 VS
     _intro(M, F) {
       const ov = document.createElement('div'); ov.className = 'pb-intro';
-      const card = (sd, side) => `<div class="pb-ic ${side}" style="--tc:${TRAINERS[sd.trainer].color}">${emblem(sd.trainer, 64)}<div><b>${esc(sd.name)}</b><small>${TRAINERS[sd.trainer].name} · ${TRAINERS[sd.trainer].style}</small><span>${sd.mons.map(m => img(m.id)).join('')}</span></div></div>`;
+      const card = (sd, side) => `<div class="pb-ic ${side}" style="--tc:${TRAINERS[sd.trainer].color}">${emblem(sd.trainer, 64)}<div><b>${esc(sd.name)}</b><small>${TRAINERS[sd.trainer].name} · ${TRAINERS[sd.trainer].style}</small><span>${sd.units.map(u => img(u.id)).join('')}</span></div></div>`;
       ov.innerHTML = `${card(F, 'foe')}<div class="pb-vs">VS</div>${card(M, 'me')}`;
       this.root.appendChild(ov); sfx('wave_start');
-      setTimeout(() => ov.classList.add('out'), 1500); setTimeout(() => ov.remove(), 1850);
+      setTimeout(() => ov.classList.add('out'), 1450); setTimeout(() => ov.remove(), 1800);
     },
-    _actsFor(stepNo) { return this.cpu ? (this.acts[stepNo] || {}) : ((this.room && this.room.acts && this.room.acts[stepNo]) || {}); },
-    async _pump() {
-      if (this.busy || !this.st) return; this.busy = true;
-      try {
-        for (;;) {
-          if (this.st.winner) { this._result(); break; }
-          const a = this._actsFor(this.st.step);
-          if (this.cpu) for (const s of this.st.need) if (s !== this.me && !a[s]) { a[s] = cpuChoose(this.st, s, rngOf((this.seed + this.st.step * 7919) >>> 0), this.cpuLv); this.acts[this.st.step] = a; }
-          if (!this.cpu) { const o = this.room && this.room[foeOf(this.me)]; if (o && (o.left || (o.hb && Date.now() - o.hb > 40000))) { this.st.winner = this.me; this._result('상대가 대결을 나갔어요'); break; } }
-          if (this.st.need.every(s => a[s])) {
-            const ev = step(this.st, a, this.seed); await this._play(ev); this.view = JSON.parse(JSON.stringify(this.st)); ['p1', 'p2'].forEach(s => this._drawSide(s)); continue;
-          }
-          if (this.st.need.includes(this.me) && !a[this.me]) this._askInput(); else this._waitInput();
-          break;
-        }
-      } finally { this.busy = false; }
-    },
-    _submit(action) {
-      const no = this.st.step; if (this._sent[no]) return; this._sent[no] = true; clearInterval(this.tmT);
-      this.root.querySelector('.pb-cmd').innerHTML = this.cpu ? '' : '<div class="pb-wait2">상대의 선택을 기다리는 중</div>';
-      if (this.cpu) { (this.acts[no] = this.acts[no] || {})[this.me] = action; this._pump(); }
-      else this.net.update(this.code, { [`acts.${no}.${this.me}`]: action }).catch(() => { this._sent[no] = false; this._askInput(); });
-    },
-    _waitInput() { const c = this.root.querySelector('.pb-cmd'); if (c) c.innerHTML = `<div class="pb-wait2">${this.st.phase === 'replace' ? '상대가 다음 포켓몬을 고르는 중' : '상대의 선택을 기다리는 중'}</div>`; },
-    _askInput() {
-      const c = this.root.querySelector('.pb-cmd'), sd = this.st.side[this.me], m = act(sd), foe = act(this.st.side[foeOf(this.me)]);
-      const team = only => `<div class="pb-swl">${sd.mons.map((x, i) => { const e = eff(foe.type, x.type); return `<button data-sw="${i}" ${x.hp <= 0 || i === sd.active ? 'disabled' : ''}>${img(x.id)}<span>${esc(x.name)} ${typeChip(x.type)}${x.hp > 0 && i !== sd.active ? (e > 1 ? '<em class="pb-risk dn">상대에게 약함</em>' : e < 1 ? '<em class="pb-risk up">상대에게 강함</em>' : '') : ''}</span><i class="pb-hpbar"><b style="width:${x.hp / x.maxHp * 100}%"></b></i><small>${x.hp <= 0 ? '기절' : i === sd.active ? '싸우는 중' : `${x.hp}/${x.maxHp}${x.status ? ' · ' + ST_KR[x.status] : ''}`}</small></button>`; }).join('')}</div>${only ? '' : '<button class="pb-btn ghost" data-a="cancel">돌아가기</button>'}`;
-      if (this.st.phase === 'replace') { c.innerHTML = `<div class="pb-ask">다음에 내보낼 포켓몬</div>${team(true)}`; c.querySelectorAll('[data-sw]').forEach(b => b.onclick = () => this._submit({ t: 'switch', to: +b.dataset.sw })); this._timer(() => this._submit({ t: 'switch', to: sd.mons.findIndex((x, i) => x.hp > 0 && i !== sd.active) })); return; }
-      const main = () => {
-        const moves = m.pp.every(p => p <= 0) ? `<button data-mv="-1" style="--tc:var(--t-normal)"><b>${STRUGGLE.name}</b><span>기술을 모두 써서 마지막 힘을 짜낸다</span></button>`
-          : m.moves.map((mv, i) => { const e = mv.kind === 'status' ? 1 : eff(mv.type, foe.type); return `<button data-mv="${i}" style="--tc:var(--t-${mv.type})" ${m.pp[i] <= 0 ? 'disabled' : ''} title="${esc(this._moveDesc(mv))}"><b>${tIcon(mv.type, 16)}${esc(mv.name)}</b><span>${esc(this._moveDesc(mv)) || '부가효과 없음'}</span><em>${m.pp[i]}/${mv.pp}</em>${e > 1 ? '<i class="up">효과 큼</i>' : e < 1 ? '<i class="dn">효과 약함</i>' : ''}</button>`; }).join('');
-        c.innerHTML = `<div class="pb-moves">${moves}</div><div class="pb-acts"><button data-a="sw">교체</button><button data-a="item" ${sd.item > 0 ? '' : 'disabled'}>회복약 ${sd.item}</button>${this.cpu ? '' : '<span class="pb-timer" aria-label="남은 시간"></span>'}</div>`;
-        c.querySelectorAll('[data-mv]').forEach(b => b.onclick = () => this._submit({ t: 'move', i: +b.dataset.mv }));
-        c.querySelector('[data-a="sw"]').onclick = () => { c.innerHTML = `<div class="pb-ask">누구로 바꿀까요?</div>${team(false)}`; c.querySelectorAll('[data-sw]').forEach(b => b.onclick = () => this._submit({ t: 'switch', to: +b.dataset.sw })); c.querySelector('[data-a="cancel"]').onclick = main; };
-        c.querySelector('[data-a="item"]').onclick = () => this._submit({ t: 'item' });
+    // 시뮬레이션: 고정 20틱/초. 연습에서 기술을 고르는 동안 0.25배(불릿타임)
+    _startLoop() {
+      cancelAnimationFrame(this.raf); let last = performance.now(), acc = 0, uiAcc = 0;
+      const loop = now => {
+        if (!this.st || !this.root) return; this.raf = requestAnimationFrame(loop);
+        const dt = Math.min(0.1, (now - last) / 1000); last = now;
+        if (!this.st.winner) { acc += dt * (this.cpu && this.sel ? 0.25 : 1); let n = 0; while (acc >= 1 / TPS && n++ < 8) { acc -= 1 / TPS; this._step(); if (this.st.winner) break; } }
+        this.root.classList.toggle('slow', !!(this.cpu && this.sel));
+        uiAcc += dt; if (uiAcc > 0.08) { uiAcc = 0; this._drawHud(); }
+        if (this.st.winner && !this._resultShown && (this.cpu || this.me === 'p1' || (this.room && this.room.state === 'ended'))) this._result();
       };
-      main();
-      this._timer(() => this._submit(validate(this.st, this.me, null)));
+      this.raf = requestAnimationFrame(loop);
     },
-    _timer(onEnd) {
-      if (this.cpu) return; clearInterval(this.tmT); let left = TURN_SEC;
-      const tick = () => { const el = this.root && this.root.querySelector('.pb-timer'); if (el) { el.textContent = left; el.classList.toggle('low', left <= 10); } if (left-- <= 0) { clearInterval(this.tmT); onEnd(); } };
-      tick(); this.tmT = setInterval(tick, 1000);
+    _stopLoop() { cancelAnimationFrame(this.raf); this.raf = 0; if (this.arena) { this.arena.dispose(); this.arena = null; } },
+    _step() {
+      const st = this.st, ev = [];
+      if (st.t % TPS === 0) { this.snaps.push(JSON.stringify(st)); if (this.snaps.length > 40) this.snaps.shift(); }
+      for (const L of this.log) if (L.tk === st.t + 1) apply(st, L.a, ev);
+      if (this.cpu) { const R = rngOf((st.seed + st.t * 7919) >>> 0); for (const a of cpuThink(st, foeOf(this.me), this.cpuLv, R, this.mem)) apply(st, a, ev); }
+      tick(st, ev);
+      this._fx(ev);
     },
-
-    // ----- 그리기·연출 -----
-    _drawSide(s) {
-      const sd = this.view.side[s], m = sd.mons[sd.active], r = this.root; if (!r) return;
-      const card = r.querySelector(`.pb-card[data-s="${s}"]`), mon = r.querySelector(`.pb-mon[data-s="${s}"]`), balls = r.querySelector(`.pb-balls[data-s="${s}"]`);
-      if (balls) balls.innerHTML = sd.mons.map(x => `<i class="${x.hp <= 0 ? 'out' : ''}" title="${esc(x.name)}"></i>`).join('');
-      const pct = m.hp / m.maxHp;
-      if (card) card.innerHTML = `<div class="pb-cname"><b>${esc(m.name)}</b>${tIcon(m.type, 18)}${m.status ? `<em class="pb-st ${m.status}">${ST_KR[m.status]}</em>` : ''}</div>
-        <div class="pb-hprow"><span>HP</span><i class="pb-hp"><b style="width:${pct * 100}%" class="${pct < 0.25 ? 'red' : pct < 0.5 ? 'yel' : ''}"></b></i></div>${s === this.me ? `<span class="pb-hpn">${m.hp} / ${m.maxHp}</span>` : ''}
-        <span class="pb-stg">${['atk', 'def', 'spd'].filter(k => m.stg[k]).map(k => `<i class="${m.stg[k] > 0 ? 'up' : 'dn'}">${STAT_KR[k]} ${m.stg[k] > 0 ? '+' : ''}${m.stg[k]}</i>`).join('')}</span>`;
-      if (mon && mon.dataset.id !== m.id + ':' + sd.active) { mon.dataset.id = m.id + ':' + sd.active; mon.innerHTML = img(m.id, 'pb-sprite'); mon.classList.remove('faint'); }
-      if (mon) mon.classList.toggle('faint', m.hp <= 0);
+    // 입력 → 기록. 연습·방장: 다음 틱 / 손님: 방 문서로 보내면 방장이 적용 틱을 정함
+    _commit(a) {
+      a.s = this.me;
+      if (this.cpu) { this.log.push({ tk: this.st.t + 1, a }); return; }
+      if (this.me === 'p1') { const tk = this.st.t + 2, k = this.log.length; this.log.push({ tk, a }); this.net.update(this.code, { [`log.${k}`]: { tk, a } }).catch(() => {}); }
+      else { const n = this.cmdN++; this.net.update(this.code, { [`cmd.${n}`]: a }).catch(() => {}); }
     },
-    _log(t) { const l = this.root && this.root.querySelector('.pb-log'); if (l) l.textContent = t; },
-    _who(s) { return s === this.me ? '' : '상대 '; },
-    async _play(ev) {
-      const fast = document.hidden, W = ms => (fast ? 0 : sleep(ms)), r = this.root; if (!r) return;
-      const monEl = s => r.querySelector(`.pb-mon[data-s="${s}"]`);
-      const cur = s => this.view.side[s].mons[this.view.side[s].active];
-      const setHp = (s, hp) => { cur(s).hp = hp; this._drawSide(s); };
-      const anim = (s, k) => { const el = monEl(s); if (el) { el.classList.remove(k); void el.offsetWidth; el.classList.add(k); } return el; };
-      for (const e of ev) {
-        if (!this.root) return;
-        if (e.t === 'use') { this._log(`${this._who(e.side)}${e.name}의 ${e.move}!`); if (e.kind !== 'status') anim(e.side, 'lunge'); else anim(e.side, 'charge'); sfx(e.kind === 'status' ? 'skill' : 'tap'); await W(650); }
-        else if (e.t === 'dmg') { const el = anim(e.side, 'hit'); if (el) this._pop(el, `-${e.amt}`, e.crit ? 'crit' : e.eff > 1 ? 'big' : ''); setHp(e.side, e.hp); sfx(e.crit ? 'pull_epic' : 'hit');
-          if (e.crit) this._log('급소에 맞았다!'); else if (e.eff > 1) this._log('상성이 좋다! 큰 피해 (×1.4)'); else if (e.eff < 1) this._log('상성이 나쁘다… 피해가 줄었다 (×0.7)'); await W(e.crit || e.eff !== 1 ? 750 : 450); }
-        else if (e.t === 'miss') { this._log('빗나갔다!'); await W(550); }
-        else if (e.t === 'recoil') { setHp(e.side, e.hp); this._log(`반동으로 ${e.amt} 피해를 입었다`); await W(500); }
-        else if (e.t === 'status') { cur(e.side).status = e.st; this._drawSide(e.side); anim(e.side, 'st-' + e.st); this._log(`${this._who(e.side)}${e.name}은(는) ${ST_KR[e.st]} 상태가 됐다!`); sfx('skill'); await W(650); }
-        else if (e.t === 'cure') { cur(e.side).status = null; this._drawSide(e.side); this._log(e.st === 'freeze' ? `${this._who(e.side)}${e.name}의 얼음이 녹았다!` : `${this._who(e.side)}${e.name}의 ${ST_KR[e.st]}이(가) 나았다!`); await W(550); }
-        else if (e.t === 'cant') { this._log(`${this._who(e.side)}${e.name}은(는) ${e.why}!`); await W(650); }
-        else if (e.t === 'stage') { cur(e.side).stg[e.stat] += e.d; this._drawSide(e.side); if (e.d) anim(e.side, e.d > 0 ? 'buff' : 'debuff'); this._log(e.d === 0 ? `${STAT_KR[e.stat]}은(는) 더 변하지 않는다` : `${this._who(e.side)}${e.name}의 ${STAT_KR[e.stat]} ${e.d > 0 ? '상승' : '하락'}${Math.abs(e.d) > 1 ? ' (크게)' : ''}`); await W(550); }
-        else if (e.t === 'heal' || e.t === 'item') { if (e.t === 'item') cur(e.side).status = null; setHp(e.side, e.hp); if (!e.small) { anim(e.side, 'buff'); this._log(e.t === 'item' ? `${this._who(e.side)}회복약 사용! ${e.name}의 체력이 회복됐다` : `${this._who(e.side)}${e.name}의 체력이 회복됐다`); sfx('buy'); } await W(e.small ? 250 : 550); }
-        else if (e.t === 'dot') { setHp(e.side, e.hp); anim(e.side, 'hit'); this._log(`${this._who(e.side)}${e.name}은(는) ${ST_KR[e.st]} 때문에 피해를 입었다`); await W(500); }
-        else if (e.t === 'faint') { const el = monEl(e.side); el && el.classList.add('faint'); this._log(`${this._who(e.side)}${e.name}은(는) 쓰러졌다!`); sfx('life_lost'); await W(900); }
-        else if (e.t === 'switch') { const sd = this.view.side[e.side]; sd.mons[sd.active].stg = { atk: 0, def: 0, spd: 0 }; sd.active = e.idx; this._drawSide(e.side); anim(e.side, 'enter');
-          this._log(e.forced ? `${this._who(e.side)}${e.name}이(가) 끌려 나왔다!` : e.side === this.me ? `가라, ${e.name}!` : `상대가 ${e.name}을(를) 내보냈다!`); sfx('place'); await W(700); }
-        else if (e.t === 'msg') { this._log(e.text); await W(450); }
+    _onRoom(d) {
+      this.room = d; const o = d[foeOf(this.me)];
+      if (o && (o.left || (o.hb && Date.now() - o.hb > 40000)) && this.st && !this.st.winner) { this.st.winner = this.me; this.st.why = '상대가 대결을 나갔어요'; }
+      if (!this.st) return;
+      if (this.me === 'p1') {
+        const cmds = d.cmd || {}; while (cmds[this.hostSeen]) { const a = { ...cmds[this.hostSeen], s: 'p2' }, tk = this.st.t + 2, k = this.log.length; this.log.push({ tk, a }); this.net.update(this.code, { [`log.${k}`]: { tk, a } }).catch(() => {}); this.hostSeen++; }
+        if (this.st.winner && d.state !== 'ended') this.net.update(this.code, { state: 'ended', winner: this.st.winner, why: this.st.why || '' }).catch(() => {});
+      } else {
+        const L = d.log || {}; let rewind = Infinity;
+        while (L[this.log.length]) { const e = L[this.log.length]; this.log.push(e); if (e.tk <= this.st.t) rewind = Math.min(rewind, e.tk); }
+        if (rewind < Infinity) this._rollback(rewind);
+        if (d.state === 'ended' && d.winner) { this.st.winner = d.winner; this.st.why = d.why || this.st.why; }
       }
     },
-    _pop(el, text, cls) { const p = document.createElement('span'); p.className = 'pb-pop ' + (cls || ''); p.textContent = text; el.appendChild(p); setTimeout(() => p.remove(), 900); },
-    _forfeit() { if (!this.st || this.st.winner) return; this.st.winner = foeOf(this.me); if (!this.cpu) this.net.update(this.code, { [`${this.me}.left`]: true }).catch(() => {}); this._result('기권했어요'); },
-    _result(why) {
-      clearInterval(this.tmT); const w = this.st.winner, win = w === this.me, draw = w === 'draw';
-      if (!this.cpu && this.code) this.net.update(this.code, { state: 'ended', winner: w }).catch(() => {});
+    _rollback(tk) { // 이미 지난 틱의 기록을 받으면: 그 전 저장점으로 되돌려 다시 계산
+      const now = this.st.t; let snap = null;
+      for (let k = this.snaps.length - 1; k >= 0; k--) { const s = JSON.parse(this.snaps[k]); if (s.t < tk) { snap = s; this.snaps.length = k + 1; break; } }
+      if (!snap) return;
+      this.st = snap; const ev = [];
+      while (this.st.t < now) { for (const L of this.log) if (L.tk === this.st.t + 1) apply(this.st, L.a, ev); tick(this.st, ev); if (this.st.t % TPS === 0) { this.snaps.push(JSON.stringify(this.st)); if (this.snaps.length > 40) this.snaps.shift(); } }
+      this._fx(ev.filter(e => e.k === 'faint' || e.k === 'act' || e.k === 'dmg'), true);
+    },
+
+    // ----- 입력: 내 카드 탭 → 기술 트레이 → 기술을 상대(아군)에게 끌어다 놓기 (또는 탭 → 대상 탭) -----
+    _bindInput() {
+      const r = this.root;
+      r.querySelectorAll('.pb-mc').forEach(b => b.onclick = () => this._select(+b.dataset.i));
+      r.querySelector('[data-a="item"]').onclick = () => this._openTray('item');
+      window.removeEventListener('keydown', this._key);
+      this._key = e => { if (!this.st) return; if (['1', '2', '3'].includes(e.key)) this._select(+e.key - 1); if (e.key === 'Escape') this._closeTray(); };
+      window.addEventListener('keydown', this._key);
+      r.querySelector('.pb-arena').addEventListener('pointerdown', e => { if (this.aim) { const h = this.arena && this.arena.hitTest(e.clientX, e.clientY); if (h) this._fire(this.aim.m, h); else this._closeTray(); } });
+    },
+    _select(i) {
+      const u = this.st.side[this.me].units[i]; if (!u || u.hp <= 0 || this.st.winner) return;
+      if (this.sel && this.sel.i === i) return this._closeTray();
+      if (u.g < 50 || u.busy > 0 || u.st === 'freeze') { this._tick(u.st === 'freeze' ? `${u.name}은(는) 얼어 있다` : `${u.name}의 게이지가 아직이에요 (50부터)`); return; }
+      this.sel = { i }; sfx('tap'); this._openTray(i);
+    },
+    _openTray(i) {
+      const tray = this.root.querySelector('.pb-tray'), sd = this.st.side[this.me];
+      this._clearMarks(); this.aim = null;
+      if (i === 'item') {
+        if (sd.items <= 0 || sd.itemCd > 0) return this._tick(sd.items <= 0 ? '회복약을 다 썼어요' : '회복약은 잠시 뒤에 다시 쓸 수 있어요');
+        this.sel = { i: 'item' };
+        tray.innerHTML = `<div class="pb-trayh"><b>회복약</b> 아군에게 끌어다 놓으세요 · 체력 40%와 상태이상 회복</div><div class="pb-moves one"><button class="pb-mv" data-m="item" style="--tc:#3ddc97"><span class="pb-mvi">${window.ICON ? ICON('candy', 28) : ''}</span><b>회복약</b><small>남은 ${sd.items}개</small></button></div>`;
+      } else {
+        const u = sd.units[i];
+        tray.innerHTML = `<div class="pb-trayh"><b>${esc(u.name)}</b> 기술 아이콘을 상대에게 끌어다 놓으세요</div><div class="pb-moves">${u.moves.map((m, k) => { const ok = canUse(u, m);
+          return `<button class="pb-mv ${ok ? '' : 'off'}" data-m="${k}" style="--tc:var(--t-${m.type})"><span class="pb-mvi">${tIcon(m.type, 28)}<i>${m.cost}</i></span><b>${esc(m.name)}</b><small>${SLOT_KR[m.slot]}</small><em>${esc(moveDesc(m))}</em></button>`; }).join('')}</div>`;
+      }
+      tray.hidden = false; this._drawHud();
+      tray.querySelectorAll('.pb-mv').forEach(b => b.addEventListener('pointerdown', e => this._dragStart(e, b.dataset.m)));
+    },
+    _closeTray() { this.sel = null; this.aim = null; const t = this.root && this.root.querySelector('.pb-tray'); if (t) t.hidden = true; this._clearMarks(); this.root && this.root.querySelector('.pb-ghost')?.remove(); this._drawHud(); },
+    _clearMarks() { if (!this.arena) return; for (const sd of ['me', 'foe']) for (let i = 0; i < 3; i++) this.arena.mark(sd, i, false); },
+    _moveOf(mk) { if (mk === 'item') return { tgt: 'ally', kind: 'heal', type: 'grass', item: true }; const u = this.st.side[this.me].units[this.sel.i]; return u && u.moves[+mk]; },
+    _dragStart(e, mk) {
+      if (!this.sel) return; const m = this._moveOf(mk); if (!m) return;
+      if (!m.item) { const u = this.st.side[this.me].units[this.sel.i]; if (!canUse(u, m)) { this._tick(`게이지 ${m.cost}이 필요해요`); return; } }
+      e.preventDefault();
+      if (m.tgt === 'self' || m.tgt === 'foes') { this._fire(mk, null); return; } // 대상 없는 기술은 누르면 바로
+      const sx = e.clientX, sy = e.clientY, btn = e.currentTarget, side = s => (s === this.me ? 'me' : 'foe'); let moved = false, ghost = null, hover = null;
+      const valid = h => h && (m.tgt === 'ally' ? h.side === 'me' : h.side === 'foe');
+      const list = m.item ? this.st.side[this.me].units.filter(u => u.hp > 0).map(u => ({ s: this.me, i: u.i })) : validTargets(this.st, this.me, m);
+      list.forEach(t => this.arena && this.arena.mark(side(t.s), t.i, true, m.tgt === 'ally' ? 0x3ddc97 : 0xffd34d));
+      const mv = ev => {
+        if (!moved && Math.hypot(ev.clientX - sx, ev.clientY - sy) > 8) { moved = true; ghost = btn.querySelector('.pb-mvi').cloneNode(true); ghost.className = 'pb-ghost'; ghost.style.setProperty('--tc', getComputedStyle(btn).getPropertyValue('--tc')); this.root.appendChild(ghost); }
+        if (ghost) { ghost.style.transform = `translate(${ev.clientX - 30}px, ${ev.clientY - 30}px)`; const h = this.arena && this.arena.hitTest(ev.clientX, ev.clientY); hover = valid(h) ? h : null; ghost.classList.toggle('on', !!hover); }
+      };
+      const up = () => {
+        window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', up); ghost && ghost.remove();
+        if (moved) { if (hover) this._fire(mk, hover); else this._tick(m.tgt === 'ally' ? '아군 위에 놓아야 해요' : '상대 포켓몬 위에 놓아야 해요'); }
+        else { this.aim = { m: mk }; this._tick(m.tgt === 'ally' ? '회복할 아군을 탭하세요' : '공격할 상대를 탭하세요'); }
+      };
+      window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up); window.addEventListener('pointercancel', up);
+    },
+    _fire(mk, h) {
+      if (!this.sel) return; const m = this._moveOf(mk); if (!m) return;
+      if (h && ((m.tgt === 'ally') !== (h.side === 'me'))) { this._tick(m.tgt === 'ally' ? '아군에게 써야 해요' : '상대에게 써야 해요'); return; }
+      const ts = h ? (h.side === 'me' ? this.me : foeOf(this.me)) : null;
+      this._commit(mk === 'item' ? { m: 'item', ti: h ? h.i : 0 } : { i: this.sel.i, m: +mk, ts, ti: h ? h.i : 0 }); sfx('tap'); this._closeTray();
+    },
+
+    // ----- 그리기 -----
+    _drawHud() {
+      const r = this.root, st = this.st; if (!r || !st) return;
+      const M = st.side[this.me], F = st.side[foeOf(this.me)];
+      const left = Math.max(0, LIMIT - st.t), clk = r.querySelector('.pb-clock'); if (clk) { clk.textContent = `${Math.floor(left / TPS / 60)}:${String(Math.floor(left / TPS) % 60).padStart(2, '0')}`; clk.classList.toggle('low', left < 30 * TPS); }
+      const put = (el, u) => {
+        if (!el) return; el.classList.toggle('dead', u.hp <= 0);
+        const hp = el.querySelector('.pb-hpb b'), g = el.querySelector('.pb-gb b'), pct = u.hp / u.maxHp;
+        hp.style.width = pct * 100 + '%'; hp.className = pct < 0.25 ? 'red' : pct < 0.5 ? 'yel' : '';
+        g.style.width = u.g + '%'; el.classList.toggle('half', u.hp > 0 && u.g >= 50 && u.g < 100 && !u.busy && u.st !== 'freeze'); el.classList.toggle('full', u.hp > 0 && u.g >= 100 && !u.busy && u.st !== 'freeze');
+        const sc = el.querySelector('.pb-stc'), tags = [u.st ? ST_KR[u.st] : '', u.tauntT > 0 ? '도발' : '', u.slowT > 0 ? '둔화' : ''].filter(Boolean); sc.textContent = tags.join(' '); sc.className = 'pb-stc ' + (u.st || '');
+        const n = el.querySelector('.pb-mchp'); if (n) n.textContent = u.hp > 0 ? `${u.hp}/${u.maxHp}` : '기절';
+      };
+      r.querySelectorAll('.pb-mc').forEach(el => { put(el, M.units[+el.dataset.i]); el.classList.toggle('sel', !!(this.sel && this.sel.i === +el.dataset.i)); });
+      r.querySelectorAll('.pb-fc').forEach(el => put(el, F.units[+el.dataset.i]));
+      const ib = r.querySelector('.pb-itembtn'); if (ib) { ib.querySelector('b').textContent = M.items; ib.classList.toggle('off', M.items <= 0 || M.itemCd > 0); ib.classList.toggle('sel', !!(this.sel && this.sel.i === 'item')); }
+      if (this.sel && this.sel.i !== 'item') { const u = M.units[this.sel.i]; if (!u || u.hp <= 0) return this._closeTray(); r.querySelectorAll('.pb-tray .pb-mv').forEach(b => b.classList.toggle('off', !canUse(u, u.moves[+b.dataset.m]))); }
+    },
+    _tick(t) { const el = this.root && this.root.querySelector('.pb-ticker'); if (!el) return; el.textContent = t; el.classList.remove('show'); void el.offsetWidth; el.classList.add('show'); },
+    _fx(ev, quiet) {
+      const A = this.arena, side = s => (s === this.me ? 'me' : 'foe'), U = (s, i) => A && A.units[side(s)][i];
+      for (const e of ev) {
+        const key = e.k + ':' + e.s + ':' + e.i + ':' + (e.amt || '') + ':' + (e.move || '') + ':' + Math.floor(this.st.t / 4); if (quiet && this.seenEv.has(key)) continue; this.seenEv.add(key); if (this.seenEv.size > 500) this.seenEv = new Set();
+        const u = U(e.s, e.i), nm = () => (this.st.side[e.s].units[e.i] || {}).name, who = e.s === this.me ? '' : '상대 ';
+        if (e.k === 'act') { if (u) { const t = e.tgts[0] && U(e.tgts[0].s, e.tgts[0].i); if (e.kind === 'heal' || e.kind === 'buff') A.aura(t || u, TCOL[e.mtype] || 0xffffff); else { A.lunge(u, t); for (const tg of e.tgts) { const tu = U(tg.s, tg.i); tu && A.projectile(u, tu, TCOL[e.mtype] || 0xffffff); } } }
+          this._tick(`${who}${nm()}의 ${e.move}!`); sfx(e.kind && e.kind !== 'atk' ? 'skill' : 'tap'); }
+        else if (e.k === 'dmg') { setTimeout(() => { if (A && u) A.hit(u, e.crit ? 0xffd34d : e.eff > 1 ? 0xff7a59 : 0xffffff, e.crit || e.eff > 1); this._pop(e.s, e.i, `-${e.amt}`, e.crit ? 'crit' : e.eff > 1 ? 'big' : e.eff < 1 ? 'weak' : ''); }, 300); sfx(e.crit ? 'pull_epic' : 'hit');
+          if (e.crit) this._tick('급소에 맞았다!'); else if (e.eff > 1) this._tick('상성이 좋다! ×1.4'); else if (e.eff < 1) this._tick('상성이 나쁘다… ×0.7'); else if (e.cover) this._tick('전열이 엄호해서 피해가 줄었다 ×0.7'); }
+        else if (e.k === 'faint') { setTimeout(() => A && u && A.faint(u), 450); this._tick(`${who}${nm()}은(는) 쓰러졌다!`); sfx('life_lost'); if (this.sel && e.s === this.me && this.sel.i === e.i) this._closeTray(); }
+        else if (e.k === 'miss') this._tick('빗나갔다!');
+        else if (e.k === 'status') { u && A.setTint(u, e.st === 'freeze' ? 0x9fd8ff : e.st === 'burn' ? 0xffb199 : e.st === 'poison' ? 0xd7a6ff : 0xfff08a); this._tick(`${who}${nm()}은(는) ${ST_KR[e.st]} 상태!`); }
+        else if (e.k === 'cure') { u && A.setTint(u, null); }
+        else if (e.k === 'heal' || e.k === 'item') { this._pop(e.s, e.i, '회복', 'heal'); if (e.k === 'item') { u && A.aura(u, 0x3ddc97); u && A.setTint(u, null); this._tick(`${who}회복약! ${nm()} 회복`); } sfx('buy'); }
+        else if (e.k === 'dot' && e.st !== 'recoil') this._pop(e.s, e.i, `-${e.amt}`, 'dot');
+        else if (e.k === 'push') this._pop(e.s, e.i, e.cut ? '끊기!' : '게이지↓', 'push');
+        else if (e.k === 'taunt') { u && A.aura(u, 0xff5c7a); this._tick(`${who}${nm()}의 도발! 단일 공격이 끌려온다`); }
+        else if (e.k === 'stage' && e.d) this._pop(e.s, e.i, `${STAT_KR[e.stat]}${e.d > 0 ? '↑' : '↓'}`, e.d > 0 ? 'up' : 'down');
+        else if (e.k === 'slow') this._pop(e.s, e.i, '둔화', 'down');
+        else if (e.k === 'msg') this._tick(e.text);
+      }
+    },
+    _pop(s, i, text, cls) {
+      if (!this.arena || !this.root) return; const q = this.arena.rectOf(s === this.me ? 'me' : 'foe', i); if (!q) return;
+      const p = document.createElement('span'); p.className = 'pb-pop ' + (cls || ''); p.textContent = text; p.style.left = q.cx + 'px'; p.style.top = (q.top + (q.bottom - q.top) * 0.25) + 'px';
+      this.root.appendChild(p); setTimeout(() => p.remove(), 900);
+    },
+    _forfeit() { if (!this.st || this.st.winner) return; this.st.winner = foeOf(this.me); this.st.why = '기권했어요'; if (!this.cpu) this.net.update(this.code, { [`${this.me}.left`]: true, state: 'ended', winner: this.st.winner, why: '상대가 기권했어요' }).catch(() => {}); },
+    _result() {
+      this._resultShown = true; this._closeTray(); const w = this.st.winner, win = w === this.me, draw = w === 'draw', M = this.st.side[this.me];
       sfx(win ? 'record' : draw ? 'wave_clear' : 'gameover');
-      const M = this.st.side[this.me], left = M.mons.filter(m => m.hp > 0).length;
-      const ov = document.createElement('div'); ov.className = 'pb-result';
+      const left = M.units.filter(u => u.hp > 0).length, ov = document.createElement('div'); ov.className = 'pb-result';
       ov.innerHTML = `<div class="pb-rbox" style="--tc:${TRAINERS[M.trainer].color}">${emblem(M.trainer, 72)}<div class="pb-h1 ${win ? 'win' : draw ? '' : 'lose'}">${win ? '승리' : draw ? '무승부' : '패배'}</div>
-        <p class="pb-sub">${why ? esc(why) : win ? `${left}마리가 남아 이겼어요` : '다음엔 상성이 좋은 포켓몬으로 교체해 보세요'}</p>
-        <div class="pb-rteam">${M.mons.map(m => `<span class="${m.hp <= 0 ? 'out' : ''}">${img(m.id)}</span>`).join('')}</div>
+        <p class="pb-sub">${this.st.why ? esc(this.st.why) : win ? `${left}마리가 남아 이겼어요` : '상성 좋은 상대에게 기술을 끌어다 놓아 보세요'}</p>
+        <div class="pb-rteam">${M.units.map(u => `<span class="${u.hp <= 0 ? 'out' : ''}">${img(u.id)}</span>`).join('')}</div>
         ${this.cpu ? '<button class="pb-btn primary" data-a="again">같은 팀으로 다시</button><button class="pb-btn" data-a="pick">팀 다시 고르기</button>' : ''}<button class="pb-btn ghost" data-a="exit">나가기</button></div>`;
       this.root.appendChild(ov);
       ov.querySelector('[data-a="exit"]').onclick = () => this.close();
-      const ag = ov.querySelector('[data-a="again"]'); if (ag) ag.onclick = () => { const s = this.st.side; const me = { name: s.p1.name, trainer: s.p1.trainer, team: s.p1.mons.map(m => m.id) }; this.seed = (Math.random() * 1e9) >>> 0; const R = rngOf(this.seed ^ 77); this.startBattle(me, { name: `CPU · ${LV_KR[this.cpuLv]}`, trainer: TR_IDS[Math.floor(R() * TR_IDS.length)], team: cpuTeam(R, this.cpuLv, me.team) }); };
+      const ag = ov.querySelector('[data-a="again"]'); if (ag) ag.onclick = () => { const s = this.st.side.p1, me = { name: s.name, trainer: s.trainer, team: s.units.map(u => u.id) }, seed = (Math.random() * 1e9) >>> 0, R = rngOf(seed ^ 77); this.startBattle(me, { name: `CPU · ${LV_KR[this.cpuLv]}`, trainer: TR_IDS[Math.floor(R() * TR_IDS.length)], team: cpuTeam(R, this.cpuLv, me.team) }, seed); };
       const pk = ov.querySelector('[data-a="pick"]'); if (pk) pk.onclick = () => { this.st = null; this.openPick(); };
     },
   };
-  // 테스트·밸런스 확인용 (콘솔/시뮬에서 사용)
-  PB._engine = { TP, TRAINERS, statsOf, movesOf, newState, step, cpuChoose, cpuTeam, rngOf, roster };
+  // 밸런스 확인용: 화면 없이 CPU끼리 한 판
+  function simulate(t1, t2, tr1, tr2, lv1, lv2, seed) {
+    const st = newState({ team: t1, trainer: tr1 }, { team: t2, trainer: tr2 }, seed), mem = {}, ev = [];
+    while (!st.winner) { const R = rngOf((seed + st.t * 7919) >>> 0); for (const a of cpuThink(st, 'p1', lv1, R, mem)) apply(st, a, ev); for (const a of cpuThink(st, 'p2', lv2, R, mem)) apply(st, a, ev); tick(st, ev); ev.length = 0; }
+    return st;
+  }
+  PB._engine = { TP, TRAINERS, TPS, statsOf, movesOf, newState, apply, tick, cpuThink, cpuTeam, rngOf, roster, simulate, cycleSec };
 })();
