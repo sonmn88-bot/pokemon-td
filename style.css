@@ -1728,3 +1728,13 @@ html, body { overscroll-behavior: none; }
   #hud-top { gap:0 !important; }
 }
 @media (max-width:560px) { .hud-cell { font-size:14.5px !important; } } /* v4.1: 메이플 숫자가 넓어 390px에서 3px 넘침 → 축소 */
+/* v4.1 알림 묶음: 가운데 한 칸에 같은 폭으로 세로 정렬 (예전엔 띠마다 폭·높이가 달라 겹치고 들쭉날쭉) */
+#announce-stack { position:absolute; top:calc(var(--hud-h) + env(safe-area-inset-top,0px) + 66px); left:50%; transform:translateX(-50%);
+  width:min(360px, calc(100% - 32px)); display:flex; flex-direction:column; gap:6px; z-index:40; pointer-events:none; }
+#announce-stack .wave-announce.band { position:static; left:auto; top:auto; transform:none; width:100%; max-width:none; box-sizing:border-box;
+  animation:annStack 2.2s var(--ease-out) forwards; }
+@keyframes annStack { 0% { opacity:0; transform:translateY(-6px); } 10%,80% { opacity:1; transform:none; } 100% { opacity:0; } }
+@media (prefers-reduced-motion: reduce) { #announce-stack .wave-announce.band { animation:none; } }
+/* v4.1 다음 웨이브 버튼: 살짝 투명 (뒤 필드가 비침), 글자는 또렷하게 */
+.wave-btn { background:linear-gradient(180deg, rgba(63,224,164,.72), rgba(16,185,129,.72)) !important;
+  box-shadow:0 4px 0 rgba(8,135,93,.7), 0 8px 18px rgba(0,0,0,.2) !important; backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px); }

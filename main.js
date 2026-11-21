@@ -1719,7 +1719,10 @@ class App {
     el.className = 'wave-announce band';
     el.style.setProperty('--ac', color || '#ffc24b');
     if (/<(br|span|b)\b/.test(text)) el.innerHTML = text; else el.textContent = text; // 내부 문구만 들어옴 (줄바꿈·작은 글씨 지원)
-    document.getElementById('game-screen').appendChild(el);
+    // v4.1: 알림은 한 세로 묶음(#announce-stack)에 최신이 위로 쌓임 → 줄 높이가 달라도 겹치지 않고 왼쪽 끝이 맞음
+    let stack = document.getElementById('announce-stack');
+    if (!stack) { stack = document.createElement('div'); stack.id = 'announce-stack'; document.getElementById('game-screen').appendChild(stack); }
+    stack.prepend(el);
     const entry = { el, timer: null };
     this._activeAnnounces.push(entry);
     this._repositionAnnounces();
@@ -1736,8 +1739,7 @@ class App {
     if (!this._activeAnnounces) return;
     this._activeAnnounces.forEach((entry, i) => {
       // v3.6: 화면 가운데 큰 글씨 대신 HUD 아래 얇은 띠로 쌓음 (최신이 위)
-      const n = this._activeAnnounces.length - 1 - i;
-      entry.el.style.top = `calc(var(--hud-h) + 70px + ${n * 40}px)`;
+      // v4.1: 위치는 #announce-stack(flex 세로)이 정함 - 개별 top 지정 안 함
     });
   }
 
