@@ -9,8 +9,8 @@
 (function () {
   'use strict';
   const TPS = 20, GK = 0.42, LIMIT = 180 * TPS, BUSY = 12, HB_MS = 5000, ITEM_CD = 8 * TPS;
-  const PROF = { H: { hp: 1.12, atk: 1.0, def: 1.12, spd: 0.76 }, N: { hp: 1, atk: 1, def: 1, spd: 1 }, F: { hp: 0.92, atk: 1.16, def: 0.9, spd: 1.3 } };
-  const ROLE = { dealer: { atk: 1.12 }, aoe: {}, control: { def: 1.05, atk: 0.94 }, support: { hp: 1.12, def: 1.08, atk: 0.86 }, execute: { atk: 1.06, spd: 1.05 }, boss: { atk: 1.05, hp: 1.05 } };
+  const PROF = { H: { hp: 1.15, atk: 1.08, def: 1.1, spd: 0.86 }, N: { hp: 1, atk: 1, def: 1, spd: 1 }, F: { hp: 0.92, atk: 1.16, def: 0.9, spd: 1.3 } };
+  const ROLE = { dealer: { atk: 1.12 }, aoe: {}, control: { def: 1.05, atk: 0.94 }, support: { hp: 1.12, def: 1.08, atk: 0.86 }, execute: { atk: 1.06, spd: 1.05 }, boss: { atk: 1.1, hp: 1.08 } };
   const TKR = { fire: '불꽃', water: '물', electric: '전기', grass: '풀', psychic: '에스퍼', normal: '노말' };
   const TCOL = { fire: 0xff6b3d, water: 0x3fa9ff, electric: 0xffd84a, grass: 0x58d06b, psychic: 0xc77dff, normal: 0xe8e8f0 };
   const ST_KR = { burn: '화상', poison: '독', shock: '감전', freeze: '빙결' };
@@ -30,18 +30,18 @@
   const TAGMOVE = {
     burn: { name: '불티 폭풍', power: 82, fx: { st: 'burn', ch: 0.45 } },
     poison: { name: '독가루 바람', power: 78, fx: { st: 'poison', ch: 0.55 } },
-    slow: { name: '끈끈한 덫', power: 84, fx: { slow: 7 } },
+    slow: { name: '끈끈한 덫', power: 102, fx: { slow: 9 } },
     stun: { name: '전류 스파크', power: 82, fx: { st: 'shock', ch: 0.4 } },
-    freeze: { name: '냉기 일섬', power: 86, fx: { st: 'freeze', ch: 0.4 } },
-    chain: { name: '연속 타격', power: 28, fx: { hits: [2, 4] } },
+    freeze: { name: '냉기 일섬', power: 104, fx: { st: 'freeze', ch: 0.6 } },
+    chain: { name: '연속 타격', power: 24, fx: { hits: [2, 4] } },
     multi: { name: '흩뿌리기 사격', power: 50, tgt: 'foes', fx: {} },
     knockback: { name: '날려버리기', power: 78, fx: { push: 40 } },
     crit: { name: '급소 노리기', power: 88, fx: { crit: 0.35 } },
     pierce: { name: '관통 일격', power: 86, fx: { pierce: true } },
     antiAir: { name: '대공 사격', power: 90, fx: { vsFast: 1.6 } },
-    gold: { name: '럭키 펀치', power: 86, fx: { crit: 0.18 } },
-    blast: { name: '자폭 돌진', power: 105, fx: { recoil: 0.25 } },
-    stack: { name: '기 모으기 타격', power: 80, fx: { stack: 30 } },
+    gold: { name: '럭키 펀치', power: 62, fx: { crit: 0.1 } },
+    blast: { name: '자폭 돌진', power: 96, fx: { recoil: 0.28 } },
+    stack: { name: '기 모으기 타격', power: 92, fx: { stack: 42 } },
     range: { name: '끊어치기', power: 70, fx: { push: 25, cut: true } },
   };
   const BASIC_POW = 40, MAIN_POW = 95, SP_COST = 70, DMG_K = 0.22, SPD_EXP = 0.3; // DMG_K: 판 길이(약 1분) / SPD_EXP: 빠를수록 한 방 약하게
@@ -59,12 +59,12 @@
   const cycleSec = s => +(100 / (s.spd * GK)).toFixed(1);
   function specialOf(d) { // 특수기(게이지 70): 역할·체형별
     if (d.role === 'support') return { name: '응급 처치', kind: 'heal', tgt: 'ally', fx: { heal: 0.32 } };
-    if (d.profile === 'H') return { name: '도발', kind: 'buff', tgt: 'self', fx: { taunt: 6, stage: ['def', 1] } };
+    if (d.profile === 'H') return { name: '도발', kind: 'buff', tgt: 'self', fx: { taunt: 4, stage: ['def', 1] } };
     if (d.role === 'dealer') return { name: '필살 일격', power: 72, tgt: 'foe', fx: { crit: 0.45 } };
-    if (d.role === 'aoe') return { name: '휩쓸기', power: 22, tgt: 'foes', fx: { debuff: ['def', -1] } };
-    if (d.role === 'control') return { name: '발묶기', kind: 'debuff', tgt: 'foe', fx: { slow: 6, push: 30 } };
-    if (d.role === 'execute') return { name: '마무리 일격', power: 55, tgt: 'foe', fx: { finisher: 0.4 } };
-    if (d.role === 'boss') return { name: '끝장 추격', power: 72, tgt: 'foe', fx: { pierce: true } };
+    if (d.role === 'aoe') return { name: '휩쓸기', power: 14, tgt: 'foes', fx: { debuff: ['def', -1] } };
+    if (d.role === 'control') return { name: '발묶기', kind: 'debuff', tgt: 'foe', fx: { slow: 8, push: 38 } };
+    if (d.role === 'execute') return { name: '마무리 일격', power: 62, tgt: 'foe', fx: { finisher: 0.4 } };
+    if (d.role === 'boss') return { name: '끝장 추격', power: 92, tgt: 'foe', fx: { pierce: true } };
     return { name: '방어 태세', kind: 'buff', tgt: 'self', fx: { stage: ['def', 2] } };
   }
   function movesOf(d) {
@@ -137,7 +137,7 @@
       const taunter = alive(st.side[f]).find(x => x.tauntT > 0); if (taunter && taunter !== t) { t = taunter; ev.push({ k: 'msg', text: `${t.name}의 도발! 공격이 끌려간다` }); }
       tgts = [t]; }
     me.g -= m.cost; me.busy = BUSY;
-    ev.push({ k: 'act', s, i: me.i, move: m.name, mtype: m.type, kind: m.kind, slot: m.slot, tgts: tgts.map(t => ({ s: sd.units.includes(t) ? s : f, i: t.i })) });
+    ev.push({ k: 'act', s, i: me.i, move: m.name, mtype: m.type, kind: m.kind, slot: m.slot, fx: Object.keys(m.fx || {}), fxst: (m.fx || {}).st, foes: m.tgt === 'foes', tgts: tgts.map(t => ({ s: sd.units.includes(t) ? s : f, i: t.i })) });
     const fx = m.fx || {};
     function stage(u, side, k, d) { const b = u.stg[k]; u.stg[k] = Math.max(-3, Math.min(3, b + d)); ev.push({ k: 'stage', s: side, i: u.i, stat: k, d: u.stg[k] - b }); }
     function hitFx(t, side) {
@@ -292,11 +292,16 @@
       const r = this._root(), all = roster();
       let team = [], trainer = TRAINERS[this._pref('trainer')] ? this._pref('trainer') : 'red', filter = 'all', focus = all[0].id, ready = false;
       this.cpuLv = Math.max(0, Math.min(2, +(this._pref('lv') ?? 1)));
+      const oppHtml = () => { const o = this.room && this.room[this.me === 'p1' ? 'p2' : 'p1'], rd = !this.cpu && !!(o && o.ready);
+        const nm = this.cpu ? `CPU · ${LV_KR[this.cpuLv]}` : o ? esc(o.name) : '상대를 기다리는 중';
+        return `<span class="pb-oppvs">VS</span><b>${nm}</b><span class="pb-qs">${[0, 1, 2].map(() => `<i class="pb-q ${rd ? 'ok' : ''}">${rd ? '✓' : '?'}</i>`).join('')}</span><small>${this.cpu ? '대결이 시작되면 CPU 팀이 공개돼요' : rd ? '준비 완료' : o ? '팀을 고르는 중' : '코드 ' + this.code}</small>`; };
+      this._oppHtml = oppHtml;
       const render = () => {
         const d = GachaTowerDefs[focus], s = statsOf(d), mv = movesOf(d), max = { hp: 200, atk: 85, def: 85, spd: 85 }, T = TRAINERS[trainer];
         const slot = (i, lbl) => { const id = team[i], x = id && GachaTowerDefs[id]; return `<button class="pb-por ${i === 0 ? 'front' : ''} ${id ? '' : 'empty'}" ${id ? `data-rm="${i}" aria-label="${esc(x.name)} 빼기"` : 'disabled'} style="--tc:var(--t-${x ? x.type : 'normal'})">${id ? img(id, 'pb-porimg') : ''}<span class="pb-porlbl">${lbl}</span>${id ? `<b>${esc(x.name)}</b>` : '<b class="pb-porph">비어 있음</b>'}</button>`; };
         r.innerHTML = `<div class="pb-pick">
           <header class="pb-top"><button class="pb-x" data-a="back" aria-label="뒤로">${window.ICON ? ICON('back', 20) : '‹'}</button><b>${this.cpu ? '연습 모드' : '방 ' + this.code}</b><span class="pb-count">${team.length}/3</span></header>
+          <div class="pb-opp">${oppHtml()}</div>
           <section class="pb-stage" style="--tc:${T.color}"><div class="pb-stagebg">${emblem(trainer, 170)}</div>${slot(0, '전열 · 1')}<div class="pb-back">${slot(1, '후열 · 2')}${slot(2, '후열 · 3')}</div></section>
           <div class="pb-trainers" role="radiogroup" aria-label="트레이너">${TR_IDS.map(id => `<button role="radio" aria-checked="${trainer === id}" data-tr="${id}" class="${trainer === id ? 'on' : ''}" style="--tc:${TRAINERS[id].color}" ${ready ? 'disabled' : ''}>${emblem(id, 30)}<b>${TRAINERS[id].name}</b></button>`).join('')}</div>
           <p class="pb-trdesc" style="--tc:${T.color}"><b>${T.name} · ${T.style}</b> ${T.desc}${trainer === 'yellow' ? '' : '. 회복약 1개'}</p>
@@ -333,6 +338,7 @@
           if (d.state === 'battle' && !this.st) return this.startBattle(d.p1, d.p2, d.seed);
           if (d.p1 && d.p2 && d.p1.ready && d.p2.ready && d.state === 'pick') this.net.update(this.code, { state: 'battle' }).catch(() => {});
           const w = this.root && this.root.querySelector('.pb-wait'); if (w) w.textContent = this._pickWaitText();
+          const op = this.root && this.root.querySelector('.pb-opp'); if (op && this._oppHtml) op.innerHTML = this._oppHtml();
         });
         clearInterval(this.hbT); this.hbT = setInterval(() => this.code && this.net.update(this.code, { [`${this.me}.hb`]: Date.now() }).catch(() => {}), HB_MS);
       }
@@ -349,7 +355,7 @@
       r.innerHTML = `<div class="pb-battle">
         <div class="pb-arena"></div>
         <div class="pb-hudtop"><span class="pb-tr">${emblem(F.trainer, 26)}<b>${esc(F.name)}</b></span><span class="pb-clock" aria-label="남은 시간">3:00</span><button class="pb-ff" data-a="ff">기권</button></div>
-        <div class="pb-fcards">${F.units.map(u => `<div class="pb-fc" data-i="${u.i}" style="--tc:var(--t-${u.type})"><div class="pb-fcn"><b>${esc(u.name)}</b>${tIcon(u.type, 14)}</div><em class="pb-stc"></em><i class="pb-hpb"><b></b></i><i class="pb-gb"><b></b></i></div>`).join('')}</div>
+        <div class="pb-fcards">${F.units.map(u => `<div class="pb-fc" data-i="${u.i}" style="--tc:var(--t-${u.type});order:${[2, 1, 3][u.i]}"><div class="pb-fcn"><b>${esc(u.name)}</b>${tIcon(u.type, 14)}<small>${u.i === 0 ? '전열' : '후열'}</small></div><em class="pb-stc"></em><i class="pb-hpb"><b></b></i><i class="pb-gb"><b></b></i></div>`).join('')}</div>
         <div class="pb-ticker" aria-live="polite"></div>
         <div class="pb-tray" hidden></div>
         <div class="pb-mycards">${M.units.map(u => `<button class="pb-mc" data-i="${u.i}" style="--tc:var(--t-${u.type})" aria-label="${esc(u.name)} 선택 (${u.i + 1})">${img(u.id, 'pb-mcimg')}<span class="pb-mcn"><b>${esc(u.name)}</b><small>${u.i === 0 ? '전열' : '후열'}</small></span><em class="pb-stc"></em><span class="pb-mchp"></span><i class="pb-hpb"><b></b></i><i class="pb-gb"><b></b><s></s></i><kbd>${u.i + 1}</kbd></button>`).join('')}
@@ -362,6 +368,7 @@
       } catch (e) { console.warn('3D 경기장 실패', e); r.querySelector('.pb-arena').classList.add('fallback'); }
       r.querySelector('.pb-loading')?.remove();
       this._bindInput(); this._drawHud();
+      if (this.cpu) { const tip = document.createElement('div'); tip.className = 'pb-tip'; tip.textContent = '게이지가 찬 내 카드를 탭 → 기술을 상대에게 끌어다 놓기'; r.querySelector('.pb-battle').appendChild(tip); this._tip = tip; setTimeout(() => tip.remove(), 9000); }
       this._intro(M, F);
       if (!this.cpu) {
         this.unsub && this.unsub();
@@ -401,7 +408,7 @@
     },
     // 입력 → 기록. 연습·방장: 다음 틱 / 손님: 방 문서로 보내면 방장이 적용 틱을 정함
     _commit(a) {
-      a.s = this.me;
+      a.s = this.me; if (this._tip) { this._tip.remove(); this._tip = null; }
       if (this.cpu) { this.log.push({ tk: this.st.t + 1, a }); return; }
       if (this.me === 'p1') { const tk = this.st.t + 2, k = this.log.length; this.log.push({ tk, a }); this.net.update(this.code, { [`log.${k}`]: { tk, a } }).catch(() => {}); }
       else { const n = this.cmdN++; this.net.update(this.code, { [`cmd.${n}`]: a }).catch(() => {}); }
@@ -454,7 +461,8 @@
         tray.innerHTML = `<div class="pb-trayh"><b>회복약</b> 아군에게 끌어다 놓으세요 · 체력 40%와 상태이상 회복</div><div class="pb-moves one"><button class="pb-mv" data-m="item" style="--tc:#3ddc97"><span class="pb-mvi">${window.ICON ? ICON('candy', 28) : ''}</span><b>회복약</b><small>남은 ${sd.items}개</small></button></div>`;
       } else {
         const u = sd.units[i];
-        tray.innerHTML = `<div class="pb-trayh"><b>${esc(u.name)}</b> 기술 아이콘을 상대에게 끌어다 놓으세요</div><div class="pb-moves">${u.moves.map((m, k) => { const ok = canUse(u, m);
+        const tn = this._taunter();
+        tray.innerHTML = `<div class="pb-trayh">${tn ? `<b class="pb-tauntnote">상대 ${esc(tn.name)}가 도발 중</b> 단일 공격은 ${esc(tn.name)}에게만 갈 수 있어요 (${Math.ceil(tn.tauntT / TPS)}초)` : `<b>${esc(u.name)}</b> 기술 아이콘을 상대에게 끌어다 놓으세요`}</div><div class="pb-moves">${u.moves.map((m, k) => { const ok = canUse(u, m);
           return `<button class="pb-mv ${ok ? '' : 'off'}" data-m="${k}" style="--tc:var(--t-${m.type})"><span class="pb-mvi">${tIcon(m.type, 28)}<i>${m.cost}</i></span><b>${esc(m.name)}</b><small>${SLOT_KR[m.slot]}</small><em>${esc(moveDesc(m))}</em></button>`; }).join('')}</div>`;
       }
       tray.hidden = false; this._drawHud();
@@ -462,6 +470,7 @@
     },
     _closeTray() { this.sel = null; this.aim = null; const t = this.root && this.root.querySelector('.pb-tray'); if (t) t.hidden = true; this._clearMarks(); this.root && this.root.querySelector('.pb-ghost')?.remove(); this._drawHud(); },
     _clearMarks() { if (!this.arena) return; for (const sd of ['me', 'foe']) for (let i = 0; i < 3; i++) this.arena.mark(sd, i, false); },
+    _taunter() { const F = this.st.side[foeOf(this.me)]; return F.units.find(u => u.hp > 0 && u.tauntT > 0) || null; },
     _moveOf(mk) { if (mk === 'item') return { tgt: 'ally', kind: 'heal', type: 'grass', item: true }; const u = this.st.side[this.me].units[this.sel.i]; return u && u.moves[+mk]; },
     _dragStart(e, mk) {
       if (!this.sel) return; const m = this._moveOf(mk); if (!m) return;
@@ -469,23 +478,28 @@
       e.preventDefault();
       if (m.tgt === 'self' || m.tgt === 'foes') { this._fire(mk, null); return; } // 대상 없는 기술은 누르면 바로
       const sx = e.clientX, sy = e.clientY, btn = e.currentTarget, side = s => (s === this.me ? 'me' : 'foe'); let moved = false, ghost = null, hover = null;
-      const valid = h => h && (m.tgt === 'ally' ? h.side === 'me' : h.side === 'foe');
-      const list = m.item ? this.st.side[this.me].units.filter(u => u.hp > 0).map(u => ({ s: this.me, i: u.i })) : validTargets(this.st, this.me, m);
-      list.forEach(t => this.arena && this.arena.mark(side(t.s), t.i, true, m.tgt === 'ally' ? 0x3ddc97 : 0xffd34d));
+      const tn = m.tgt === 'foe' ? this._taunter() : null;
+      const valid = h => h && (m.tgt === 'ally' ? h.side === 'me' : h.side === 'foe' && (!tn || h.i === tn.i));
+      let list = m.item ? this.st.side[this.me].units.filter(u => u.hp > 0).map(u => ({ s: this.me, i: u.i })) : validTargets(this.st, this.me, m);
+      if (tn) list = list.filter(t => t.i === tn.i);
+      list.forEach(t => this.arena && this.arena.mark(side(t.s), t.i, true, m.tgt === 'ally' ? 0x3ddc97 : tn ? 0xff5c7a : 0xffd34d));
+      const foeFront = this.st.side[foeOf(this.me)].units[0]; let lastHint = null;
       const mv = ev => {
         if (!moved && Math.hypot(ev.clientX - sx, ev.clientY - sy) > 8) { moved = true; ghost = btn.querySelector('.pb-mvi').cloneNode(true); ghost.className = 'pb-ghost'; ghost.style.setProperty('--tc', getComputedStyle(btn).getPropertyValue('--tc')); this.root.appendChild(ghost); }
-        if (ghost) { ghost.style.transform = `translate(${ev.clientX - 30}px, ${ev.clientY - 30}px)`; const h = this.arena && this.arena.hitTest(ev.clientX, ev.clientY); hover = valid(h) ? h : null; ghost.classList.toggle('on', !!hover); }
+        if (ghost) { ghost.style.transform = `translate(${ev.clientX - 30}px, ${ev.clientY - 30}px)`; const h = this.arena && this.arena.hitTest(ev.clientX, ev.clientY); hover = valid(h) ? h : null; ghost.classList.toggle('on', !!hover); this.arena && this.arena.lit(hover && hover.side, hover && hover.i); this.root.querySelectorAll('.pb-fc').forEach(el => el.classList.toggle('lit', !!(hover && hover.side === 'foe' && +el.dataset.i === hover.i)));
+          const hint = hover && hover.side === 'foe' && m.tgt === 'foe' && hover.i !== 0 && foeFront.hp > 0 ? '전열이 살아 있어 피해 ×0.7' : (h && !hover && tn && h.side === 'foe') ? `도발 중이라 ${tn.name}만 노릴 수 있어요` : null; if (hint && hint !== lastHint) this._tick(hint); lastHint = hint; }
       };
       const up = () => {
-        window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', up); ghost && ghost.remove();
-        if (moved) { if (hover) this._fire(mk, hover); else this._tick(m.tgt === 'ally' ? '아군 위에 놓아야 해요' : '상대 포켓몬 위에 놓아야 해요'); }
-        else { this.aim = { m: mk }; this._tick(m.tgt === 'ally' ? '회복할 아군을 탭하세요' : '공격할 상대를 탭하세요'); }
+        window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', up); ghost && ghost.remove(); this.arena && this.arena.lit(null, null); this.root.querySelectorAll('.pb-fc.lit').forEach(el => el.classList.remove('lit'));
+        if (moved) { if (hover) this._fire(mk, hover); else if (!(tn && !hover)) this._tick(m.tgt === 'ally' ? '아군 위에 놓아야 해요' : '상대 포켓몬 위에 놓아야 해요'); }
+        else { this.aim = { m: mk }; this._tick(m.tgt === 'ally' ? '회복할 아군을 탭하세요' : tn ? `도발 중인 ${tn.name}를 탭하세요` : '공격할 상대를 탭하세요'); }
       };
       window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up); window.addEventListener('pointercancel', up);
     },
     _fire(mk, h) {
       if (!this.sel) return; const m = this._moveOf(mk); if (!m) return;
       if (h && ((m.tgt === 'ally') !== (h.side === 'me'))) { this._tick(m.tgt === 'ally' ? '아군에게 써야 해요' : '상대에게 써야 해요'); return; }
+      const tn = m.tgt === 'foe' ? this._taunter() : null; if (h && tn && h.side === 'foe' && h.i !== tn.i) { this._tick(`상대 ${tn.name}가 도발 중이라 ${tn.name}에게 갑니다`); h = { side: 'foe', i: tn.i }; }
       const ts = h ? (h.side === 'me' ? this.me : foeOf(this.me)) : null;
       this._commit(mk === 'item' ? { m: 'item', ti: h ? h.i : 0 } : { i: this.sel.i, m: +mk, ts, ti: h ? h.i : 0 }); sfx('tap'); this._closeTray();
     },
@@ -505,6 +519,7 @@
       };
       r.querySelectorAll('.pb-mc').forEach(el => { put(el, M.units[+el.dataset.i]); el.classList.toggle('sel', !!(this.sel && this.sel.i === +el.dataset.i)); });
       r.querySelectorAll('.pb-fc').forEach(el => put(el, F.units[+el.dataset.i]));
+      if (this.arena) for (const sd of ['p1', 'p2']) this.st.side[sd].units.forEach(u => this.arena.setTaunt(sd === this.me ? 'me' : 'foe', u.i, u.hp > 0 && u.tauntT > 0));
       const ib = r.querySelector('.pb-itembtn'); if (ib) { ib.querySelector('b').textContent = M.items; ib.classList.toggle('off', M.items <= 0 || M.itemCd > 0); ib.classList.toggle('sel', !!(this.sel && this.sel.i === 'item')); }
       if (this.sel && this.sel.i !== 'item') { const u = M.units[this.sel.i]; if (!u || u.hp <= 0) return this._closeTray(); r.querySelectorAll('.pb-tray .pb-mv').forEach(b => b.classList.toggle('off', !canUse(u, u.moves[+b.dataset.m]))); }
     },
@@ -514,18 +529,19 @@
       for (const e of ev) {
         const key = e.k + ':' + e.s + ':' + e.i + ':' + (e.amt || '') + ':' + (e.move || '') + ':' + Math.floor(this.st.t / 4); if (quiet && this.seenEv.has(key)) continue; this.seenEv.add(key); if (this.seenEv.size > 500) this.seenEv = new Set();
         const u = U(e.s, e.i), nm = () => (this.st.side[e.s].units[e.i] || {}).name, who = e.s === this.me ? '' : '상대 ';
-        if (e.k === 'act') { if (u) { const t = e.tgts[0] && U(e.tgts[0].s, e.tgts[0].i); if (e.kind === 'heal' || e.kind === 'buff') A.aura(t || u, TCOL[e.mtype] || 0xffffff); else { A.lunge(u, t); for (const tg of e.tgts) { const tu = U(tg.s, tg.i); tu && A.projectile(u, tu, TCOL[e.mtype] || 0xffffff); } } }
+        if (e.k === 'act') { if (u && A) { const spec = { type: e.mtype, slot: e.slot, kind: e.kind, fx: e.fx || [], fxst: e.fxst, foes: e.foes, miss: ev.some(x => x.k === 'miss' && e.tgts.some(t => t.s === x.s && t.i === x.i)) };
+            const tos = e.tgts.map(t => U(t.s, t.i)).filter(Boolean); this._spec = spec; if (e.kind === 'atk') A.lunge(u, tos[0]); A.cast(u, tos, spec); }
           this._tick(`${who}${nm()}의 ${e.move}!`); sfx(e.kind && e.kind !== 'atk' ? 'skill' : 'tap'); }
-        else if (e.k === 'dmg') { setTimeout(() => { if (A && u) A.hit(u, e.crit ? 0xffd34d : e.eff > 1 ? 0xff7a59 : 0xffffff, e.crit || e.eff > 1); this._pop(e.s, e.i, `-${e.amt}`, e.crit ? 'crit' : e.eff > 1 ? 'big' : e.eff < 1 ? 'weak' : ''); }, 300); sfx(e.crit ? 'pull_epic' : 'hit');
+        else if (e.k === 'dmg') { const dl = A && this._spec ? A.delayOf(this._spec) * 1000 : 300; setTimeout(() => { if (A && u) A.accent(u, { crit: e.crit, eff: e.eff }); this._pop(e.s, e.i, `-${e.amt}`, e.crit ? 'crit' : e.eff > 1 ? 'big' : e.eff < 1 ? 'weak' : ''); sfx(e.crit ? 'pull_epic' : 'hit'); }, dl);
           if (e.crit) this._tick('급소에 맞았다!'); else if (e.eff > 1) this._tick('상성이 좋다! ×1.4'); else if (e.eff < 1) this._tick('상성이 나쁘다… ×0.7'); else if (e.cover) this._tick('전열이 엄호해서 피해가 줄었다 ×0.7'); }
         else if (e.k === 'faint') { setTimeout(() => A && u && A.faint(u), 450); this._tick(`${who}${nm()}은(는) 쓰러졌다!`); sfx('life_lost'); if (this.sel && e.s === this.me && this.sel.i === e.i) this._closeTray(); }
         else if (e.k === 'miss') this._tick('빗나갔다!');
         else if (e.k === 'status') { u && A.setTint(u, e.st === 'freeze' ? 0x9fd8ff : e.st === 'burn' ? 0xffb199 : e.st === 'poison' ? 0xd7a6ff : 0xfff08a); this._tick(`${who}${nm()}은(는) ${ST_KR[e.st]} 상태!`); }
         else if (e.k === 'cure') { u && A.setTint(u, null); }
-        else if (e.k === 'heal' || e.k === 'item') { this._pop(e.s, e.i, '회복', 'heal'); if (e.k === 'item') { u && A.aura(u, 0x3ddc97); u && A.setTint(u, null); this._tick(`${who}회복약! ${nm()} 회복`); } sfx('buy'); }
+        else if (e.k === 'heal' || e.k === 'item') { this._pop(e.s, e.i, '회복', 'heal'); if (e.k === 'item') { u && A && A.cast(u, [u], { type: 'grass', kind: 'heal', fx: [] }); u && A.setTint(u, null); this._tick(`${who}회복약! ${nm()} 회복`); } sfx('buy'); }
         else if (e.k === 'dot' && e.st !== 'recoil') this._pop(e.s, e.i, `-${e.amt}`, 'dot');
         else if (e.k === 'push') this._pop(e.s, e.i, e.cut ? '끊기!' : '게이지↓', 'push');
-        else if (e.k === 'taunt') { u && A.aura(u, 0xff5c7a); this._tick(`${who}${nm()}의 도발! 단일 공격이 끌려온다`); }
+        else if (e.k === 'taunt') { this._tick(`${who}${nm()}의 도발! 4초 동안 단일 공격이 ${nm()}에게 끌려요`); }
         else if (e.k === 'stage' && e.d) this._pop(e.s, e.i, `${STAT_KR[e.stat]}${e.d > 0 ? '↑' : '↓'}`, e.d > 0 ? 'up' : 'down');
         else if (e.k === 'slow') this._pop(e.s, e.i, '둔화', 'down');
         else if (e.k === 'msg') this._tick(e.text);
