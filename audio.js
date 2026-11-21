@@ -13,7 +13,8 @@
   const THROTTLE = { hit: 70, pop: 90, tap: 40, buy: 60, place: 60, sell: 60, life_lost: 150, pull_normal: 50 };
   const VARY = { hit: .12, pop: .15, tap: .05, buy: .06, place: .08 }; // 반복음 피치 흔들기 (덜 지침)
   const MAX_VOICES = 10;
-  const BGM_FILES = { field: 'bgm_field.mp3', field2: 'bgm_field2.mp3', boss: 'bgm_boss.mp3' };
+  const BGM_FILES = { field: 'bgm_field.mp3', field2: 'bgm_field2.mp3', boss: 'bgm_boss.mp3', battle1: 'bgm_battle1.mp3', battle2: 'bgm_battle2.mp3', battle3: 'bgm_battle3.mp3' };
+  const BGM_GAIN = { battle1: 0.5, battle2: 0.5, battle3: 0.5 }; // 곡마다 크기 보정 (기본 BGM_VOL 대비)
   const BGM_VOL = 0.32;
 
   let settings = { sfx: true, bgm: true };
@@ -77,6 +78,7 @@
     _want: null, _cur: null, _src: null, _gain: null, _token: 0,
     // mapId → 곡. 'infinite'·'boss'는 보스곡, 동굴·도시는 2번 곡
     _pick(mapId) {
+      if (mapId === 'battle') return 'battle' + (1 + Math.floor(Math.random() * 3)); // 포켓몬 배틀: 3곡 중 무작위
       if (mapId === 'boss' || mapId === 'infinite') return 'boss';
       const w = window.app?.engine?.currentWave || 0;
       if (w >= 90) return 'boss';
@@ -101,7 +103,7 @@
       this._fadeOut();
       const src = ctx.createBufferSource(); src.buffer = buf; src.loop = true;
       const g = ctx.createGain(); g.gain.value = 0; src.connect(g); g.connect(bgmBus);
-      g.gain.linearRampToValueAtTime(BGM_VOL, ctx.currentTime + 0.8);
+      g.gain.linearRampToValueAtTime(BGM_VOL * (1 + (BGM_GAIN[k] || 0)), ctx.currentTime + 0.8);
       src.start(); this._src = src; this._gain = g;
     },
   };
