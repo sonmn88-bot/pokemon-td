@@ -9,6 +9,7 @@
   const COL = 'pokemontd_rooms', SYNC_MS = 2000, LOST_MS = 20000, SPAWN_GAP = 380;
   // v3.16 공정 대전: 같은 시드(웨이브·특성 동일) + 공용 웨이브 시계(배속·스킵 잠금) + 30웨이브 결승 + 25웨이브부터 서든데스
   // v3.18: 70웨이브까지 공용 시계 → 이후 '결전': 웨이브 없이 몹이 한 마리씩 끝없이(점점 빠르고 강하게), 골드 더 — 먼저 무너지는 쪽이 패배
+  const VS_TIER_HP = 1.08; // v4.1: 대전이 너무 쉬움 → 10웨이브 단위로 몹(보스 포함) 체력 ×1.08씩 (초반 1~9웨이브는 그대로)
   const WAVE_SEC = 60, FINAL_WAVE = 70, SUDDEN = 70;           // 서든데스(견제 반값·2배 수량)는 결전부터
   // 결전 난이도·보상: 체력 10초마다 ×1.06(5분 ×5.7, 10분 ×33), 간격 1.1→0.3초.
   //   처치 골드 = 2.5 × 체력배율^0.7 → 강해지는 만큼 골드도 늘지만 조금 덜 늘어서, 꾸준히 강화해야 버팀 (결국 실력 차이로 승부)
@@ -196,7 +197,9 @@
       e._vsGoldMul = 1.6; e.addGold(300);
       const spawn = e._spawnEnemy.bind(e);
       e._spawnEnemy = (item) => { spawn(item); const en = e.enemies[e.enemies.length - 1], w = e.currentWave || 1;
-        if (en && !en.isBoss && !en._vsHp) { const m = w <= 8 ? 0.75 : w < 16 ? 0.75 + (w - 8) / 8 * 0.25 : 1; en.maxHp = Math.round(en.maxHp * m); en.hp = Math.min(en.hp, en.maxHp); en._vsHp = 1; } };
+        if (en && !en._vsHp) { const early = en.isBoss ? 1 : w <= 8 ? 0.75 : w < 16 ? 0.75 + (w - 8) / 8 * 0.25 : 1;
+          const m = early * Math.pow(VS_TIER_HP, Math.floor(Math.min(w, FINAL_WAVE) / 10)); // v4.1 대전 난이도: 10웨이브마다 체력 +8% (복리, 70웨이브 ×1.71)
+          en.maxHp = Math.round(en.maxHp * m); en.hp = Math.min(en.hp, en.maxHp); en._vsHp = 1; } };
       this.speed = room.speed || 1; this.startAt = this._startAt || Date.now(); e.speedMul = this.speed; // 공용 시계 기준 = 각자 카운트다운이 끝난 순간
       document.getElementById('game-screen').classList.add('vs-mode');          // 배속·웨이브 버튼 숨김 (공용 시계)
       if (this.me === 'p1') this.net.update(this.code, { state: 'playing' }).catch(() => {});
