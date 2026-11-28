@@ -15,7 +15,7 @@
   //   처치 골드 = 2.5 × 체력배율^0.7 → 강해지는 만큼 골드도 늘지만 조금 덜 늘어서, 꾸준히 강화해야 버팀 (결국 실력 차이로 승부)
   const ENDLESS_HP = T => Math.pow(1.06, T / 10), ENDLESS_GAP = T => Math.max(0.3, 1.1 - T / 500), ENDLESS_CARD = 120;
   const ENDLESS_GOLD = T => 2.5 * Math.pow(ENDLESS_HP(T), 0.7);
-  const COOLDOWN = { small: 50, elite: 100, boss: 150, haste: 70, stone: 140, rush: 100, heal: 180 }; // v5.4 쿨타임(게임초) 대폭 단축 — 오가는 견제가 잦도록
+  const COOLDOWN = { small: 50, elite: 100, boss: 150, haste: 70, stone: 140, rush: 100, heal: 120 }; // v5.4 쿨타임(게임초) 대폭 단축 — 오가는 견제가 잦도록
   const inc = w => 95 + 4 * w + 0.15 * w * w;
   const PASSIVE = 0.55, SEND_INC = 0.006; // v5.4: 가만히 있어도 초당 (웨이브 수입 × 0.55 ÷ 60) 골드 · 몬스터를 보낼 때마다 보낸 값의 0.6%/초씩 수입 영구 증가                  // 웨이브당 골드 수입 추정치(처치+클리어+이자 측정값에 맞춘 식)
   const sudden = w => w >= SUDDEN;
@@ -62,7 +62,7 @@
     { key: 'vs_haste', icon: 'bolt', name: '광폭화 주문', mul: 0.7, bounty: 0, desc: '상대 필드의 모든 몬스터가 12초간 40% 빨라져요', vs: 'haste', n: 1, noInc: 1 },
     { key: 'vs_stone', icon: 'gem', name: '메가스톤 구입', mul: 3, bounty: 0, desc: '메가스톤 1개 (메가진화 재료)', vs: 'stone', n: 1, self: 1 },
     { key: 'vs_rush', icon: 'coin', name: '골드 러시', mul: 0.8, bounty: 0, desc: '30초간 처치 골드 ×1.8', vs: 'rush', n: 1, self: 1 },
-    { key: 'vs_heal', icon: 'heart', name: '응급 수리', mul: 2, bounty: 0, desc: '내 목숨 +3', vs: 'heal', n: 1, self: 1 },
+    { key: 'vs_heal', icon: 'bolt', name: '폭풍 정리', mul: 1.5, bounty: 0, desc: '내 필드의 모든 몬스터에게 체력 25% 피해 (보스는 10%)', vs: 'heal', n: 1, self: 1 },
   ];
   const itemCost = (it, w) => Math.round(it.mul * inc(w) * 1.4 / 5) * 5; // ×1.4 = 대전 수입 배율(1.6)에 맞춤 (결전 할인은 따로)
   const AUTO = w => 4 + Math.floor(w / 4);                     // 웨이브를 시간 안에 다 잡으면 자동으로 보내는 수
@@ -291,7 +291,7 @@
       const app = window.app, e = app.engine, w = Math.max(1, e.currentWave || 1);
       if (it.vs === 'stone') { e._megaStones = (e._megaStones || 0) + 1; app._refreshMegaHud && app._refreshMegaHud(); app._autoGrow && app._autoGrow(); app.showWaveAnnounce('메가스톤 +1', '#b18cff'); }
       else if (it.vs === 'rush') { this._rushUntil = (this._el || 0) + 30; app.showWaveAnnounce('골드 러시! 30초간 처치 골드 ×1.8', '#ffd34d'); }
-      else if (it.vs === 'heal') { e.lives += 3; e.onLivesChange && e.onLivesChange(e.lives); app.showWaveAnnounce('목숨 +3', '#34d399'); }
+      else if (it.vs === 'heal') { let n = 0; for (const en of e.enemies) { if (en.dead || en.reachedEnd) continue; en.hp = Math.max(1, en.hp - en.maxHp * (en.isBoss ? 0.1 : 0.25)); n++; } e.triggerScreenShake && e.triggerScreenShake(7, 0.3); app.showWaveAnnounce(`폭풍 정리! 몬스터 ${n}마리에게 피해`, '#ff9f43'); }
       try { window.GameAudio && GameAudio.sfx.play('skill'); } catch (_) {}
     },
     _incoming(kind, n) {
