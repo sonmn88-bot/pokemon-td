@@ -123,6 +123,7 @@
       this.code = code; this.me = me; this.opp = me === 'p1' ? 'p2' : 'p1'; this.ended = false;
       this.kills = 0; this.sentAuto = 0; this.recv = { small: 0, elite: 0, boss: 0, haste: 0, mend: 0 }; this.pending = []; this._resultShown = false; this._done = false; this._counting = false; this.active = false;
       if (this.unsub) { this.unsub(); this.unsub = null; } clearInterval(this.timer); clearInterval(this.spawnTimer);
+      document.querySelectorAll('.vs-lobby').forEach(x => x.remove()); // 대기실이 겹쳐 쌓이지 않게
       const ov = document.createElement('div'); ov.className = 'vs-overlay vs-lobby';
       ov.innerHTML = `<div class="vs-box"><div class="vs-title">대기실</div><div class="vs-code-big">${code}</div><small class="vs-sub">상대에게 이 코드를 알려주세요</small>
         <div class="vs-players"></div>
@@ -189,6 +190,7 @@
     // ---------- 게임 연동 ----------
     _start() {
       const app = window.app, room = this.room || {};
+      document.querySelectorAll('.vs-lobby').forEach(x => x.remove()); this._lobby = null; // 시작 순간 대기실·카운트다운 창을 전부 제거
       this.active = true;
       // 같은 시드로 시작 → 두 사람의 판 특성·강조 몬스터·웨이브 구성이 똑같음 (뽑기 운만 다름)
       const mine = room[this.me] || {};
