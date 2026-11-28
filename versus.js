@@ -15,7 +15,7 @@
   //   처치 골드 = 2.5 × 체력배율^0.7 → 강해지는 만큼 골드도 늘지만 조금 덜 늘어서, 꾸준히 강화해야 버팀 (결국 실력 차이로 승부)
   const ENDLESS_HP = T => Math.pow(1.06, T / 10), ENDLESS_GAP = T => Math.max(0.3, 1.1 - T / 500), ENDLESS_CARD = 120;
   const ENDLESS_GOLD = T => 2.5 * Math.pow(ENDLESS_HP(T), 0.7);
-  const COOLDOWN = { small: 50, elite: 100, boss: 150, haste: 70, stone: 140, rush: 100, heal: 120 }; // v5.4 쿨타임(게임초) 대폭 단축 — 오가는 견제가 잦도록
+  const COOLDOWN = { small: 50, elite: 100, boss: 150, haste: 70, stone: 140, rush: 100, mend: 80 }; // v5.4 쿨타임(게임초) 대폭 단축 — 오가는 견제가 잦도록
   const inc = w => 95 + 4 * w + 0.15 * w * w;
   const PASSIVE = 0.55, SEND_INC = 0.006; // v5.4: 가만히 있어도 초당 (웨이브 수입 × 0.55 ÷ 60) 골드 · 몬스터를 보낼 때마다 보낸 값의 0.6%/초씩 수입 영구 증가                  // 웨이브당 골드 수입 추정치(처치+클리어+이자 측정값에 맞춘 식)
   const sudden = w => w >= SUDDEN;
@@ -62,7 +62,7 @@
     { key: 'vs_haste', icon: 'bolt', name: '광폭화 주문', mul: 0.7, bounty: 0, desc: '상대 필드의 모든 몬스터가 12초간 40% 빨라져요', vs: 'haste', n: 1, noInc: 1 },
     { key: 'vs_stone', icon: 'gem', name: '메가스톤 구입', mul: 3, bounty: 0, desc: '메가스톤 1개 (메가진화 재료)', vs: 'stone', n: 1, self: 1 },
     { key: 'vs_rush', icon: 'coin', name: '골드 러시', mul: 0.8, bounty: 0, desc: '30초간 처치 골드 ×1.8', vs: 'rush', n: 1, self: 1 },
-    { key: 'vs_heal', icon: 'bolt', name: '폭풍 정리', mul: 1.5, bounty: 0, desc: '내 필드의 모든 몬스터에게 체력 25% 피해 (보스는 10%)', vs: 'heal', n: 1, self: 1 },
+    { key: 'vs_mend', icon: 'heart', name: '치유의 바람', mul: 0.9, bounty: 0, desc: '상대 필드의 모든 몬스터 체력을 가득 채우고 최대 체력 +15%', vs: 'mend', n: 1, noInc: 1 },
   ];
   const itemCost = (it, w) => Math.round(it.mul * inc(w) * 1.4 / 5) * 5; // ×1.4 = 대전 수입 배율(1.6)에 맞춤 (결전 할인은 따로)
   const AUTO = w => 4 + Math.floor(w / 4);                     // 웨이브를 시간 안에 다 잡으면 자동으로 보내는 수
@@ -74,7 +74,7 @@
   const VS = window.Versus = {
     makeNet: () => makeNet(), COL, LOST_MS, // v4.4: 포켓몬 배틀(battle.js)이 같은 방 서버를 씀
     net: null, code: null, me: null, opp: null, room: null, unsub: null, active: false,
-    kills: 0, sentAuto: 0, recv: { small: 0, elite: 0, boss: 0, haste: 0 }, pending: [], timer: null, spawnTimer: null, ended: false,
+    kills: 0, sentAuto: 0, recv: { small: 0, elite: 0, boss: 0, haste: 0, mend: 0 }, pending: [], timer: null, spawnTimer: null, ended: false,
 
     // ---------- 로비 UI ----------
     openMenu() {
@@ -100,7 +100,7 @@
         try {
           await this.net.create(code, { code, state: 'lobby', startAt: 0, winner: null, created: Date.now(), seed: (Math.random() * 1e9) >>> 0, speed: 1,
             p1: { name: myName(), ready: false, hb: Date.now(), hero: app.starterHero || 'pikachu', starter: 'charmander' }, p2: null,
-            st: {}, send: { p1: { small: 0, elite: 0, boss: 0, haste: 0 }, p2: { small: 0, elite: 0, boss: 0, haste: 0 } } });
+            st: {}, send: { p1: { small: 0, elite: 0, boss: 0, haste: 0, mend: 0 }, p2: { small: 0, elite: 0, boss: 0, haste: 0, mend: 0 } } });
           ov.remove(); this._enter(code, 'p1');
         } catch (e) { msg(this._errText(e)); }
       };
@@ -121,7 +121,7 @@
 
     _enter(code, me) {
       this.code = code; this.me = me; this.opp = me === 'p1' ? 'p2' : 'p1'; this.ended = false;
-      this.kills = 0; this.sentAuto = 0; this.recv = { small: 0, elite: 0, boss: 0, haste: 0 }; this.pending = []; this._resultShown = false; this._done = false; this._counting = false; this.active = false;
+      this.kills = 0; this.sentAuto = 0; this.recv = { small: 0, elite: 0, boss: 0, haste: 0, mend: 0 }; this.pending = []; this._resultShown = false; this._done = false; this._counting = false; this.active = false;
       if (this.unsub) { this.unsub(); this.unsub = null; } clearInterval(this.timer); clearInterval(this.spawnTimer);
       const ov = document.createElement('div'); ov.className = 'vs-overlay vs-lobby';
       ov.innerHTML = `<div class="vs-box"><div class="vs-title">대기실</div><div class="vs-code-big">${code}</div><small class="vs-sub">상대에게 이 코드를 알려주세요</small>
@@ -160,7 +160,7 @@
       if (this.active) {
         this._renderPanel();
         const s = d.send && d.send[this.opp];                                           // 상대가 보낸 누적 수 → 새로 온 만큼 소환 대기열에
-        if (s) for (const k of ['small', 'elite', 'boss', 'haste']) { const n = (s[k] || 0) - this.recv[k]; if (n > 0) { this.recv[k] += n; this._incoming(k, n); } }
+        if (s) for (const k of ['small', 'elite', 'boss', 'haste', 'mend']) { const n = (s[k] || 0) - this.recv[k]; if (n > 0) { this.recv[k] += n; this._incoming(k, n); } }
         if (d.state === 'ended' && !this._resultShown) this._finish(d.winner === this.me ? 'win' : d.winner === 'draw' ? 'draw' : 'lose', d.why);
         // 결승: 둘 다 끝났으면 방장이 판정 (목숨 많은 쪽 → 필드 몹 적은 쪽 → 처치 많은 쪽)
         const a = (d.st || {}).p1, b = (d.st || {}).p2;
@@ -284,20 +284,20 @@
     },
     _send(kind, n, auto) {
       this.net.update(this.code, {}, { [`send.${this.me}.${kind}`]: n }).catch(() => {});
-      const label = { small: '몬스터', elite: '황금 엘리트', boss: '미니보스', haste: '광폭화' }[kind];
+      const label = { small: '몬스터', elite: '황금 엘리트', boss: '미니보스', haste: '광폭화', mend: '치유' }[kind];
       window.app.showWaveAnnounce(`${auto ? `처치 ${this.kills}! ` : ''}상대에게 ${label} ${n}마리 보냄`, '#ff9f43');
     },
     _useSelf(it) {
       const app = window.app, e = app.engine, w = Math.max(1, e.currentWave || 1);
       if (it.vs === 'stone') { e._megaStones = (e._megaStones || 0) + 1; app._refreshMegaHud && app._refreshMegaHud(); app._autoGrow && app._autoGrow(); app.showWaveAnnounce('메가스톤 +1', '#b18cff'); }
       else if (it.vs === 'rush') { this._rushUntil = (this._el || 0) + 30; app.showWaveAnnounce('골드 러시! 30초간 처치 골드 ×1.8', '#ffd34d'); }
-      else if (it.vs === 'heal') { let n = 0; for (const en of e.enemies) { if (en.dead || en.reachedEnd) continue; en.hp = Math.max(1, en.hp - en.maxHp * (en.isBoss ? 0.1 : 0.25)); n++; } e.triggerScreenShake && e.triggerScreenShake(7, 0.3); app.showWaveAnnounce(`폭풍 정리! 몬스터 ${n}마리에게 피해`, '#ff9f43'); }
       try { window.GameAudio && GameAudio.sfx.play('skill'); } catch (_) {}
     },
     _incoming(kind, n) {
       if (kind === 'haste') { this._haste(); return; }
+      if (kind === 'mend') { this._mend(); return; }
       for (let i = 0; i < n; i++) this.pending.push(kind);                               // 한꺼번에 쏟아지지 않게 0.38초 간격으로 소환
-      const label = { small: '몬스터', elite: '황금 엘리트', boss: '미니보스', haste: '광폭화' }[kind];
+      const label = { small: '몬스터', elite: '황금 엘리트', boss: '미니보스', haste: '광폭화', mend: '치유' }[kind];
       window.app.showWaveAnnounce(`상대가 ${label} ${n}마리를 보냈다!`, '#ff5c7a');
       try { navigator.vibrate && navigator.vibrate(80); } catch (_) {}
     },
@@ -308,6 +308,14 @@
       hit.forEach(en => { en._vsHaste = 1.4; en.speed *= 1.4; });
       setTimeout(() => hit.forEach(en => { if (en._vsHaste) { en.speed /= en._vsHaste; en._vsHaste = 0; } }), 12000 / (this.speed || 1));
       window.app.showWaveAnnounce(`상대의 광폭화! 몬스터 ${hit.length}마리가 빨라졌어요`, '#ff5c7a');
+    },
+    // 치유의 바람: 필드 몬스터 체력 가득 + 최대 체력 +15% (몹마다 한 번만 — 중첩 방지)
+    _mend() {
+      const e = window.app && window.app.engine; if (!e) return;
+      const hit = e.enemies.filter(en => !en.dead && !en.reachedEnd);
+      hit.forEach(en => { if (!en._vsMend) { en._vsMend = 1; en.maxHp = Math.round(en.maxHp * 1.15); } en.hp = en.maxHp; });
+      e.triggerScreenShake && e.triggerScreenShake(5, 0.25);
+      window.app.showWaveAnnounce(`상대의 치유의 바람! 몬스터 ${hit.length}마리가 회복했어요`, '#ff5c7a');
     },
     _spawnPending() {
       const e = window.app && window.app.engine; if (!e || !this.active || this.ended || !this.pending.length || !e.running) return;
