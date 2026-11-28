@@ -15,12 +15,22 @@ Object.assign(App.prototype, {
     if (!this._inventory) this._storageReset();
     for (const d of defs) { d._uid = ++this._uidSeq; this._inventory.push(d); }
     this.renderStorageStrip();
+    if (this._autoGrow && !this._autoGrowing) setTimeout(() => this._autoGrow(), 0); // 새로 얻은 먹이를 필드에 자동 반영
   },
 
-  _takeFromStorageById(id) {
-    const i = this._inventory.findIndex(d => d.id === id);
-    return i >= 0 ? this._inventory.splice(i, 1)[0] : null;
+  // key: 'id' (가장 낮은 ★부터 — 키워둔 애가 딸려 나가지 않게) 또는 'id@★' (그 ★ 그대로)
+  _takeFromStorageById(key) {
+    const [id, st] = String(key).split('@');
+    let best = -1;
+    this._inventory.forEach((d, i) => {
+      if (d.id !== id) return;
+      const k = d._stack || 1;
+      if (st) { if (k === Number(st) && best < 0) best = i; }
+      else if (best < 0 || k < (this._inventory[best]._stack || 1)) best = i;
+    });
+    return best >= 0 ? this._inventory.splice(best, 1)[0] : null;
   },
+
 
   _placeFromStorage(id, slotIdx) {
     const slot = this.engine?.towerSlots[slotIdx];
@@ -40,12 +50,13 @@ Object.assign(App.prototype, {
   _storageGroups() {
     const map = new Map();
     for (const d of this._inventory || []) {
-      if (!map.has(d.id)) map.set(d.id, { def: d, count: 0 });
-      map.get(d.id).count++;
+      const key = d.id + '@' + (d._stack || 1); // ★이 다르면 따로 표시 (★5 만든 애가 ★1에 섞여 구분 안 되던 문제)
+      if (!map.has(key)) map.set(key, { def: d, count: 0, key, stack: d._stack || 1 });
+      map.get(key).count++;
     }
     const order = window.MERGE_ORDER;
     return [...map.values()].sort((a, b) =>
-      order.indexOf(b.def.grade) - order.indexOf(a.def.grade) || a.def.name.localeCompare(b.def.name));
+      order.indexOf(b.def.grade) - order.indexOf(a.def.grade) || b.stack - a.stack || a.def.name.localeCompare(b.def.name));
   },
 
   // 합성 가능한 게 있는지 (버튼에 빨간 점)
@@ -72,16 +83,16 @@ Object.assign(App.prototype, {
     mergeBtn.addEventListener('click', () => this.openMergePanel());
     strip.appendChild(mergeBtn);
 
-    for (const { def, count } of groups.slice(0, MAX)) {
+    for (const { def, count, key, stack } of groups.slice(0, MAX)) {
       const g = window.GRADES[def.grade];
       const b = document.createElement('button');
       // v3.6: 같은 종 3개(확정 진화) = 초록 점, 필드의 메가 원본에 먹일 수 있으면 '먹이' 표시
       const feedable = window.MEGA?.feedMats && this.engine?.towers.some(t => MEGA.feedMats(this, t).some(m => m.id === def.id)); // v3.8: 실제로 먹일 수 있는 재료만
-      b.className = 'storage-item' + (this._placingId === def.id ? ' placing' : '') + (count >= 3 ? ' ready' : '');
+      b.className = 'storage-item' + (this._placingId === key ? ' placing' : '') + (count >= 3 && stack === 1 ? ' ready' : '') + (stack > 1 ? ' grown' : '');
       b.style.setProperty('--gc', g.color);
-      b.innerHTML = `<span class="si-emoji">${PKM(def, 30)}</span><span class="si-stars">${'★'.repeat(g.stars)}</span>${count > 1 ? `<span class="si-count">×${count}</span>` : ''}${feedable ? '<span class="si-feed">먹이</span>' : window.MEGA_OF?.[def.id] ? `<span class="si-mega">${ICON('gem', 11)}</span>` : ''}`;
-      b.title = `${def.name} (${g.name}) - 탭해서 배치`;
-      b.addEventListener('click', () => this._onStorageItemTap(def.id));
+      b.innerHTML = `<span class="si-emoji">${PKM(def, 30)}</span><span class="si-stars">${stack > 1 ? `<b class="si-grow">★${stack}</b>` : '★'.repeat(g.stars)}</span>${count > 1 ? `<span class="si-count">×${count}</span>` : ''}${feedable ? '<span class="si-feed">먹이</span>' : window.MEGA_OF?.[def.id] ? `<span class="si-mega">${ICON('gem', 11)}</span>` : ''}`;
+      b.title = `${def.name} (${g.name})${stack > 1 ? ' 각성 ★' + stack : ''} - 탭해서 배치`;
+      b.addEventListener('click', () => this._onStorageItemTap(key));
       strip.appendChild(b);
     }
     if (groups.length > MAX) {
@@ -93,7 +104,7 @@ Object.assign(App.prototype, {
     }
   },
 
-  _onStorageItemTap(id) {
+  _onStorageItemTap(id) { // id = 보관 키('id@★')
     if (!this.engine) return;
     const sel = this.engine.selectedSlotIdx;
     if (sel !== null && sel !== undefined && !this.engine.towerSlots[sel]?.occupied) {
@@ -182,12 +193,12 @@ Object.assign(App.prototype, {
       }).join('');
 
       const list = mats.filter(m => m.def.grade === ui.grade)
-        .sort((a, b) => (a.kind === b.kind ? 0 : a.kind === 'store' ? -1 : 1) || a.def.name.localeCompare(b.def.name));
+        .sort((a, b) => (a.kind === b.kind ? 0 : a.kind === 'store' ? -1 : 1) || (a.def._stack || 1) - (b.def._stack || 1) || a.def.name.localeCompare(b.def.name));
       const G = window.GRADES[ui.grade];
       const cards = list.length ? list.map(m => `
         <button class="mg-card ${ui.sel.has(m.key) ? 'sel' : ''}" data-key="${m.key}" style="--gc:${G.color}">
           ${m.kind === 'field' ? '<span class="mg-field">필드</span>' : ''}
-          ${window.MEGA_OF?.[m.def.id] ? '<span class="mg-megabadge">메가</span>' : ''}<span class="mg-emoji">${PKM(m.def, 34)}</span><span class="mg-name">${m.def.name}</span>
+          ${window.MEGA_OF?.[m.def.id] ? '<span class="mg-megabadge">메가</span>' : ''}${(m.def._stack || 1) > 1 ? `<span class="mg-grown">★${m.def._stack}</span>` : ''}<span class="mg-emoji">${PKM(m.def, 34)}</span><span class="mg-name">${m.def.name}</span>
         </button>`).join('') : `<div class="mg-empty">이 등급의 포켓몬이 없어요</div>`;
 
       const n = selected.length;
@@ -203,6 +214,7 @@ Object.assign(App.prototype, {
         <div class="mg-tabs">${tabs}</div>
         <div class="mg-opts">
           <label><input type="checkbox" data-act="field" ${ui.field ? 'checked' : ''}> 필드 타워도 재료로</label>
+          <label title="필드의 메가·레전드에 먹이를 알아서 먹이고, ★5 + 메가스톤이면 (형태가 1개일 때) 바로 메가진화"><input type="checkbox" data-act="ag" ${this._autoGrowOn && this._autoGrowOn() ? 'checked' : ''}> 자동 성장</label>
           <button class="mg-auto" data-act="auto">자동 3개</button>
           <button class="mg-auto all" data-act="all" ${window.NEXT_GRADE[ui.grade] ? '' : 'disabled'}>한 번에 전부</button>
         </div>
@@ -216,6 +228,7 @@ Object.assign(App.prototype, {
         </div>`;
 
       overlay.querySelector('[data-act="close"]').onclick = () => { overlay.remove(); this.renderStorageStrip(); };
+      overlay.querySelector('[data-act="ag"]').onchange = e => { try { localStorage.setItem('pokemontd_autogrow', e.target.checked ? '1' : '0'); } catch (_) {} if (e.target.checked) this._autoGrow && this._autoGrow(); };
       overlay.querySelector('[data-act="field"]').onchange = e => { ui.field = e.target.checked; render(); };
       overlay.querySelectorAll('.mg-tab').forEach(b => b.onclick = () => { ui.grade = b.dataset.grade; ui.sel.clear(); render(); });
       overlay.querySelectorAll('.mg-card').forEach(b => b.onclick = () => {
@@ -226,7 +239,7 @@ Object.assign(App.prototype, {
       overlay.querySelector('[data-act="auto"]').onclick = () => {
         ui.sel.clear();
         // 보관함 우선, 그다음 필드. 같은 종이 3개 이상이면 그걸 먼저 (확정 진화 가능하게)
-        const pool = list.slice();
+        const pool = list.filter(m => (m.def._stack || 1) < 2); // 키워둔(★2+) 포켓몬은 자동 재료에서 제외
         const byId = {}; pool.forEach(m => (byId[m.def.id] = byId[m.def.id] || []).push(m));
         const triple = Object.values(byId).find(a => a.length >= 3);
         (triple || pool).slice(0, 3).forEach(m => ui.sel.add(m.key));
@@ -243,7 +256,7 @@ Object.assign(App.prototype, {
           const mg = this.engine.towers.find(t => t.def && t.def.megaOf === id);
           return mg && ((mg.def._stack || 1) >= 5) ? 0 : Infinity; };
         for (;;) {
-          const all = this._allMaterials(false).filter(m => m.def.grade === grade), taken = {};
+          const all = this._allMaterials(false).filter(m => m.def.grade === grade && (m.def._stack || 1) < 2), taken = {}; // ★2+는 보호
           const pool = all.filter(m => {
             if (!window.MEGA_OF?.[m.def.id]) return true;
             const spare = all.filter(x => x.def.id === m.def.id).length - megaNeed(m.def.id); // 먹이로 필요한 수를 뺀 여분만 재료로
@@ -318,20 +331,24 @@ Object.assign(App.prototype, {
         const all = this._allMaterials(true);
         const idx = r.pick(all.map(m => m.def), { miracle: this.engine._miracle });
         if (!idx) return;
-        // v3.8: 재료 레전드를 직접 고름 (자동 선택은 아끼던 레전드가 들어가는 문제)
+        // v3.8: 재료 레전드를 직접 고름 → v5.4: 평범한 재료(★1·보관함)로 충분하면 알아서 고르고, 키운 애(★2+)·필드 타워가 필요할 때만 직접 고르기
         const legs = all.filter(m => m.def.grade === 'legend');
         const need = r.id === 'mew' ? 3 : 2, distinct = r.id === 'mew';
-        if (legs.length >= need && !(r.id === 'mew' && this.engine._miracle && new Set(legs.map(m => m.def.id)).size < 3)) { // v3.15: 딱 맞는 수여도 직접 고르기(자동 소모 금지)
-          this._pickRecipeLegends(r, legs, need, distinct, picked => {
+        const miracleMix = r.id === 'mew' && this.engine._miracle && new Set(legs.map(m => m.def.id)).size < 3;
+        if (legs.length >= need && !miracleMix) {
+          const auto = this._autoLegends(legs, need, distinct);
+          const go = picked => {
             if (!this.engine.spendGold(r.cost)) { this.showWaveAnnounce('골드가 부족해요', '#ff5c7a'); return; }
             const used = r.id === 'mewtwo' ? [all.find(m => m.def.id === 'mew'), ...picked] : picked;
             this._consumeMaterials(used);
             const res = { ...window.GachaTowerDefs[r.id], _starLevel: 1 };
             const birds = r.id === 'mew' && ['articuno','zapdos','moltres'].every(id => used.some(m => m.def.id === id));
             overlay.remove();
+            if (auto) this.showWaveAnnounce(`재료 자동 선택: ${picked.map(m => m.def.name).join(' · ')}`, '#a78bfa');
             this._playMergeReveal(res, { recipe: true, birds }, () => { this._addToStorage([res]); this._trackNewTower(res); this.openMergePanel(); });
-          });
-          return;
+          };
+          if (auto) return go(auto);
+          return this._pickRecipeLegends(r, legs, need, distinct, go);
         }
         if (!this.engine.spendGold(r.cost)) return;
         const used = idx.map(i => all[i]);
@@ -346,6 +363,14 @@ Object.assign(App.prototype, {
   },
 
   // v3.8 레시피 재료 선택 (뮤: 서로 다른 레전드 3 / 뮤츠: 레전드 2)
+  // 레시피 재료 자동 선택: 보관함의 ★1 중 덜 아까운 순(중복 종 우선, 메가 원본 뒤로). 키운 애·필드 타워가 필요하면 null → 직접 고르기
+  _autoLegends(legs, need, distinct) {
+    const cnt = {}; legs.forEach(m => { cnt[m.def.id] = (cnt[m.def.id] || 0) + 1; });
+    const cost = m => (m.kind === 'field' ? 100 : 0) + ((m.def._stack || 1) - 1) * 20 + (window.MEGA_OF?.[m.def.id] ? 10 : 0) - (cnt[m.def.id] > 1 ? 5 : 0);
+    const sorted = legs.slice().sort((a, b) => cost(a) - cost(b)), out = [], seen = new Set();
+    for (const m of sorted) { if (out.length >= need) break; if (distinct && seen.has(m.def.id)) continue; seen.add(m.def.id); out.push(m); }
+    return out.length === need && out.every(m => cost(m) < 20) ? out : null;
+  },
   _pickRecipeLegends(r, legs, need, distinct, done) {
     const ov = document.createElement('div');
     ov.className = 'merge-overlay recipe-pick';

@@ -15,8 +15,9 @@
   //   처치 골드 = 2.5 × 체력배율^0.7 → 강해지는 만큼 골드도 늘지만 조금 덜 늘어서, 꾸준히 강화해야 버팀 (결국 실력 차이로 승부)
   const ENDLESS_HP = T => Math.pow(1.06, T / 10), ENDLESS_GAP = T => Math.max(0.3, 1.1 - T / 500), ENDLESS_CARD = 120;
   const ENDLESS_GOLD = T => 2.5 * Math.pow(ENDLESS_HP(T), 0.7);
-  const COOLDOWN = { small: 120, elite: 240, boss: 360 };      // 견제 쿨타임(게임초): 2배속 기준 실제 1·2·3분
-  const inc = w => 95 + 4 * w + 0.15 * w * w;                  // 웨이브당 골드 수입 추정치(처치+클리어+이자 측정값에 맞춘 식)
+  const COOLDOWN = { small: 50, elite: 100, boss: 150, haste: 70, stone: 140, rush: 100, heal: 180 }; // v5.4 쿨타임(게임초) 대폭 단축 — 오가는 견제가 잦도록
+  const inc = w => 95 + 4 * w + 0.15 * w * w;
+  const PASSIVE = 0.55, SEND_INC = 0.006; // v5.4: 가만히 있어도 초당 (웨이브 수입 × 0.55 ÷ 60) 골드 · 몬스터를 보낼 때마다 보낸 값의 0.6%/초씩 수입 영구 증가                  // 웨이브당 골드 수입 추정치(처치+클리어+이자 측정값에 맞춘 식)
   const sudden = w => w >= SUDDEN;
 
   // ---------- 전송 계층 ----------
@@ -55,12 +56,16 @@
   // 상점에 대전 중에만 붙는 '몬스터 보내기'
   // 가격 = 그 웨이브 수입의 몇 배 (서든데스엔 반값·2배 수량). 받은 쪽은 잡으면 현상금(가격의 일부)을 받음
   const VS_ITEMS = [
-    { key: 'vs_small', icon: 'sword', name: '몬스터 보내기 ×8', mul: 0.6, bounty: 0.3, desc: '상대 필드에 이번 웨이브 몬스터 8마리', vs: 'small', n: 8 },
-    { key: 'vs_elite', icon: 'sword', name: '엘리트 보내기 ×3', mul: 1.2, bounty: 0.4, desc: '상대에게 황금 엘리트 3마리 (체력 2.2배·빠름)', vs: 'elite', n: 3 },
-    { key: 'vs_boss', icon: 'crown', name: '미니보스 보내기', mul: 3, bounty: 0.4, desc: '상대에게 미니보스 1마리', vs: 'boss', n: 1 },
+    { key: 'vs_small', icon: 'sword', name: '몬스터 보내기 ×10', mul: 0.5, bounty: 0.2, desc: '상대 필드에 이번 웨이브 몬스터 10마리 · 보낸 값만큼 내 수입 증가', vs: 'small', n: 10 },
+    { key: 'vs_elite', icon: 'sword', name: '엘리트 보내기 ×4', mul: 1.1, bounty: 0.25, desc: '상대에게 황금 엘리트 4마리 (체력 2.2배·빠름) · 수입 증가', vs: 'elite', n: 4 },
+    { key: 'vs_boss', icon: 'crown', name: '미니보스 보내기', mul: 2.6, bounty: 0.25, desc: '상대에게 미니보스 1마리 (잡으면 상대가 메가스톤을 얻을 수도!) · 수입 증가', vs: 'boss', n: 1 },
+    { key: 'vs_haste', icon: 'bolt', name: '광폭화 주문', mul: 0.7, bounty: 0, desc: '상대 필드의 모든 몬스터가 12초간 40% 빨라져요', vs: 'haste', n: 1, noInc: 1 },
+    { key: 'vs_stone', icon: 'gem', name: '메가스톤 구입', mul: 3, bounty: 0, desc: '메가스톤 1개 (메가진화 재료)', vs: 'stone', n: 1, self: 1 },
+    { key: 'vs_rush', icon: 'coin', name: '골드 러시', mul: 0.8, bounty: 0, desc: '30초간 처치 골드 ×1.8', vs: 'rush', n: 1, self: 1 },
+    { key: 'vs_heal', icon: 'heart', name: '응급 수리', mul: 2, bounty: 0, desc: '내 목숨 +3', vs: 'heal', n: 1, self: 1 },
   ];
   const itemCost = (it, w) => Math.round(it.mul * inc(w) * 1.4 / 5) * 5; // ×1.4 = 대전 수입 배율(1.6)에 맞춤 (결전 할인은 따로)
-  const AUTO = w => 3 + Math.floor(w / 5);                     // 웨이브를 시간 안에 다 잡으면 자동으로 보내는 수
+  const AUTO = w => 4 + Math.floor(w / 4);                     // 웨이브를 시간 안에 다 잡으면 자동으로 보내는 수
 
   const HEROES = [['pikachu', '피카츄'], ['togepi', '토게피'], ['eevee', '이브이']], STARTERS = [['bulbasaur', '이상해씨'], ['charmander', '파이리'], ['squirtle', '꼬부기']];
   const heroImg = id => `<img src="assets/heroes/${id}.png" alt="">`;
@@ -69,7 +74,7 @@
   const VS = window.Versus = {
     makeNet: () => makeNet(), COL, LOST_MS, // v4.4: 포켓몬 배틀(battle.js)이 같은 방 서버를 씀
     net: null, code: null, me: null, opp: null, room: null, unsub: null, active: false,
-    kills: 0, sentAuto: 0, recv: { small: 0, elite: 0, boss: 0 }, pending: [], timer: null, spawnTimer: null, ended: false,
+    kills: 0, sentAuto: 0, recv: { small: 0, elite: 0, boss: 0, haste: 0 }, pending: [], timer: null, spawnTimer: null, ended: false,
 
     // ---------- 로비 UI ----------
     openMenu() {
@@ -95,7 +100,7 @@
         try {
           await this.net.create(code, { code, state: 'lobby', startAt: 0, winner: null, created: Date.now(), seed: (Math.random() * 1e9) >>> 0, speed: 1,
             p1: { name: myName(), ready: false, hb: Date.now(), hero: app.starterHero || 'pikachu', starter: 'charmander' }, p2: null,
-            st: {}, send: { p1: { small: 0, elite: 0, boss: 0 }, p2: { small: 0, elite: 0, boss: 0 } } });
+            st: {}, send: { p1: { small: 0, elite: 0, boss: 0, haste: 0 }, p2: { small: 0, elite: 0, boss: 0, haste: 0 } } });
           ov.remove(); this._enter(code, 'p1');
         } catch (e) { msg(this._errText(e)); }
       };
@@ -116,7 +121,7 @@
 
     _enter(code, me) {
       this.code = code; this.me = me; this.opp = me === 'p1' ? 'p2' : 'p1'; this.ended = false;
-      this.kills = 0; this.sentAuto = 0; this.recv = { small: 0, elite: 0, boss: 0 }; this.pending = []; this._resultShown = false; this._done = false; this._counting = false; this.active = false;
+      this.kills = 0; this.sentAuto = 0; this.recv = { small: 0, elite: 0, boss: 0, haste: 0 }; this.pending = []; this._resultShown = false; this._done = false; this._counting = false; this.active = false;
       if (this.unsub) { this.unsub(); this.unsub = null; } clearInterval(this.timer); clearInterval(this.spawnTimer);
       const ov = document.createElement('div'); ov.className = 'vs-overlay vs-lobby';
       ov.innerHTML = `<div class="vs-box"><div class="vs-title">대기실</div><div class="vs-code-big">${code}</div><small class="vs-sub">상대에게 이 코드를 알려주세요</small>
@@ -155,7 +160,7 @@
       if (this.active) {
         this._renderPanel();
         const s = d.send && d.send[this.opp];                                           // 상대가 보낸 누적 수 → 새로 온 만큼 소환 대기열에
-        if (s) for (const k of ['small', 'elite', 'boss']) { const n = (s[k] || 0) - this.recv[k]; if (n > 0) { this.recv[k] += n; this._incoming(k, n); } }
+        if (s) for (const k of ['small', 'elite', 'boss', 'haste']) { const n = (s[k] || 0) - this.recv[k]; if (n > 0) { this.recv[k] += n; this._incoming(k, n); } }
         if (d.state === 'ended' && !this._resultShown) this._finish(d.winner === this.me ? 'win' : d.winner === 'draw' ? 'draw' : 'lose', d.why);
         // 결승: 둘 다 끝났으면 방장이 판정 (목숨 많은 쪽 → 필드 몹 적은 쪽 → 처치 많은 쪽)
         const a = (d.st || {}).p1, b = (d.st || {}).p2;
@@ -197,7 +202,7 @@
       e._runSeed = room.seed || 1; window.__wavePlan = {};
       // v3.17 대전 경제: 웨이브가 시계대로 와서 혼자 할 때보다 준비 시간이 짧음 → 시작 골드 600, 처치·클리어 골드 ×1.6,
       //   초반 몹 체력 낮춤(1~8웨이브 75% → 16웨이브에 100%). 판매 환급 등엔 배율 없음(무한 골드 방지)
-      e._vsGoldMul = 1.6; e.addGold(700); // v4.3: 시작 골드 600 → 1000
+      e._vsGoldMul = this._vsBaseMul = 2.1; e.addGold(1500); e._vsStoneAdd = 0.5; e._vsInc = 0; this._passAcc = 0; this._lastEl = 0; this._rushUntil = 0; // v5.4: 처치·클리어 골드 ×2.1, 시작 골드 +1500, 메가스톤 확률 +50%p
       const spawn = e._spawnEnemy.bind(e);
       e._spawnEnemy = (item) => { spawn(item); const en = e.enemies[e.enemies.length - 1], w = e.currentWave || 1;
         if (en && !en._vsHp) { const early = en.isBoss ? 1 : w <= 8 ? 0.75 : w < 16 ? 0.75 + (w - 8) / 8 * 0.25 : 1;
@@ -213,7 +218,7 @@
         this.kills++;
       };
       const wc = e.onWaveComplete;                                                       // 시간 안에 다 잡으면 자동 견제
-      e.onWaveComplete = (w, g, x) => { wc && wc(w, g, x); if (this.active && !this.ended && w <= FINAL_WAVE) this._send('small', AUTO(w), true); };
+      e.onWaveComplete = (w, g, x) => { wc && wc(w, g, x); if (this.active && !this.ended && w <= FINAL_WAVE) { this._send('small', AUTO(w), true); e._vsInc = (e._vsInc || 0) + AUTO(w) * 0.04 * inc(w) / 10 * 1.4 * SEND_INC * 10; } };
       const over = e.onGameOver;
       e.onGameOver = () => {
         if (!this.ended) this.net.update(this.code, { state: 'ended', winner: this.opp, why: '목숨이 다 떨어졌어요' }).catch(() => {});
@@ -227,7 +232,9 @@
         buy: () => {
           if (left(it) > 0) return false;
           this._cdUntil[it.vs] = (this._el || 0) + COOLDOWN[it.vs];
+          if (it.self) return this._useSelf(it);
           this._send(it.vs, it.n);
+          if (!it.noInc) e._vsInc = (e._vsInc || 0) + it.mul * inc(Math.max(1, e.currentWave || 1)) * 1.4 * SEND_INC; // 견제할수록 수입이 늘어요
         } })));
       this._panel = document.createElement('div'); this._panel.id = 'vs-panel';
       document.getElementById('game-screen').appendChild(this._panel);
@@ -245,7 +252,13 @@
         const done = (e.currentWave || 0) - 1;                                            // 10웨이브 지날 때마다 카드 (멈추지 않음)
         if (done > 0 && done % 10 === 0 && this._cardAt !== done && app._offerCards && !app._cardOpen) { this._cardAt = done; app._offerCards(done); }
       }
+      const dt = Math.max(0, Math.min(5, el - (this._lastEl || 0))); this._lastEl = el;        // 패시브 수입 (게임초 기준 → 배속에도 공정)
+      const wv = Math.max(1, e.currentWave || 1);
+      this._passAcc = (this._passAcc || 0) + dt * (inc(wv) * PASSIVE / WAVE_SEC + (e._vsInc || 0));
+      if (this._passAcc >= 1) { const g = Math.floor(this._passAcc); this._passAcc -= g; e.gold = Math.round(e.gold + g); e.onGoldChange && e.onGoldChange(e.gold); }
+      if (target > (this._stoneAt || 0) && target % 8 === 0 && target > 1) { this._stoneAt = target; e._megaStones = (e._megaStones || 0) + 1; app._refreshMegaHud && app._refreshMegaHud(); app._autoGrow && app._autoGrow(); app.showWaveAnnounce(`${target}웨이브 보너스! 메가스톤 +1`, '#b18cff'); } // 8웨이브마다 스톤 1개
       if (el >= FINAL_WAVE * WAVE_SEC) this._endless(el - FINAL_WAVE * WAVE_SEC);
+      else e._vsGoldMul = (this._vsBaseMul || 2.1) * (this._rushUntil > el ? 1.8 : 1);
       if (this._panel) this._renderPanel();
     },
     // 결전: 몹이 한 마리씩 끝없이 (간격 1.1초 → 0.3초, 체력 10초마다 ×1.07), 처치 골드 ×2.5, 2분마다 카드
@@ -267,18 +280,34 @@
       if (T >= this._endNext) this._endNext = T;                                          // 밀린 건 버림 (동시 방출 금지)
       if (T >= this._endCard && app._offerCards && !app._cardOpen) { this._endCard += ENDLESS_CARD; app._offerCards(e.currentWave); }
       this._endT = T;
-      e._vsGoldMul = ENDLESS_GOLD(T);                                                   // 몹이 강해지는 만큼 골드도
+      e._vsGoldMul = ENDLESS_GOLD(T) * ((this._rushUntil || 0) > (this._el || 0) ? 1.8 : 1); // 몹이 강해지는 만큼 골드도
     },
     _send(kind, n, auto) {
       this.net.update(this.code, {}, { [`send.${this.me}.${kind}`]: n }).catch(() => {});
-      const label = { small: '몬스터', elite: '황금 엘리트', boss: '미니보스' }[kind];
+      const label = { small: '몬스터', elite: '황금 엘리트', boss: '미니보스', haste: '광폭화' }[kind];
       window.app.showWaveAnnounce(`${auto ? `처치 ${this.kills}! ` : ''}상대에게 ${label} ${n}마리 보냄`, '#ff9f43');
     },
+    _useSelf(it) {
+      const app = window.app, e = app.engine, w = Math.max(1, e.currentWave || 1);
+      if (it.vs === 'stone') { e._megaStones = (e._megaStones || 0) + 1; app._refreshMegaHud && app._refreshMegaHud(); app._autoGrow && app._autoGrow(); app.showWaveAnnounce('메가스톤 +1', '#b18cff'); }
+      else if (it.vs === 'rush') { this._rushUntil = (this._el || 0) + 30; app.showWaveAnnounce('골드 러시! 30초간 처치 골드 ×1.8', '#ffd34d'); }
+      else if (it.vs === 'heal') { e.lives += 3; e.onLivesChange && e.onLivesChange(e.lives); app.showWaveAnnounce('목숨 +3', '#34d399'); }
+      try { window.GameAudio && GameAudio.sfx.play('skill'); } catch (_) {}
+    },
     _incoming(kind, n) {
+      if (kind === 'haste') { this._haste(); return; }
       for (let i = 0; i < n; i++) this.pending.push(kind);                               // 한꺼번에 쏟아지지 않게 0.38초 간격으로 소환
-      const label = { small: '몬스터', elite: '황금 엘리트', boss: '미니보스' }[kind];
+      const label = { small: '몬스터', elite: '황금 엘리트', boss: '미니보스', haste: '광폭화' }[kind];
       window.app.showWaveAnnounce(`상대가 ${label} ${n}마리를 보냈다!`, '#ff5c7a');
       try { navigator.vibrate && navigator.vibrate(80); } catch (_) {}
+    },
+    // 광폭화: 필드의 몬스터를 12초간 +40% (몹마다 한 번만 — 중첩 곱셈 금지, 끝나면 원래 속도로)
+    _haste() {
+      const e = window.app && window.app.engine; if (!e) return;
+      const hit = e.enemies.filter(en => !en.dead && !en.reachedEnd && !en._vsHaste);
+      hit.forEach(en => { en._vsHaste = 1.4; en.speed *= 1.4; });
+      setTimeout(() => hit.forEach(en => { if (en._vsHaste) { en.speed /= en._vsHaste; en._vsHaste = 0; } }), 12000 / (this.speed || 1));
+      window.app.showWaveAnnounce(`상대의 광폭화! 몬스터 ${hit.length}마리가 빨라졌어요`, '#ff5c7a');
     },
     _spawnPending() {
       const e = window.app && window.app.engine; if (!e || !this.active || this.ended || !this.pending.length || !e.running) return;
@@ -288,7 +317,7 @@
       if (kind === 'boss') e._spawnEnemy({ type: MINIBOSS_POOL[Math.floor(Math.random() * MINIBOSS_POOL.length)], bossTier: true, hpMul: 6 + w * 0.25, rewardMul: 2 });
       else e._spawnEnemy({ type: ids[Math.floor(Math.random() * ids.length)] });
       const en = e.enemies[e.enemies.length - 1]; if (!en) return;
-      en._vsSent = true; en._bounty = false;
+      en._vsSent = true; en._bounty = false; if (kind === 'boss') en._megaDrop = true; // 받은 미니보스를 잡으면 메가스톤 기회
       const it = VS_ITEMS.find(x => x.vs === kind); en._vsBounty = Math.round(itemCost(it, w) * it.bounty / it.n);
       if (kind === 'elite' && en._elite !== 'gold') { const wasSilver = en._elite === 'silver', base = wasSilver ? en.maxHp / 1.5 : en.maxHp; en._elite = 'gold'; en.maxHp = Math.floor(base * 2.2); en.hp = en.maxHp; en.speed *= wasSilver ? 1.13 : 1.3; } // 받은 엘리트는 항상 황금
     },
@@ -331,7 +360,7 @@
       clearInterval(this.timer); clearInterval(this.spawnTimer); this.timer = this.spawnTimer = null;
       this.unsub && this.unsub(); this.unsub = null;
       if (window.ShopItems) for (let i = window.ShopItems.length - 1; i >= 0; i--) if (window.ShopItems[i].vs) window.ShopItems.splice(i, 1);
-      this._panel && this._panel.remove(); this._panel = null; this._done = false; this._endOn = false; this._endT = 0; this._cardAt = 0;
+      this._panel && this._panel.remove(); this._panel = null; this._done = false; this._stoneAt = 0; this._endOn = false; this._endT = 0; this._cardAt = 0;
       document.getElementById('game-screen')?.classList.remove('vs-mode');
       const tg = window.HeroDefs && HeroDefs.togepi && HeroDefs.togepi.attack;          // 대전 끝나면 혼자 하기 수치로 되돌림
       if (tg && this._tgDmg !== undefined) { tg.baseDamage = this._tgDmg; this._tgDmg = undefined; }

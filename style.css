@@ -1945,3 +1945,8 @@ html, body { overscroll-behavior: none; }
 .pb-stc.curse, .pb-st.curse { color:#d9a8ff; } .pb-st.curse { background:#6b3fa0; }
 .pb-pop.trait { color:#ffe08a; font-size:16px; }
 @media (max-height:760px) { .pb-trait { display:none; } .pb-syn { margin-top:4px; } }
+
+/* v5.4 보관함: 키운(★2+) 포켓몬 구분 */
+.storage-item.grown { box-shadow:0 0 0 2px #ffc24b, 0 0 10px rgba(255,194,75,.55); }
+.si-grow { color:#ffc24b; font-weight:900; text-shadow:0 1px 2px #000; font-size:11px; }
+.mg-grown { position:absolute; top:4px; right:6px; font-size:11px; font-weight:900; color:#ffc24b; text-shadow:0 1px 2px #000; }

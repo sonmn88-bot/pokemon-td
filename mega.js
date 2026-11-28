@@ -115,10 +115,10 @@ function _feedMats(app, t) {
   if (t.def.mega) { // 메가 먹이 = ★5 원본 (보관함 우선, 그다음 필드)
     const five = d => d.id === sameId && ((d._stack || 1) >= STACK_MAX);
     const field = app.engine.towers.filter(x => x !== t && x.def && five(x.def)).map(x => ({ __field: x, id: x.def.id }));
-    return inv.filter(five).concat(field);
+    return inv.filter(five).concat(field); // 메가 먹이 = ★5 원본만
   }
   // v3.15: 먹이는 무조건 '같은 종 + 같은 등급'만 (같은 타입·같은 계열·다른 등급 먹이 없음 — 히든도 같은 히든만)
-  return inv.filter(d => d.id === sameId && d.grade === t.def.grade && !!d.hidden === !!t.def.hidden && !d.mega);
+  return inv.filter(d => d.id === sameId && d.grade === t.def.grade && !!d.hidden === !!t.def.hidden && !d.mega && (d._stack || 1) < 2); // ★2+는 먹이에서 제외(키운 애 보호)
 }
 function canFeed(app, t) { return _feedOk(t) ? _feedMats(app, t).length : 0; }
 function feedTower(app, t) {
@@ -138,6 +138,7 @@ function canMega(app, t) {
 }
 
 // ---- 메가스톤 드롭 ----
+const MEGA_OF_ID = d => !!(d && window.MEGA_OF && window.MEGA_OF[d.id]);
 function megaStoneChance(wave) { return Math.min(0.9, 0.3 + 0.1 * (Math.floor(wave / 20) - 1)); }
 
 // ---- 몬스터 편성 (판마다 2가지 강조) ----
@@ -187,7 +188,7 @@ Object.assign(App.prototype, {
 
   _rollMegaStone(en) {
     const e = this.engine, w = e.currentWave;
-    const chance = en._isKing ? 1 : Math.min(0.95, megaStoneChance(w) + (e._cardMods ? e._cardMods.stoneAdd : 0));
+    const chance = en._isKing ? 1 : Math.min(0.95, megaStoneChance(w) + (e._cardMods ? e._cardMods.stoneAdd : 0) + (e._vsStoneAdd || 0));
     let n = Math.random() < chance ? 1 : 0;
     if (n && w >= 100 && Math.random() < 0.25) n = 2;
     if (w >= 50 && Math.random() < 0.35) this._dropHeroItem('보스'); // v3.7: 최종 각성은 웨이브 50부터
@@ -196,6 +197,7 @@ Object.assign(App.prototype, {
     this.SFX && this.SFX.play('pull_epic');
     this.showWaveAnnounce(`메가스톤 ${n}개 획득! (보유 ${e._megaStones})`, '#b18cff');
     this._refreshMegaHud();
+    this._autoGrow && this._autoGrow();
   },
 
   _megaWaveClear(wave) {
@@ -289,6 +291,46 @@ Object.assign(App.prototype, {
     }
     return h;
   },
+  // 메가진화 실행 (패널 버튼·자동 성장 공용)
+  _doMega(t, slotIdx, mid) {
+    if (!canMega(this, t)) return false;
+    if (this.engine.towers.some(x => x._gachaId === mid)) { this.showWaveAnnounce('같은 메가는 필드에 1마리만', '#ff5c7a'); return false; }
+    this.engine._megaStones--;
+    const slot = this.engine.towerSlots[slotIdx];
+    const nd = { ...GachaTowerDefs[mid], _stack: 1, _tmTag: t.def._tmTag }; // 메가는 ★1부터 다시 성장
+    const nt = window._createGachaTower(nd, slot.x, slot.y, this.engine);
+    nt._evolveGlowTimer = 1.2;
+    this.engine.towers = this.engine.towers.filter(x => x !== t); this.engine.towers.push(nt);
+    slot.tower = nt; this.engine.selectedTower = nt;
+    window.applyTowerSynergies && window.applyTowerSynergies(this.engine.towers);
+    this._refreshMegaHud();
+    this._trackNewTower && this._trackNewTower(nd);
+    this._playMergeReveal ? this._playMergeReveal(nd, { recipe: true }, () => this.syncTowerPanel()) : this.syncTowerPanel();
+    this.engine.triggerScreenShake && this.engine.triggerScreenShake(8, 0.35);
+    return true;
+  },
+  // 자동 성장: 필드의 메가 원본·메가·레전드·유니크·히든에 보관함 먹이를 알아서 먹이고, ★5 + 스톤 + 메가 1종뿐이면 바로 메가진화
+  //   (일반 에픽은 합성 재료일 수 있어 자동 안 함). 설정은 합성 연구소의 '자동 성장'
+  _autoGrow() {
+    const e = this.engine; if (!e || !this._autoGrowOn() || this._autoGrowing) return;
+    this._autoGrowing = true;
+    try {
+      let fed = 0, mega = null;
+      for (let guard = 0; guard < 30; guard++) {
+        const t = e.towers.find(x => x.def && (x.def.mega || MEGA_OF_ID(x.def) || x.def.grade === 'legend' || x.def.grade === 'unique' || x.def.hidden) && _feedOk(x) && _feedMats(this, x).some(m => !m.__field)); // 자동은 보관함 재료만 (필드 타워를 희생시키지 않음)
+        if (!t || !feedTower(this, t)) break;
+        fed++; e.spawnFloatingText(`★${towerStack(t)} 자동 각성!`, t.x, t.y - 36, '#ffc24b');
+      }
+      for (const t of e.towers) {
+        if (!canMega(this, t)) continue;
+        const forms = (window.MEGA_OF[t.def.id] || []).filter(id => !e.towers.some(x => x._gachaId === id));
+        if (forms.length === 1) { mega = { t, id: forms[0] }; break; }
+      }
+      if (fed) { this.SFX && this.SFX.play('merge'); this.renderStorageStrip && this.renderStorageStrip(); this.syncTowerPanel && this.syncTowerPanel(); }
+      if (mega) { const si = e.towerSlots.findIndex(s => s.tower === mega.t); if (si >= 0) this._doMega(mega.t, si, mega.id); }
+    } finally { this._autoGrowing = false; }
+  },
+  _autoGrowOn() { try { return localStorage.getItem('pokemontd_autogrow') !== '0'; } catch (_) { return true; } },
   _bindMegaPanel(panel, t, slotIdx) {
     panel.querySelector('[data-action="feed"]')?.addEventListener('click', () => {
       if (!feedTower(this, t)) return;
@@ -297,22 +339,6 @@ Object.assign(App.prototype, {
       this.renderStorageStrip && this.renderStorageStrip();
       this.syncTowerPanel();
     });
-    panel.querySelectorAll('[data-action="mega"]').forEach(b => b.addEventListener('click', () => {
-      if (!canMega(this, t)) return;
-      const mid = b.dataset.mega;
-      if (this.engine.towers.some(x => x._gachaId === mid)) { this.showWaveAnnounce('같은 메가는 필드에 1마리만', '#ff5c7a'); return; }
-      this.engine._megaStones--;
-      const slot = this.engine.towerSlots[slotIdx];
-      const nd = { ...GachaTowerDefs[mid], _stack: 1, _tmTag: t.def._tmTag }; // 메가는 ★1부터 다시 성장
-      const nt = window._createGachaTower(nd, slot.x, slot.y, this.engine);
-      nt._evolveGlowTimer = 1.2; // (2로 넣었던 게 화면 깨짐 원인 - 반지름이 음수가 됐음)
-      this.engine.towers = this.engine.towers.filter(x => x !== t); this.engine.towers.push(nt);
-      slot.tower = nt; this.engine.selectedTower = nt;
-      window.applyTowerSynergies && window.applyTowerSynergies(this.engine.towers);
-      this._refreshMegaHud();
-      this._trackNewTower && this._trackNewTower(nd);
-      this._playMergeReveal ? this._playMergeReveal(nd, { recipe: true }, () => this.syncTowerPanel()) : this.syncTowerPanel();
-      this.engine.triggerScreenShake && this.engine.triggerScreenShake(8, 0.35);
-    }));
+    panel.querySelectorAll('[data-action="mega"]').forEach(b => b.addEventListener('click', () => this._doMega(t, slotIdx, b.dataset.mega)));
   },
 });
